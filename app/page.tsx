@@ -153,12 +153,10 @@ export default function Home() {
       <header className="bg-gradient-to-br from-emerald-950 to-teal-700 px-4 py-16 text-white">
         <div className="mx-auto max-w-6xl">
           <p className="text-sm font-bold tracking-widest text-emerald-300">
-            SMILECARE · ONLINE BOOKING
+            BB DENTAL CLINIC · ONLINE BOOKING
           </p>
           <h1 className="mt-4 max-w-3xl text-4xl font-black sm:text-6xl">
             Цагаа өөрөө сонго.
-            <br />
-            <span className="text-emerald-300">Тайван ир.</span>
           </h1>
           <p className="mt-5 max-w-xl text-emerald-50">
             Эмчийн бодит хуваарьтай уялдсан, найдвартай онлайн захиалга.

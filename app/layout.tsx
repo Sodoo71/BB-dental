@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Шүдний эмнэлэг | Цаг захиалга",
-  description: "Шүдний эмнэлгийн онлайн цаг захиалгын систем",
+  title: "BB Dental Clinic",
+  description: "BB Dental Clinic захиалга удирдах систем",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
