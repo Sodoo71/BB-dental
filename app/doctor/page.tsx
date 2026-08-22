@@ -140,8 +140,7 @@ export default function DoctorDashboardPage() {
     );
   }
 
-  const greeting =
-    new Date().getHours() < 12 ? "Good morning" : "Good afternoon";
+  const greeting = new Date().getHours() < 12 ? "Өглөөний мэнд" : "Өдрийн мэнд";
 
   return (
     <div className="space-y-6">
@@ -149,10 +148,10 @@ export default function DoctorDashboardPage() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.28em] text-emerald-600">
-              Doctor workspace
+              Эмчийн ажиллах хэсэг
             </p>
             <h1 className="mt-2 text-3xl font-black text-slate-900">
-              {greeting}, Dr. {data.doctor.name}
+              {greeting}, Др. {data.doctor.name}
             </h1>
             <p className="mt-2 text-sm text-slate-500">
               {new Date().toLocaleDateString("en-US", {
@@ -165,7 +164,7 @@ export default function DoctorDashboardPage() {
           </div>
           <div className="flex items-center gap-2 rounded-2xl bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700">
             <CalendarDays className="h-4 w-4" />
-            Today&apos;s schedule ready
+            Өнөөдрийн хуваарь бэлэн
           </div>
         </div>
       </header>

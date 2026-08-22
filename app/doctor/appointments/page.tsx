@@ -76,10 +76,10 @@ export default function DoctorAppointmentsPage() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.24em] text-emerald-600">
-            Appointments
+            Уулзалтууд
           </p>
           <h1 className="mt-1 text-2xl font-black text-slate-900">
-            My appointments
+            Миний уулзалтууд
           </h1>
         </div>
         <div className="flex items-center gap-2">
@@ -88,25 +88,25 @@ export default function DoctorAppointmentsPage() {
             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
           >
             <RefreshCw className="h-4 w-4" />
-            Refresh
+            Шинэчлэх
           </button>
           <Link
             href="/doctor"
             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
           >
             <ArrowLeft className="h-4 w-4" />
-            Dashboard
+            Хянах самбар
           </Link>
         </div>
       </div>
 
       {loading ? (
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-slate-500">
-          Loading appointments…
+          Уулзалтуудыг ачаалж байна…
         </div>
       ) : appointments.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm text-slate-500">
-          No appointments found in the current period.
+          Одоогийн хугацаанд уулзалт олдсонгүй.
         </div>
       ) : (
         <div className="space-y-3">
@@ -142,10 +142,10 @@ export default function DoctorAppointmentsPage() {
 
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 {[
-                  ["CONFIRMED", "Confirm"],
-                  ["COMPLETED", "Completed"],
-                  ["CANCELLED", "Cancelled"],
-                  ["NO_SHOW", "No-show"],
+                  ["CONFIRMED", "Баталгаажуулах"],
+                  ["COMPLETED", "Дууссан"],
+                  ["CANCELLED", "Цуцлагдсан"],
+                  ["NO_SHOW", "Ирээгүй"],
                 ].map(([status, label]) => (
                   <button
                     key={status}
