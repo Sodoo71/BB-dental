@@ -11,23 +11,25 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
 // 1. ХҮЙСИЙН ЭНУМ
 enum Gender {
-  MALE    // Эрэгтэй
-  FEMALE  // Эмэгтэй
-  OTHER   // Бусад
+  MALE // Эрэгтэй
+  FEMALE // Эмэгтэй
+  OTHER // Бусад
 }
 
 // 2. ЗАХИАЛГЫН ТӨЛӨВ
 enum AppointmentStatus {
-  PENDING    // Хүлээгдэж буй (Шинээр ирсэн)
-  CONFIRMED  // Утсаар ярьж баталгаажуулсан
-  COMPLETED  // Ирж үзүүлээд дууссан
-  CANCELLED  // Цуцлагдсан
-  NO_SHOW    // Цагтаа ирээгүй
+  PENDING // Хүлээгдэж буй (Шинээр ирсэн)
+  CONFIRMED // Утсаар ярьж баталгаажуулсан
+  COMPLETED // Ирж үзүүлээд дууссан
+  CANCELLED // Цуцлагдсан
+  NO_SHOW // Цагтаа ирээгүй
 }
 
 enum UserRole {
+  PATIENT
   SUPER_ADMIN
   ADMIN
   DOCTOR
@@ -48,95 +50,118 @@ model User {
 
 // 3. ҮЙЛЧИЛГЭЭНИЙ МЭДЭЭЛЭЛ (Services)
 model Service {
-  id          String   @id @default(uuid())
-  name        String   // Үйлчилгээний нэр (ж: Шүд ломбодох, Суваг цэвэрлэх)
-  description String?  // Товч тайлбар
-  durationMin Int      @default(30) // Үргэлжлэх хугацаа (минутаар: 30, 60 гэх мэт)
-  price       Decimal? // Үнэ (Сонголттой)
-  isActive    Boolean  @default(true) // Идэвхтэй ашиглагдаж байгаа эсэх
+  id          String  @id @default(uuid())
+  name        String // Үйлчилгээний нэр (ж: Шүд ломбодох, Суваг цэвэрлэх)
+  description String? // Товч тайлбар
+  durationMin String // Үргэлжлэх хугацаа (минутаар: 30, 60 гэх мэт)
+  price       String // Үнэ (Сонголттой)
+  isActive    Boolean @default(true) // Идэвхтэй ашиглагдаж байгаа эсэх
 
   appointments Appointment[]
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 }
 
 // 4. ЭМЧИЙН МЭДЭЭЛЭЛ (Doctors)
-model Doctor {
-  id          String   @id @default(uuid())
-  name        String   // Эмчийн нэр
-  title       String?  // Цол/Мэргэшил (ж: Ахлах эмч, Гажиг засалч)
-  phone       String?  // Эмчийн холбогдох дугаар
-  email       String?  
-  telegramChatId String? // Захиалгын мэдэгдэл хүлээн авах Telegram chat ID
-  avatarUrl   String?  // Эмчийн зураг
-  isActive    Boolean  @default(true)
+enum DoctorAvailabilityType {
+  DAY_OFF
+  BLOCKED_RANGE
+  SCHEDULE_OVERRIDE
+}
 
-  schedules    DoctorSchedule[]
-  appointments Appointment[]
-  user         User?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+model Doctor {
+  id             String  @id @default(uuid())
+  name           String // Эмчийн нэр
+  title          String? // Цол/Мэргэшил (ж: Ахлах эмч, Гажиг засалч)
+  phone          String? // Эмчийн холбогдох дугаар
+  email          String?
+  telegramChatId String? // Захиалгын мэдэгдэл хүлээн авах Telegram chat ID
+  avatarUrl      String? // Эмчийн зураг
+  isActive       Boolean @default(true)
+
+  schedules              DoctorSchedule[]
+  availabilityExceptions DoctorAvailabilityException[]
+  appointments           Appointment[]
+  user                   User?
+  createdAt              DateTime                      @default(now())
+  updatedAt              DateTime                      @updatedAt
 }
 
 // 5. ЭМЧИЙН АЖИЛЛАХ ЦАГИЙН ХУВААРЬ (Weekly Schedule)
 model DoctorSchedule {
-  id        String   @id @default(uuid())
-  doctorId  String
-  doctor    Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
-  
-  dayOfWeek Int      // Долоо хоногийн өдөр (0: Ням, 1: Даваа, ..., 6: Бямба)
-  startTime String   // Эхлэх цаг (ж: "09:00")
-  endTime   String   // Дуусах цаг (ж: "18:00")
-  isDayOff  Boolean  @default(false) // Амралтын өдөр эсэх
+  id       String @id @default(uuid())
+  doctorId String
+  doctor   Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  dayOfWeek Int // Долоо хоногийн өдөр (0: Ням, 1: Даваа, ..., 6: Бямба)
+  startTime String // Эхлэх цаг (ж: "09:00")
+  endTime   String // Дуусах цаг (ж: "18:00")
+  isDayOff  Boolean @default(false) // Амралтын өдөр эсэх
 
   @@unique([doctorId, dayOfWeek])
 }
 
+model DoctorAvailabilityException {
+  id        String                 @id @default(uuid())
+  doctorId  String
+  doctor    Doctor                 @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  date      DateTime
+  type      DoctorAvailabilityType @default(BLOCKED_RANGE)
+  startTime String?
+  endTime   String?
+  reason    String?
+  isActive  Boolean                @default(true)
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
+
+  @@index([doctorId, date])
+}
+
 // 6. ҮЙЛЧЛҮҮЛЭГЧИЙН МЭДЭЭЛЭЛ (Patients / Clients)
 model Patient {
-  id          String   @id @default(uuid())
-  phone       String   @unique // Утасны дугаараар давтан хэрэглэгчийг танина
-  fullName    String   // Бүтэн нэр
-  age         Int?     // Нас
-  gender      Gender?  // Хүйс
-  
+  id       String  @id @default(uuid())
+  phone    String  @unique // Утасны дугаараар давтан хэрэглэгчийг танина
+  fullName String // Бүтэн нэр
+  age      Int? // Нас
+  gender   Gender? // Хүйс
+
   appointments Appointment[]
   notes        PatientNote[] // Үйлчлүүлэгчид хамаарах эмчийн/ресепшний тэмдэглэлүүд
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // 7. ЗАХИАЛГЫН МЭДЭЭЛЭЛ (Appointments)
 model Appointment {
-  id             String            @id @default(uuid())
-  
+  id String @id @default(uuid())
+
   // Холбоосууд
-  patientId      String
-  patient        Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  
-  serviceId      String
-  service        Service           @relation(fields: [serviceId], references: [id])
-  
-  doctorId       String?           // Сонгосон эмч (заавал биш байж болно)
-  doctor         Doctor?           @relation(fields: [doctorId], references: [id])
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id])
+
+  doctorId String? // Сонгосон эмч (заавал биш байж болно)
+  doctor   Doctor? @relation(fields: [doctorId], references: [id])
 
   // Цаг ба Өдөр
-  appointmentDate DateTime         // Сонгосон өдөр (жишээ нь: 2026-08-25)
-  startTime       String           // Эхлэх цаг (жишээ нь: "14:00")
-  endTime         String           // Дуусах цаг (жишээ нь: "14:30")
+  appointmentDate DateTime // Сонгосон өдөр (жишээ нь: 2026-08-25)
+  startTime       String // Эхлэх цаг (жишээ нь: "14:00")
+  endTime         String // Дуусах цаг (жишээ нь: "14:30")
 
   // Төлөв ба Төрөл
-  status         AppointmentStatus @default(PENDING)
-  isRepeat       Boolean           @default(false) // Давтан үзлэг эсэх
+  status   AppointmentStatus @default(PENDING)
+  isRepeat Boolean           @default(false) // Давтан үзлэг эсэх
 
   // Хэрэглэгчийн цаг авахдаа үлдээсэн тайлбар/зовж буй асуудал
-  chiefComplaint String?           // ж: "Баруун доод араа шүд өвдөж байна"
+  chiefComplaint String? // ж: "Баруун доод араа шүд өвдөж байна"
 
-  notes          AppointmentNote[] // Тухайн захиалга дээр ресепшний бичих тэмдэглэл
+  notes AppointmentNote[] // Тухайн захиалга дээр ресепшний бичих тэмдэглэл
 
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([appointmentDate])
   @@index([patientId])
@@ -147,21 +172,21 @@ model AppointmentNote {
   id            String      @id @default(uuid())
   appointmentId String
   appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
-  
-  note          String      // ж: "Утсаа авахгүй байна, 15 минутын дараа дахин залгах", "10 минут хоцорно гэсэн"
-  author        String?     // Тэмдэглэл бичсэн ажилтны нэр
-  
-  createdAt     DateTime    @default(now())
+
+  note   String // ж: "Утсаа авахгүй байна, 15 минутын дараа дахин залгах", "10 минут хоцорно гэсэн"
+  author String? // Тэмдэглэл бичсэн ажилтны нэр
+
+  createdAt DateTime @default(now())
 }
 
 // 9. ҮЙЛЧЛҮҮЛЭГЧИЙН ЕРӨНХИЙ ТЭМДЭГЛЭЛ (Patient Profile Notes)
 model PatientNote {
-  id        String   @id @default(uuid())
+  id        String  @id @default(uuid())
   patientId String
-  patient   Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  
-  note      String   // ж: "Тарианаас харшилтай", "Хүүхэд нь дагуулж ирдэг", "Даралт ихэсдэг"
-  author    String?  // Эмч эсвэл Ресепшн
-  
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  note   String // ж: "Тарианаас харшилтай", "Хүүхэд нь дагуулж ирдэг", "Даралт ихэсдэг"
+  author String? // Эмч эсвэл Ресепшн
+
   createdAt DateTime @default(now())
 }

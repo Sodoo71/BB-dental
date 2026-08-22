@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Loader2, LockKeyhole, Mail } from "lucide-react";
 
@@ -25,6 +26,16 @@ export default function LoginPage() {
       const data = await response.json();
       if (!response.ok)
         throw new Error(data.error ?? "Нэвтрэхэд алдаа гарлаа.");
+
+      const role = data.data?.role;
+      if (role === "SUPER_ADMIN") {
+        router.replace("/super-admin");
+        return;
+      }
+      if (role === "DOCTOR") {
+        router.replace("/doctor");
+        return;
+      }
       router.replace("/admin");
     } catch (err) {
       setError(
@@ -104,6 +115,16 @@ export default function LoginPage() {
         >
           {loading && <Loader2 className="h-5 w-5 animate-spin" />}Нэвтрэх
         </button>
+
+        <p className="mt-5 text-center text-sm text-slate-600">
+          Шинэ хэрэглэгч үү?{" "}
+          <Link
+            href="/register"
+            className="font-bold text-emerald-700 underline"
+          >
+            Бүртгүүлэх (Sign Up)
+          </Link>
+        </p>
       </form>
     </main>
   );
