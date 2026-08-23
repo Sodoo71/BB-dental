@@ -78,6 +78,7 @@ model Doctor {
   telegramChatId String? // Захиалгын мэдэгдэл хүлээн авах Telegram chat ID
   avatarUrl      String? // Эмчийн зураг
   isActive       Boolean @default(true)
+  imageUrl       String?
 
   schedules              DoctorSchedule[]
   availabilityExceptions DoctorAvailabilityException[]

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { SuperAdminLayout as DashboardShell } from "@/components/super-admin/layout";
 import { sessionUser } from "@/lib/auth";
 
 export default async function SuperAdminLayout({
@@ -16,5 +17,5 @@ export default async function SuperAdminLayout({
     redirect(user.role === "ADMIN" ? "/admin" : "/unauthorized");
   }
 
-  return <>{children}</>;
+  return <DashboardShell user={user}>{children}</DashboardShell>;
 }
