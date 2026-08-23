@@ -67,34 +67,50 @@ const statusClassMap: Record<string, string> = {
 };
 
 const statusLabelMap: Record<string, string> = {
-  PENDING: "Pending",
-  CONFIRMED: "Confirmed",
-  COMPLETED: "Completed",
-  CANCELLED: "Cancelled",
-  NO_SHOW: "No-show",
+  PENDING: "Хүлээгдэж буй",
+  CONFIRMED: "Баталгаажсан",
+  COMPLETED: "Дууссан",
+  CANCELLED: "Цуцлагдсан",
+  NO_SHOW: "Ирээгүй",
 };
 
 const toTimeLabel = (value: string) => value || "--:--";
+
+const formatDate = (dateString: string | null) => {
+  if (!dateString) return "—";
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("mn-MN", {
+    month: "short",
+    day: "numeric",
+  });
+};
 
 export default function DoctorDashboardPage() {
   const [data, setData] = useState<OverviewResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const load = async () => {
       try {
         const response = await fetch("/api/doctor/overview");
         const payload = await response.json();
 
         if (!response.ok) {
-          throw new Error(payload.error || "Unable to load dashboard");
+          throw new Error(
+            payload.error || "Хянах самбарын мэдээллийг татахад алдаа гарлаа",
+          );
         }
 
         setData(payload.data);
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "Failed to load the dashboard.",
+          err instanceof Error
+            ? err.message
+            : "Хянах самбарыг ачааллахад алдаа гарлаа.",
         );
       } finally {
         setLoading(false);
@@ -105,10 +121,10 @@ export default function DoctorDashboardPage() {
   }, []);
 
   const workingHours = useMemo(() => {
-    if (!data) return "0h 0m";
+    if (!data) return "0ц 0м";
     const hours = Math.floor(data.stats.workingMinutes / 60);
     const minutes = data.stats.workingMinutes % 60;
-    return `${hours}h ${minutes}m`;
+    return `${hours}ц ${minutes}м`;
   }, [data]);
 
   if (loading) {
@@ -131,10 +147,10 @@ export default function DoctorDashboardPage() {
     return (
       <div className="rounded-[28px] border border-red-200 bg-white p-6 shadow-sm">
         <h1 className="text-2xl font-black text-slate-900">
-          Dashboard unavailable
+          Хянах самбар боломжгүй байна
         </h1>
         <p className="mt-2 text-slate-600">
-          {error || "Could not find your doctor data."}
+          {error || "Эмчийн мэдээлэл олдсонгүй."}
         </p>
       </div>
     );
@@ -154,12 +170,13 @@ export default function DoctorDashboardPage() {
               {greeting}, Др. {data.doctor.name}
             </h1>
             <p className="mt-2 text-sm text-slate-500">
-              {new Date().toLocaleDateString("en-US", {
-                weekday: "long",
-                month: "long",
-                day: "numeric",
-                year: "numeric",
-              })}
+              {mounted &&
+                new Date().toLocaleDateString("mn-MN", {
+                  weekday: "long",
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
             </p>
           </div>
           <div className="flex items-center gap-2 rounded-2xl bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700">
@@ -172,31 +189,31 @@ export default function DoctorDashboardPage() {
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {[
           {
-            label: "Today&apos;s Appointments",
+            label: "Өнөөдрийн цаг авалт",
             value: data.stats.todayAppointments,
             icon: CalendarDays,
             tone: "text-sky-600",
           },
           {
-            label: "Upcoming",
+            label: "Ирээдүйд болох",
             value: data.stats.upcoming,
             icon: Clock3,
             tone: "text-violet-600",
           },
           {
-            label: "Completed Today",
+            label: "Өнөөдөр үзсэн",
             value: data.stats.completedToday,
             icon: CheckCircle2,
             tone: "text-emerald-600",
           },
           {
-            label: "Pending",
+            label: "Хүлээгдэж буй",
             value: data.stats.pending,
             icon: AlertCircle,
             tone: "text-amber-600",
           },
           {
-            label: "Today&apos;s Working Hours",
+            label: "Өнөөдрийн ажиллах цаг",
             value: workingHours,
             icon: Stethoscope,
             tone: "text-cyan-600",
@@ -222,17 +239,17 @@ export default function DoctorDashboardPage() {
           <div className="mb-5 flex items-center justify-between">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.24em] text-emerald-600">
-                Today
+                Өнөөдөр
               </p>
               <h2 className="mt-1 text-xl font-black text-slate-900">
-                Today&apos;s appointments
+                Өнөөдрийн цаг авалтууд
               </h2>
             </div>
             <Link
               href="/doctor/appointments"
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
-              View all
+              Бүгдийг харах
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -240,7 +257,7 @@ export default function DoctorDashboardPage() {
           <div className="space-y-3">
             {data.todayAppointments.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
-                No appointments scheduled today.
+                Өнөөдөр товлосон цаг байхгүй байна.
               </div>
             ) : (
               data.todayAppointments.map((appointment) => (
@@ -262,15 +279,18 @@ export default function DoctorDashboardPage() {
                       </p>
                     </div>
                     <span
-                      className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-bold ${statusClassMap[appointment.status]}`}
+                      className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-bold ${
+                        statusClassMap[appointment.status] ??
+                        "border-slate-200 bg-slate-100 text-slate-700"
+                      }`}
                     >
-                      {statusLabelMap[appointment.status]}
+                      {statusLabelMap[appointment.status] ?? appointment.status}
                     </span>
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
                     <span>{appointment.patient.phone}</span>
                     <span>•</span>
-                    <span>{appointment.service.durationMin} min</span>
+                    <span>{appointment.service.durationMin} мин</span>
                     {appointment.chiefComplaint && (
                       <>
                         <span>•</span>
@@ -287,23 +307,20 @@ export default function DoctorDashboardPage() {
         <div className="space-y-5 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.24em] text-emerald-600">
-              Quick actions
+              Түргэн үйлдлүүд
             </p>
             <h2 className="mt-1 text-xl font-black text-slate-900">
-              What needs attention?
+              Анхаарах зүйлс
             </h2>
           </div>
 
           <div className="grid gap-3">
             {[
-              ["View Calendar", "/doctor/calendar"],
-              [
-                "View Today&apos;s Appointments",
-                "/doctor/appointments?filter=today",
-              ],
-              ["Manage Availability", "/doctor/availability"],
-              ["Add Exception / Leave", "/doctor/exceptions"],
-              ["View Patients", "/doctor/patients"],
+              ["Календарь харах", "/doctor/calendar"],
+              ["Өнөөдрийн цаг авалтууд", "/doctor/appointments?filter=today"],
+              ["Цагийн хуваарь тохируулах", "/doctor/availability"],
+              ["Чөлөө / Чөлөөний хүсэлт нэмэх", "/doctor/exceptions"],
+              ["Өвчтөнүүдийн жагсаалт", "/doctor/patients"],
             ].map(([label, href]) => (
               <Link
                 key={label}
@@ -322,20 +339,20 @@ export default function DoctorDashboardPage() {
         <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-xl font-black text-slate-900">
-              Upcoming appointments
+              Ирээдүйд болох цаг авалтууд
             </h2>
             <Link
               href="/doctor/appointments"
               className="text-sm font-semibold text-emerald-700"
             >
-              View all appointments
+              Бүх цаг авалтыг харах
             </Link>
           </div>
 
           <div className="space-y-3">
             {data.upcomingAppointments.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-                No upcoming appointments in the next 7 days.
+                Ойрын 7 хоногт товлосон цаг байхгүй байна.
               </div>
             ) : (
               data.upcomingAppointments.slice(0, 6).map((appointment) => (
@@ -345,13 +362,7 @@ export default function DoctorDashboardPage() {
                 >
                   <div>
                     <p className="text-sm font-black text-slate-900">
-                      {new Date(appointment.appointmentDate).toLocaleDateString(
-                        "en-US",
-                        {
-                          month: "short",
-                          day: "numeric",
-                        },
-                      )}
+                      {formatDate(appointment.appointmentDate)}
                     </p>
                     <p className="text-xs text-slate-500">
                       {toTimeLabel(appointment.startTime)} •{" "}
@@ -360,11 +371,14 @@ export default function DoctorDashboardPage() {
                   </div>
                   <div className="flex items-center gap-4 text-sm text-slate-600">
                     <span>{appointment.service.name}</span>
-                    <span>{appointment.service.durationMin} min</span>
+                    <span>{appointment.service.durationMin} мин</span>
                     <span
-                      className={`rounded-full border px-2 py-1 text-[11px] font-bold ${statusClassMap[appointment.status]}`}
+                      className={`rounded-full border px-2 py-1 text-[11px] font-bold ${
+                        statusClassMap[appointment.status] ??
+                        "border-slate-200 bg-slate-100 text-slate-700"
+                      }`}
                     >
-                      {statusLabelMap[appointment.status]}
+                      {statusLabelMap[appointment.status] ?? appointment.status}
                     </span>
                   </div>
                 </div>
@@ -375,19 +389,21 @@ export default function DoctorDashboardPage() {
 
         <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-xl font-black text-slate-900">My patients</h2>
+            <h2 className="text-xl font-black text-slate-900">
+              Миний өвчтөнүүд
+            </h2>
             <Link
               href="/doctor/patients"
               className="text-sm font-semibold text-emerald-700"
             >
-              View all
+              Бүгдийг харах
             </Link>
           </div>
 
           <div className="space-y-3">
             {data.patients.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-                No patient history yet.
+                Одоогоор өвчтөний түүх байхгүй байна.
               </div>
             ) : (
               data.patients.slice(0, 5).map((patient) => (
@@ -401,16 +417,11 @@ export default function DoctorDashboardPage() {
                       <p className="text-xs text-slate-500">{patient.phone}</p>
                     </div>
                     <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">
-                      {patient.totalAppointments} visits
+                      {patient.totalAppointments} удаа ирсэн
                     </span>
                   </div>
                   <div className="mt-2 text-xs text-slate-500">
-                    Last:{" "}
-                    {patient.lastAppointment
-                      ? new Date(patient.lastAppointment).toLocaleDateString(
-                          "en-US",
-                        )
-                      : "—"}
+                    Сүүлд ирсэн: {formatDate(patient.lastAppointment)}
                   </div>
                 </div>
               ))

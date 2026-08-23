@@ -28,17 +28,51 @@ const statusClassMap: Record<string, string> = {
   NO_SHOW: "border-slate-200 bg-slate-100 text-slate-700",
 };
 
+const statusLabelMap: Record<string, string> = {
+  PENDING: "Хүлээгдэж буй",
+  CONFIRMED: "Баталгаажсан",
+  COMPLETED: "Дууссан",
+  CANCELLED: "Цуцлагдсан",
+  NO_SHOW: "Ирээгүй",
+};
+
+// Date formatting туслах функц (Hydration болон цагийн зөрүүний алдаанаас сэргийлнэ)
+const formatDate = (dateString: string) => {
+  if (!dateString) return "—";
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("mn-MN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+};
+
 export default function DoctorAppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const load = async () => {
+    setLoading(true);
+    setError(null);
     try {
       const response = await fetch("/api/doctor/appointments?days=30");
       const payload = await response.json();
       if (!response.ok)
-        throw new Error(payload.error || "Unable to load appointments");
+        throw new Error(
+          payload.error || "Цаг авалтын мэдээллийг ачаалж чадсангүй",
+        );
       setAppointments(payload.data || []);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Мэдээлэл татахад алдаа гарлаа.",
+      );
     } finally {
       setLoading(false);
     }
@@ -57,19 +91,24 @@ export default function DoctorAppointmentsPage() {
       });
       const payload = await response.json();
       if (!response.ok)
-        throw new Error(payload.error || "Unable to update status");
+        throw new Error(payload.error || "Төлөв шинэчлэхэд алдаа гарлаа");
+
       setAppointments((current) =>
         current.map((item) => (item.id === id ? { ...item, status } : item)),
       );
-      alert("Appointment status updated.");
+      alert("Уулзалтын төлөв амжилттай шинэчлэгдлээ.");
     } catch (error) {
       alert(
         error instanceof Error
           ? error.message
-          : "Unable to update appointment status.",
+          : "Уулзалтын төлөв шинэчлэхэд алдаа гарлаа.",
       );
     }
   };
+
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <div className="space-y-6 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
@@ -85,9 +124,10 @@ export default function DoctorAppointmentsPage() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => void load()}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
           >
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             Шинэчлэх
           </button>
           <Link
@@ -101,8 +141,13 @@ export default function DoctorAppointmentsPage() {
       </div>
 
       {loading ? (
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-slate-500">
-          Уулзалтуудыг ачаалж байна…
+        <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-6 text-slate-500">
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
+          <span>Уулзалтуудыг ачаалж байна…</span>
+        </div>
+      ) : error ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-600">
+          {error}
         </div>
       ) : appointments.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm text-slate-500">
@@ -118,10 +163,7 @@ export default function DoctorAppointmentsPage() {
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <div className="text-sm font-black text-slate-900">
-                    {new Date(appointment.appointmentDate).toLocaleDateString(
-                      "en-US",
-                      { month: "short", day: "numeric", year: "numeric" },
-                    )}
+                    {formatDate(appointment.appointmentDate)}
                   </div>
                   <div className="mt-1 text-base font-bold text-slate-800">
                     {appointment.startTime} – {appointment.endTime}
@@ -129,22 +171,28 @@ export default function DoctorAppointmentsPage() {
                   <div className="mt-1 text-sm text-slate-600">
                     {appointment.patient.fullName} • {appointment.service.name}
                   </div>
+                  <div className="mt-0.5 text-xs text-slate-500">
+                    Утас: {appointment.patient.phone}
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <span
-                    className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-bold ${statusClassMap[appointment.status]}`}
+                    className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-bold ${
+                      statusClassMap[appointment.status] ||
+                      "border-slate-200 bg-slate-100 text-slate-700"
+                    }`}
                   >
-                    {appointment.status}
+                    {statusLabelMap[appointment.status] || appointment.status}
                   </span>
                 </div>
               </div>
 
-              <div className="mt-4 flex flex-wrap items-center gap-2">
+              <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-200/60 pt-3">
                 {[
                   ["CONFIRMED", "Баталгаажуулах"],
                   ["COMPLETED", "Дууссан"],
-                  ["CANCELLED", "Цуцлагдсан"],
+                  ["CANCELLED", "Цуцлах"],
                   ["NO_SHOW", "Ирээгүй"],
                 ].map(([status, label]) => (
                   <button
@@ -155,12 +203,12 @@ export default function DoctorAppointmentsPage() {
                         status as Appointment["status"],
                       )
                     }
-                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:border-emerald-200 hover:bg-emerald-50"
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50"
                   >
                     {status === "COMPLETED" ? (
-                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
                     ) : (
-                      <Clock3 className="h-3.5 w-3.5" />
+                      <Clock3 className="h-3.5 w-3.5 text-slate-500" />
                     )}
                     {label}
                   </button>

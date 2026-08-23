@@ -14,21 +14,25 @@ import {
 import { requireRole } from "@/lib/auth";
 
 const links = [
-  { href: "/doctor", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/doctor/calendar", label: "My Calendar", icon: CalendarRange },
+  { href: "/doctor", label: "Хянах самбар", icon: LayoutDashboard },
+  { href: "/doctor/calendar", label: "Миний календарь", icon: CalendarRange },
   {
     href: "/doctor/availability",
-    label: "My Availability",
+    label: "Ажиллах цагийн хуваарь",
     icon: CalendarDays,
   },
-  { href: "/doctor/exceptions", label: "Exceptions / Leave", icon: Clock3 },
-  { href: "/doctor/patients", label: "My Patients", icon: Users },
+  {
+    href: "/doctor/exceptions",
+    label: "Чөлөө",
+    icon: Clock3,
+  },
+  { href: "/doctor/patients", label: "Миний өвчтөнүүд", icon: Users },
   {
     href: "/doctor/appointments",
-    label: "Appointments",
+    label: "Уулзалтууд",
     icon: BriefcaseMedical,
   },
-  { href: "/doctor/profile", label: "My Profile", icon: UserCircle2 },
+  { href: "/doctor/profile", label: "Миний профайл", icon: UserCircle2 },
 ];
 
 export default async function DoctorLayout({
@@ -52,9 +56,9 @@ export default async function DoctorLayout({
             </div>
             <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-emerald-400">
-                Doctor portal
+                Эмчийн портал
               </p>
-              <h1 className="mt-1 text-lg font-black">Clinic workspace</h1>
+              <h1 className="mt-1 text-lg font-black">Эмнэлгийн систем</h1>
             </div>
           </div>
 

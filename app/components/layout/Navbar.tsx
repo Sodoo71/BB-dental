@@ -1,6 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { Menu, Phone, Sparkles, X } from "lucide-react";
+import Image from "next/image";
 
 export default function Navbar({
   scrollToBooking,
@@ -17,18 +18,15 @@ export default function Navbar({
   return (
     <nav className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/80 backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">
-        <div className="flex items-center gap-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-600 text-white shadow-md shadow-cyan-600/20">
-            <Sparkles className="h-6 w-6" />
-          </div>
-          <div>
-            <span className="text-lg font-black tracking-wider text-slate-900">
-              BB DENTAL
-            </span>
-            <span className="block text-[10px] font-extrabold tracking-widest text-cyan-600">
-              CLINIC
-            </span>
-          </div>
+        <div className="flex items-center">
+          <Image
+            src="/logo.jpg"
+            alt="BB Dental Clinic"
+            width={120}
+            height={40}
+            priority
+            className="h-10 w-auto object-contain rounded-2xl"
+          />
         </div>
 
         <div className="hidden items-center gap-8 font-bold text-slate-600 md:flex">
@@ -48,11 +46,11 @@ export default function Navbar({
 
         <div className="flex items-center gap-3">
           <a
-            href="tel:77001122"
+            href="tel:95963531"
             className="hidden items-center gap-2 rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-200 sm:flex"
           >
             <Phone className="h-4 w-4 text-cyan-600" />
-            7700-1122
+            9596-3531
           </a>
 
           <button
