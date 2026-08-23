@@ -8,6 +8,7 @@ import React, {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
+import LogoutButton from "@/components/auth/LogoutButton";
 import {
   AlertCircle,
   Check,
@@ -512,16 +513,21 @@ export default function AdminDashboard() {
               Эмч, цаг, захиалга, хуваарь
             </p>
           </div>
-          <button
-            onClick={() => {
-              setLoading(true);
-              void fetchAppointments();
-            }}
-            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            Шинэчлэх
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                setLoading(true);
+                void fetchAppointments();
+              }}
+              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              <RefreshCw
+                className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+              />
+              Шинэчлэх
+            </button>
+            <LogoutButton label="Гарах" />
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-6">

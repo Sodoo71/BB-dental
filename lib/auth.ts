@@ -3,7 +3,39 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 
 const COOKIE = "smilecare_session";
-const secret = () => process.env.AUTH_SECRET ?? "";
+const secret = () =>
+  process.env.AUTH_SECRET ?? "smilecare-dev-secret-change-me";
+
+export type AppRole = "PATIENT" | "SUPER_ADMIN" | "ADMIN" | "DOCTOR";
+
+export const getDashboardRouteForRole = (role: string | null | undefined) => {
+  switch (role) {
+    case "SUPER_ADMIN":
+      return "/super-admin";
+    case "DOCTOR":
+      return "/doctor";
+    case "ADMIN":
+      return "/admin";
+    default:
+      return "/login";
+  }
+};
+
+export const getRoleLabel = (role: string | null | undefined) => {
+  switch (role) {
+    case "SUPER_ADMIN":
+      return "Super Admin";
+    case "ADMIN":
+      return "Admin";
+    case "DOCTOR":
+      return "Doctor";
+    case "PATIENT":
+      return "Patient";
+    default:
+      return "User";
+  }
+};
+
 export const hashPassword = (password: string) => {
   const salt = randomUUID();
   return `${salt}:${scryptSync(password, salt, 64).toString("hex")}`;
@@ -25,7 +57,8 @@ const sign = (value: string) =>
   createHmac("sha256", secret()).update(value).digest("base64url");
 export async function sessionUser() {
   const token = (await cookies()).get(COOKIE)?.value;
-  if (!token || !secret()) return null;
+  if (!token) return null;
+
   const [id, signature] = token.split(".");
   if (
     !id ||
@@ -33,21 +66,35 @@ export async function sessionUser() {
     !timingSafeEqual(Buffer.from(signature), Buffer.from(sign(id)))
   )
     return null;
+
   return prisma.user.findFirst({
     where: { id, isActive: true },
-    select: { id: true, role: true, doctorId: true, name: true },
+    select: {
+      id: true,
+      role: true,
+      doctorId: true,
+      name: true,
+      email: true,
+    },
   });
 }
-export async function requireRole(...roles: string[]) {
+
+export async function requireRole(...roles: AppRole[]) {
   const user = await sessionUser();
   return user && roles.includes(user.role) ? user : null;
 }
-export const sessionCookie = (id: string) => ({
-  name: COOKIE,
-  value: `${id}.${sign(id)}`,
-  httpOnly: true,
-  sameSite: "lax" as const,
-  secure: process.env.NODE_ENV === "production",
-  path: "/",
-  maxAge: 60 * 60 * 12,
-});
+
+export const sessionCookie = (id: string) => {
+  const expires = new Date(Date.now() + 1000 * 60 * 60 * 12);
+
+  return {
+    name: COOKIE,
+    value: `${id}.${sign(id)}`,
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60 * 60 * 12,
+    expires,
+  };
+};

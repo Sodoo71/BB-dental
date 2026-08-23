@@ -16,6 +16,7 @@ import {
   Users,
 } from "lucide-react";
 import Toast from "@/app/components/ui/Toast";
+import LogoutButton from "@/components/auth/LogoutButton";
 import { useSuperAdminData } from "@/hooks/useSuperAdminData";
 import type { ServiceRow } from "@/types/service";
 import type { UserRow } from "@/types/user";
@@ -344,6 +345,10 @@ export default function SuperAdminPage() {
   return (
     <main className="min-h-screen bg-slate-100 p-4 text-slate-900 md:p-8">
       {toast.message ? <Toast toast={toast} /> : null}
+
+      <div className="mb-4 flex justify-end">
+        <LogoutButton label="Гарах" />
+      </div>
 
       {resetUser ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">

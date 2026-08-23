@@ -11,7 +11,8 @@ import {
   UserCircle2,
   Users,
 } from "lucide-react";
-import { requireRole } from "@/lib/auth";
+import LogoutButton from "@/components/auth/LogoutButton";
+import { sessionUser } from "@/lib/auth";
 
 const links = [
   { href: "/doctor", label: "Хянах самбар", icon: LayoutDashboard },
@@ -40,10 +41,22 @@ export default async function DoctorLayout({
 }: {
   children: ReactNode;
 }) {
-  const user = await requireRole("DOCTOR");
+  const user = await sessionUser();
 
-  if (!user || !user.doctorId) {
+  if (!user) {
     redirect("/login");
+  }
+
+  if (user.role !== "DOCTOR") {
+    redirect(
+      user.role === "ADMIN" || user.role === "SUPER_ADMIN"
+        ? "/admin"
+        : "/unauthorized",
+    );
+  }
+
+  if (!user.doctorId) {
+    redirect("/unauthorized");
   }
 
   return (
@@ -74,6 +87,10 @@ export default async function DoctorLayout({
               </Link>
             ))}
           </nav>
+
+          <div className="mt-6 border-t border-slate-800 pt-4">
+            <LogoutButton label="Гарах" />
+          </div>
         </aside>
 
         <div className="flex-1">{children}</div>
