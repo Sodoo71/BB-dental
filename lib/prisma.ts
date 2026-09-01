@@ -6,31 +6,31 @@ import { PrismaClient } from "@/app/generated/prisma/client";
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
   pool?: Pool;
+  dbUrl?: string;
 };
 
-const DEFAULT_NEON_DATABASE_URL =
-  "postgresql://neondb_owner:npg_bCFvK3HcTEJ6@ep-cold-breeze-azyxz1o0-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require";
+const rawDbUrl =
+  process.env.DATABASE_URL?.trim() ||
+  "postgresql://neondb_owner:npg_DA7cev5GBxrQ@ep-cold-breeze-azyxz1o0-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require";
 
-const databaseUrl =
-  process.env.DATABASE_URL?.trim() || DEFAULT_NEON_DATABASE_URL;
+// Clean channel_binding parameter for optimal serverless pg/Vercel compatibility
+const cleanDbUrl = rawDbUrl
+  .replace(/channel_binding=[^&]+&?/g, "")
+  .replace(/\?&/, "?")
+  .replace(/[?&]$/, "");
 
-const pool =
-  globalForPrisma.pool ??
-  new Pool({
-    connectionString: databaseUrl,
+if (!globalForPrisma.pool || globalForPrisma.dbUrl !== cleanDbUrl) {
+  globalForPrisma.pool = new Pool({
+    connectionString: cleanDbUrl,
     ssl: { rejectUnauthorized: false },
-    max: 10,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
+    max: 2, // Serverless recommended pool size per lambda container
+    idleTimeoutMillis: 15000,
+    connectionTimeoutMillis: 15000, // Allow Neon cold-start wake up
   });
-
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    adapter: new PrismaPg(pool),
+  globalForPrisma.dbUrl = cleanDbUrl;
+  globalForPrisma.prisma = new PrismaClient({
+    adapter: new PrismaPg(globalForPrisma.pool),
   });
-
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
-  globalForPrisma.pool = pool;
 }
+
+export const prisma = globalForPrisma.prisma!;
