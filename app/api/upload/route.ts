@@ -1,21 +1,15 @@
 import { NextResponse } from "next/server";
-import { writeFile } from "fs/promises";
+import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { requireSessionUser } from "@/lib/auth";
 import { v2 as cloudinary } from "cloudinary";
-
-if (process.env.CLOUDINARY_URL) {
-  cloudinary.config({
-    cloudinary_url: process.env.CLOUDINARY_URL,
-  });
-}
 
 export async function POST(request: Request) {
   try {
     const user = await requireSessionUser();
     if (!user) {
       return NextResponse.json(
-        { error: "Нэвтрэх шаардлагатай." },
+        { error: "Нэвтрэх хугацаа дууссан байна. Дахин нэвтэрнэ үү." },
         { status: 401 },
       );
     }
@@ -30,7 +24,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const mimeType = file.type;
+    const mimeType = file.type || "";
     const nameLower = file.name.toLowerCase();
     const isImage =
       mimeType.startsWith("image/") ||
@@ -40,7 +34,8 @@ export async function POST(request: Request) {
       nameLower.endsWith(".jpeg") ||
       nameLower.endsWith(".png") ||
       nameLower.endsWith(".webp") ||
-      nameLower.endsWith(".svg");
+      nameLower.endsWith(".svg") ||
+      nameLower.endsWith(".gif");
 
     if (!isImage) {
       return NextResponse.json(
@@ -52,9 +47,14 @@ export async function POST(request: Request) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // 1. Try Cloudinary Cloud Upload if configured
-    if (process.env.CLOUDINARY_URL) {
+    // 1. Try Cloudinary Cloud Upload if CLOUDINARY_URL is configured
+    const cloudinaryUrl = process.env.CLOUDINARY_URL;
+    if (cloudinaryUrl && cloudinaryUrl.startsWith("cloudinary://")) {
       try {
+        cloudinary.config({
+          cloudinary_url: cloudinaryUrl,
+        });
+
         const uploadResult = await new Promise<{ secure_url: string; public_id: string }>(
           (resolve, reject) => {
             const uploadStream = cloudinary.uploader.upload_stream(
@@ -80,16 +80,17 @@ export async function POST(request: Request) {
           });
         }
       } catch (cloudErr) {
-        console.warn("Cloudinary upload failed, using local storage fallback:", cloudErr);
+        console.warn("Cloudinary upload failed, falling back to local storage:", cloudErr);
       }
     }
 
-    // 2. Local Storage Fallback
+    // 2. Safe Local Storage Fallback
     const extension = path.extname(file.name) || ".jpg";
     const safeName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}${extension}`;
     const uploadDir = path.join(process.cwd(), "public", "uploads");
-    const filePath = path.join(uploadDir, safeName);
 
+    await mkdir(uploadDir, { recursive: true });
+    const filePath = path.join(uploadDir, safeName);
     await writeFile(filePath, buffer);
 
     const publicUrl = `/uploads/${safeName}`;
@@ -103,7 +104,12 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("POST /api/upload error:", error);
     return NextResponse.json(
-      { error: "Зураг байршуулахад алдаа гарлаа." },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Зураг байршуулахад алдаа гарлаа.",
+      },
       { status: 500 },
     );
   }

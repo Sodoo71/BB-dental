@@ -24,8 +24,20 @@ export function ImageUpload({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      setError("Зөвхөн зураг (PNG, JPG, WEBP) сонгоно уу.");
+    const nameLower = file.name.toLowerCase();
+    const isLikelyImage =
+      file.type.startsWith("image/") ||
+      nameLower.endsWith(".heic") ||
+      nameLower.endsWith(".heif") ||
+      nameLower.endsWith(".jpg") ||
+      nameLower.endsWith(".jpeg") ||
+      nameLower.endsWith(".png") ||
+      nameLower.endsWith(".webp") ||
+      nameLower.endsWith(".svg") ||
+      nameLower.endsWith(".gif");
+
+    if (!isLikelyImage) {
+      setError("Зөвхөн зургийн файл (PNG, JPG, WEBP, HEIC) сонгоно уу.");
       return;
     }
 
