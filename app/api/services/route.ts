@@ -23,7 +23,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const user = await requireRole("SUPER_ADMIN");
+  const user = await requireRole("SUPER_ADMIN", "ADMIN");
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
@@ -34,8 +34,16 @@ export async function POST(request: Request) {
     const description =
       typeof body.description === "string" ? body.description.trim() : null;
     const durationMin =
-      typeof body.durationMin === "string" ? body.durationMin.trim() : "";
-    const price = typeof body.price === "string" ? body.price.trim() : "";
+      typeof body.durationMin === "string" ||
+      typeof body.durationMin === "number"
+        ? String(body.durationMin).trim()
+        : "";
+    const price =
+      typeof body.price === "string" || typeof body.price === "number"
+        ? String(body.price).trim()
+        : "";
+    const imageUrl =
+      typeof body.imageUrl === "string" ? body.imageUrl.trim() : null;
     const isActive = body.isActive !== false;
 
     if (!name || !durationMin || !price) {
@@ -59,6 +67,7 @@ export async function POST(request: Request) {
         description: description || null,
         durationMin: String(parsedDuration),
         price,
+        imageUrl: imageUrl || null,
         isActive,
       },
     });
@@ -73,8 +82,87 @@ export async function POST(request: Request) {
   }
 }
 
+export async function PUT(request: Request) {
+  const user = await requireRole("SUPER_ADMIN", "ADMIN");
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
+
+  try {
+    const body = (await request.json()) as Record<string, unknown>;
+    const serviceId =
+      typeof body.id === "string" && body.id.trim()
+        ? body.id.trim()
+        : typeof body.serviceId === "string" && body.serviceId.trim()
+          ? body.serviceId.trim()
+          : "";
+
+    if (!serviceId) {
+      return NextResponse.json(
+        { error: "Үйлчилгээний ID шаардлагатай." },
+        { status: 400 },
+      );
+    }
+
+    const target = await prisma.service.findUnique({
+      where: { id: serviceId },
+    });
+
+    if (!target) {
+      return NextResponse.json(
+        { error: "Үйлчилгээ олдсонгүй." },
+        { status: 404 },
+      );
+    }
+
+    const name = typeof body.name === "string" ? body.name.trim() : undefined;
+    const description =
+      typeof body.description === "string"
+        ? body.description.trim()
+        : body.description === null
+          ? null
+          : undefined;
+    const durationMin =
+      body.durationMin !== undefined
+        ? String(body.durationMin).trim()
+        : undefined;
+    const price =
+      body.price !== undefined ? String(body.price).trim() : undefined;
+    const imageUrl =
+      typeof body.imageUrl === "string"
+        ? body.imageUrl.trim()
+        : body.imageUrl === null
+          ? null
+          : undefined;
+    const isActive =
+      typeof body.isActive === "boolean" ? body.isActive : undefined;
+
+    const updated = await prisma.service.update({
+      where: { id: serviceId },
+      data: {
+        ...(name !== undefined ? { name } : {}),
+        ...(description !== undefined
+          ? { description: description || null }
+          : {}),
+        ...(durationMin !== undefined ? { durationMin } : {}),
+        ...(price !== undefined ? { price } : {}),
+        ...(imageUrl !== undefined ? { imageUrl: imageUrl || null } : {}),
+        ...(isActive !== undefined ? { isActive } : {}),
+      },
+    });
+
+    return NextResponse.json({ success: true, data: updated });
+  } catch (error) {
+    console.error("PUT /api/services error:", error);
+    return NextResponse.json(
+      { error: "Үйлчилгээ шинэчлэхэд алдаа гарлаа." },
+      { status: 500 },
+    );
+  }
+}
+
 export async function DELETE(request: Request) {
-  const user = await requireRole("SUPER_ADMIN");
+  const user = await requireRole("SUPER_ADMIN", "ADMIN");
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }

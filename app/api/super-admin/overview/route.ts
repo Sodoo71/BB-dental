@@ -16,17 +16,28 @@ export async function GET() {
   todayEnd.setUTCDate(todayEnd.getUTCDate() + 1);
 
   const [
+    totalUsers,
+    pendingUsers,
+    totalAdmins,
     totalDoctors,
     activeDoctors,
     totalPatients,
     totalAppointments,
     todayAppointments,
+    pendingAppointments,
+    confirmedAppointments,
     completedAppointments,
     cancelledAppointments,
     noShowAppointments,
     upcomingAppointments,
     doctorsWorkingToday,
+    servicesCount,
   ] = await Promise.all([
+    prisma.user.count(),
+    prisma.user.count({ where: { isActive: false } }),
+    prisma.user.count({
+      where: { role: { in: ["ADMIN", "SUPER_ADMIN"] } },
+    }),
     prisma.doctor.count(),
     prisma.doctor.count({ where: { isActive: true } }),
     prisma.patient.count(),
@@ -36,6 +47,8 @@ export async function GET() {
         appointmentDate: { gte: todayStart, lt: todayEnd },
       },
     }),
+    prisma.appointment.count({ where: { status: "PENDING" } }),
+    prisma.appointment.count({ where: { status: "CONFIRMED" } }),
     prisma.appointment.count({ where: { status: "COMPLETED" } }),
     prisma.appointment.count({ where: { status: "CANCELLED" } }),
     prisma.appointment.count({ where: { status: "NO_SHOW" } }),
@@ -51,21 +64,28 @@ export async function GET() {
         isDayOff: false,
       },
     }),
+    prisma.service.count(),
   ]);
 
   return NextResponse.json({
     success: true,
     data: {
+      totalUsers,
+      pendingUsers,
+      totalAdmins,
       totalDoctors,
       activeDoctors,
       totalPatients,
       totalAppointments,
       todayAppointments,
+      pendingAppointments,
+      confirmedAppointments,
       completedAppointments,
       cancelledAppointments,
       noShowAppointments,
       upcomingAppointments,
       doctorsWorkingToday,
+      servicesCount,
     },
   });
 }

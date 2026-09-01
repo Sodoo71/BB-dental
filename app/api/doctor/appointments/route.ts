@@ -9,33 +9,40 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const days = Number(searchParams.get("days") ?? "30");
+  const days = Number(searchParams.get("days") ?? "90");
   const status = searchParams.get("status") || undefined;
   const startDate = searchParams.get("date") || undefined;
+  const monthParam = searchParams.get("month"); // 0-11 or 1-12
+  const yearParam = searchParams.get("year");
 
-  const now = new Date();
-  const toDate = new Date(now);
-  toDate.setDate(
-    toDate.getDate() + (Number.isFinite(days) && days > 0 ? days : 30),
-  );
+  let dateFilter: Record<string, unknown> = {};
 
-  const where: Record<string, unknown> = {
-    doctorId: user.doctorId,
-    appointmentDate: {
-      gte: new Date(now.getTime() - 24 * 60 * 60 * 1000),
-      lte: toDate,
-    },
-  };
-
-  if (status) where.status = status;
-  if (startDate) {
+  if (yearParam && monthParam !== null) {
+    const year = Number(yearParam);
+    const month = Number(monthParam);
+    const mStart = new Date(Date.UTC(year, month, 1));
+    const mEnd = new Date(Date.UTC(year, month + 1, 1));
+    dateFilter = { gte: mStart, lt: mEnd };
+  } else if (startDate) {
     const date = new Date(`${startDate}T00:00:00Z`);
     if (!Number.isNaN(date.getTime())) {
       const nextDay = new Date(date);
-      nextDay.setUTCDate(nextDay.getUTCDate() + 1);
-      where.appointmentDate = { gte: date, lt: nextDay };
+      nextDay.setUTCDate(date.getUTCDate() + 1);
+      dateFilter = { gte: date, lt: nextDay };
     }
+  } else {
+    const now = new Date();
+    const pastStart = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+    const futureEnd = new Date(now.getTime() + 120 * 24 * 60 * 60 * 1000);
+    dateFilter = { gte: pastStart, lte: futureEnd };
   }
+
+  const where: Record<string, unknown> = {
+    doctorId: user.doctorId,
+    appointmentDate: dateFilter,
+  };
+
+  if (status) where.status = status;
 
   const appointments = await prisma.appointment.findMany({
     where,

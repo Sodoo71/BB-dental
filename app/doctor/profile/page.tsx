@@ -12,6 +12,8 @@ import {
   UserRound,
   X,
 } from "lucide-react";
+import { ImageUpload } from "@/components/ui/ImageUpload";
+import { showToast } from "@/components/ui/Toast";
 
 type ProfileData = {
   id: string;
@@ -19,6 +21,7 @@ type ProfileData = {
   title?: string | null;
   phone?: string | null;
   email?: string | null;
+  avatarUrl?: string | null;
   telegramChatId?: string | null;
   role: string;
 };
@@ -28,7 +31,6 @@ export default function DoctorProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Засварлах горимын state-үүд
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
@@ -36,6 +38,7 @@ export default function DoctorProfilePage() {
     title: "",
     phone: "",
     email: "",
+    avatarUrl: "",
     telegramChatId: "",
   });
 
@@ -69,8 +72,9 @@ export default function DoctorProfilePage() {
           title: doctor?.title || "",
           phone: doctor?.phone || "",
           email: doctor?.email || me.data?.email || "",
+          avatarUrl: doctor?.avatarUrl || doctor?.imageUrl || "",
           telegramChatId: doctor?.telegramChatId || "",
-          role: me.data?.role || "ЭМЧ",
+          role: me.data?.role || "DOCTOR",
         };
 
         setProfile(loadedProfile);
@@ -79,6 +83,7 @@ export default function DoctorProfilePage() {
           title: loadedProfile.title || "",
           phone: loadedProfile.phone || "",
           email: loadedProfile.email || "",
+          avatarUrl: loadedProfile.avatarUrl || "",
           telegramChatId: loadedProfile.telegramChatId || "",
         });
       } catch (err) {
@@ -99,14 +104,10 @@ export default function DoctorProfilePage() {
     e.preventDefault();
     setSaving(true);
     try {
-      // Танай системийн API бүтцээс хамаарч endpoint-ийг тохируулна уу
       const response = await fetch("/api/doctor/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...formData,
-          telegramChatId: formData.telegramChatId,
-        }),
+        body: JSON.stringify(formData),
       });
 
       const payload = await response.json();
@@ -116,12 +117,13 @@ export default function DoctorProfilePage() {
 
       setProfile((prev) => (prev ? { ...prev, ...formData } : null));
       setIsEditing(false);
-      alert("Профайл мэдээлэл амжилттай шинэчлэгдлээ.");
+      showToast("Профайл мэдээлэл амжилттай шинэчлэгдлээ.", "success");
     } catch (err) {
-      alert(
+      showToast(
         err instanceof Error
           ? err.message
           : "Мэдээлэл хадгалахад алдаа гарлаа.",
+        "error",
       );
     } finally {
       setSaving(false);
@@ -192,15 +194,14 @@ export default function DoctorProfilePage() {
       </div>
 
       {isEditing ? (
-        /* Засварлах Форм */
         <form
           onSubmit={handleSave}
-          className="space-y-4 rounded-3xl border border-slate-200 bg-slate-50 p-5"
+          className="space-y-4 rounded-3xl border border-slate-200 bg-slate-50 p-6"
         >
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-                Овог нэр
+                Овог нэр *
               </label>
               <input
                 type="text"
@@ -223,7 +224,7 @@ export default function DoctorProfilePage() {
                 onChange={(e) =>
                   setFormData({ ...formData, title: e.target.value })
                 }
-                placeholder="Ерөнхий мэргэжлийн эмч"
+                placeholder="Ерөнхий мэргэжлийн их эмч"
                 className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-emerald-500"
               />
             </div>
@@ -270,12 +271,23 @@ export default function DoctorProfilePage() {
                 className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-emerald-500"
               />
               <p className="mt-1 text-xs text-slate-400">
-                Мэдэгдэл хүлээн авах Телеграм хэрэглэгчийн нэр эсвэл ID.
+                Захиалгын мэдэгдэл хүлээн авах Телеграм Chat ID эсвэл Username.
               </p>
+            </div>
+
+            {/* Profile Avatar Upload */}
+            <div className="md:col-span-2">
+              <ImageUpload
+                label="Профайл зураг оруулах (Avatar Upload)"
+                value={formData.avatarUrl}
+                onChange={(url) =>
+                  setFormData((prev) => ({ ...prev, avatarUrl: url }))
+                }
+              />
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex justify-end gap-2 border-t border-slate-200 pt-4">
             <button
               type="button"
               onClick={() => setIsEditing(false)}
@@ -294,12 +306,21 @@ export default function DoctorProfilePage() {
           </div>
         </form>
       ) : (
-        /* Харж буй горим */
-        <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-          <div className="mb-5 flex items-center gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
-              <UserRound className="h-7 w-7" />
-            </div>
+        <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
+          <div className="mb-6 flex items-center gap-4">
+            {profile.avatarUrl ? (
+              <div className="h-20 w-20 overflow-hidden rounded-2xl border-2 border-emerald-500 shadow-md">
+                <img
+                  src={profile.avatarUrl}
+                  alt={profile.name}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            ) : (
+              <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
+                <UserRound className="h-9 w-9" />
+              </div>
+            )}
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.24em] text-emerald-600">
                 {profile.role}

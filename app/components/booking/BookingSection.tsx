@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Select from "@/app/components/ui/Select";
 import Info from "../ui/Info";
 import Field from "../ui/Field";
@@ -11,6 +11,8 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  Sparkles,
+  Zap,
 } from "lucide-react";
 import useDoctors from "../../../hooks/useDoctors";
 import useServices from "../../../hooks/useServices";
@@ -18,6 +20,17 @@ import useAvailability from "../../../hooks/useAvailability";
 import useBooking from "../../../hooks/useBooking";
 import { iso, getCalendarCells, isPastDate } from "../../../lib/date";
 import type { Doctor, Service } from "../../../types/booking";
+
+type SuggestionItem = {
+  date: string;
+  formattedDate: string;
+  dayOfWeek: string;
+  slot: string;
+  doctorId: string;
+  doctorName: string;
+  serviceId: string;
+  serviceName: string;
+};
 
 export default function BookingSection() {
   const today = useMemo(() => new Date(), []);
@@ -42,6 +55,9 @@ export default function BookingSection() {
     new Date(today.getFullYear(), today.getMonth(), 1),
   );
 
+  const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+
   const { slots, loading: slotLoading } = useAvailability(
     doctorId,
     serviceId,
@@ -51,12 +67,55 @@ export default function BookingSection() {
   const doctor = doctors.find((x: Doctor) => x.id === doctorId);
   const service = services.find((x: Service) => x.id === serviceId);
 
+  // Fetch smart suggestions when doctor or service changes
+  useEffect(() => {
+    let active = true;
+    const fetchSuggestions = async () => {
+      setLoadingSuggestions(true);
+      try {
+        const query = new URLSearchParams();
+        if (doctorId) query.set("doctorId", doctorId);
+        if (serviceId) query.set("serviceId", serviceId);
+
+        const res = await fetch(`/api/availability/suggest?${query.toString()}`);
+        const data = await res.json();
+        if (active && res.ok && Array.isArray(data.data)) {
+          setSuggestions(data.data);
+        }
+      } catch {
+        if (active) setSuggestions([]);
+      } finally {
+        if (active) setLoadingSuggestions(false);
+      }
+    };
+
+    void fetchSuggestions();
+    return () => {
+      active = false;
+    };
+  }, [doctorId, serviceId]);
+
+  const handleSelectSuggestion = (s: SuggestionItem) => {
+    if (s.doctorId && s.doctorId !== doctorId) {
+      setDoctorId(s.doctorId);
+    }
+    if (s.serviceId && s.serviceId !== serviceId) {
+      setServiceId(s.serviceId);
+    }
+
+    setDate(s.date);
+    const targetDate = new Date(`${s.date}T00:00:00`);
+    setMonth(new Date(targetDate.getFullYear(), targetDate.getMonth(), 1));
+    setForm((prev) => ({ ...prev, startTime: s.slot }));
+    notify(true, `${s.formattedDate} өдрийн ${s.slot} цаг автоматаар сонгогдлоо.`);
+  };
+
   const cells = getCalendarCells(month);
   const slotGroups = useMemo(() => {
     const groups = [
-      { label: "Morning", slots: [] as string[] },
-      { label: "Afternoon", slots: [] as string[] },
-      { label: "Evening", slots: [] as string[] },
+      { label: "Өглөө (Morning)", slots: [] as string[] },
+      { label: "Өдөр (Afternoon)", slots: [] as string[] },
+      { label: "Орой (Evening)", slots: [] as string[] },
     ];
 
     for (const slot of slots) {
@@ -95,8 +154,6 @@ export default function BookingSection() {
           : "Захиалга амжилттай бүртгэгдлээ.",
       });
       notify(true, "Цаг амжилттай захиалагдлаа.");
-      // remove booked slot locally
-      // (availability hook will update when date/filters change)
       setForm({ ...form, startTime: "" });
     } catch (e) {
       const message =
@@ -125,7 +182,7 @@ export default function BookingSection() {
 
         <div className="overflow-hidden rounded-[32px] bg-white shadow-2xl shadow-slate-200">
           <div className="grid lg:grid-cols-[1.2fr_.8fr]">
-            <div className="space-y-8 p-6 sm:p-10">
+            <div className="space-y-7 p-6 sm:p-10">
               <div className="grid gap-4 sm:grid-cols-2">
                 <Select
                   icon={<UserRound />}
@@ -151,6 +208,60 @@ export default function BookingSection() {
                 />
               </div>
 
+              {/* SMART SUGGESTION BOX */}
+              <div className="rounded-2xl border border-cyan-100 bg-gradient-to-r from-cyan-50/90 to-blue-50/70 p-4.5">
+                <div className="mb-2.5 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-cyan-600 animate-pulse" />
+                    <span className="text-xs font-black uppercase tracking-wider text-cyan-900">
+                      Танд санал болгох боломжит цагууд
+                    </span>
+                  </div>
+                  {loadingSuggestions && (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-cyan-600" />
+                  )}
+                </div>
+
+                {suggestions.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="text-xs text-slate-600">
+                      {doctor
+                        ? `${doctor.name} эмчийн хамгийн ойрын боломжит цагууд:`
+                        : "Хамгийн ойрын боломжит цагууд:"}
+                    </p>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {suggestions.slice(0, 4).map((s, idx) => (
+                        <button
+                          key={`${s.date}-${s.slot}-${s.doctorId}`}
+                          type="button"
+                          onClick={() => handleSelectSuggestion(s)}
+                          className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition shadow-sm ${
+                            date === s.date && form.startTime === s.slot
+                              ? "border-cyan-600 bg-cyan-600 text-white"
+                              : "border-cyan-200 bg-white text-cyan-950 hover:border-cyan-400 hover:bg-cyan-50"
+                          }`}
+                        >
+                          <Zap className="h-3 w-3 text-amber-500" />
+                          <span>
+                            {s.formattedDate} · {s.slot}
+                          </span>
+                          {!doctorId && (
+                            <span className="text-[10px] text-cyan-700 opacity-80">
+                              ({s.doctorName})
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500">
+                    Эмч болон үйлчилгээ сонгоход ойрын боломжит цагуудыг автоматаар санал болгоно.
+                  </p>
+                )}
+              </div>
+
+              {/* CALENDAR */}
               <div className="rounded-2xl border border-slate-200 p-5">
                 <div className="mb-4 flex items-center justify-between">
                   <button
@@ -191,7 +302,13 @@ export default function BookingSection() {
                         key={iso(d)}
                         disabled={isPastDate(d, today)}
                         onClick={() => setDate(iso(d))}
-                        className={`mx-auto h-9 w-9 rounded-full font-bold transition ${date === iso(d) ? "bg-cyan-600 text-white shadow-md shadow-cyan-600/30" : isPastDate(d, today) ? "text-slate-300" : "hover:bg-cyan-50 text-slate-700"}`}
+                        className={`mx-auto h-9 w-9 rounded-full font-bold transition ${
+                          date === iso(d)
+                            ? "bg-cyan-600 text-white shadow-md shadow-cyan-600/30"
+                            : isPastDate(d, today)
+                              ? "text-slate-300"
+                              : "hover:bg-cyan-50 text-slate-700"
+                        }`}
                       >
                         {d.getDate()}
                       </button>
@@ -200,6 +317,7 @@ export default function BookingSection() {
                 </div>
               </div>
 
+              {/* SLOTS LIST */}
               <div>
                 <h3 className="mb-3 font-black text-slate-800">
                   Боломжит цагууд
@@ -220,7 +338,11 @@ export default function BookingSection() {
                             <button
                               key={x}
                               onClick={() => setForm({ ...form, startTime: x })}
-                              className={`rounded-xl border py-2.5 text-sm font-bold transition ${form.startTime === x ? "border-cyan-600 bg-cyan-600 text-white shadow-md" : "border-slate-200 hover:border-cyan-400 hover:bg-cyan-50/50"}`}
+                              className={`rounded-xl border py-2.5 text-sm font-bold transition ${
+                                form.startTime === x
+                                  ? "border-cyan-600 bg-cyan-600 text-white shadow-md"
+                                  : "border-slate-200 hover:border-cyan-400 hover:bg-cyan-50/50"
+                              }`}
                             >
                               {x}
                             </button>
@@ -232,17 +354,18 @@ export default function BookingSection() {
                 ) : (
                   <p className="rounded-2xl bg-slate-50 p-5 text-center text-sm font-medium text-slate-500">
                     {doctorId && serviceId && date
-                      ? "Энэ өдөр боломжит цаг байхгүй байна."
+                      ? "Энэ өдөр боломжит цаг байхгүй байна. Дээрх санал болгох цагуудаас сонгох боломжтой."
                       : "Эмч, үйлчилгээ болон өдрөө сонгоно уу."}
                   </p>
                 )}
               </div>
             </div>
 
+            {/* SIDEBAR SELECTION SUMMARY */}
             <aside className="flex flex-col justify-between bg-slate-950 p-8 text-white">
               <div>
                 <p className="text-xs font-bold tracking-widest text-cyan-400">
-                  ТА НЫ С О Н Г О Л Т
+                  ТАНЫ СОНГОЛТ
                 </p>
                 <div className="mt-8 space-y-6 text-sm">
                   <Info
@@ -273,7 +396,11 @@ export default function BookingSection() {
                   <p className="text-xs text-slate-400">Хугацаа ба Үнэ</p>
                   <p className="mt-1 text-lg font-black">
                     {service
-                      ? `${service.durationMin} мин · ${service.price ? String(service.price).toLocaleString() + "₮" : "Үнэ тодорхойгүй"}`
+                      ? `${service.durationMin} мин · ${
+                          service.price
+                            ? String(service.price).toLocaleString() + "₮"
+                            : "Үнэ тодорхойгүй"
+                        }`
                       : "Үйлчилгээ сонгоно уу"}
                   </p>
                 </div>

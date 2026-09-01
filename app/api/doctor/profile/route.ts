@@ -23,6 +23,8 @@ export async function GET() {
       phone: true,
       email: true,
       telegramChatId: true,
+      avatarUrl: true,
+      imageUrl: true,
       isActive: true,
     },
   });
@@ -55,6 +57,7 @@ export async function PUT(request: Request) {
     const telegramChatId = normalizeText(
       body.telegramChatId ?? body.telegramId,
     );
+    const avatarUrl = normalizeText(body.avatarUrl ?? body.imageUrl);
 
     const updates: Record<string, string | null> = {};
     if (typeof name === "string") updates.name = name;
@@ -62,6 +65,10 @@ export async function PUT(request: Request) {
     if (phone !== undefined) updates.phone = phone;
     if (email !== undefined) updates.email = email;
     if (telegramChatId !== undefined) updates.telegramChatId = telegramChatId;
+    if (avatarUrl !== undefined) {
+      updates.avatarUrl = avatarUrl;
+      updates.imageUrl = avatarUrl;
+    }
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json(

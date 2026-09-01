@@ -152,16 +152,16 @@ export async function POST(request: Request) {
       where: { id: doctorId, isActive: true },
       select: { id: true },
     });
-    if (!doctor) {
-      return NextResponse.json({ error: "Эмч олдсонгүй." }, { status: 404 });
-    }
+    const force = body.force === true;
 
-    await ensureAppointmentSlotIsAvailable({
-      doctorId,
-      serviceId,
-      appointmentDate: date,
-      startTime,
-    });
+    if (!force) {
+      await ensureAppointmentSlotIsAvailable({
+        doctorId,
+        serviceId,
+        appointmentDate: date,
+        startTime,
+      });
+    }
 
     const durationMin = Number(service.durationMin);
     const endTime = addMinutes(startTime, durationMin);

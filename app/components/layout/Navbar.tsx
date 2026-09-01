@@ -33,11 +33,11 @@ export default function Navbar({
           <a href="#services" className="transition hover:text-cyan-600">
             Үйлчилгээ
           </a>
-          <a href="#about" className="transition hover:text-cyan-600">
-            Бидний тухай
+          <a href="#doctors" className="transition hover:text-cyan-600">
+            Эмч нар
           </a>
           <a href="#booking" className="transition hover:text-cyan-600">
-            Захиалга
+            Цаг захиалга
           </a>
           <a href="#contact" className="transition hover:text-cyan-600">
             Холбоо барих

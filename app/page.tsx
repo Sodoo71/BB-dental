@@ -5,6 +5,7 @@ import Navbar from "./components/layout/Navbar";
 import Hero from "./components/home/Hero";
 
 import Services from "./components/home/Services";
+import DoctorsSection from "./components/home/DoctorsSection";
 import BookingSection from "./components/booking/BookingSection";
 import Footer from "./components/layout/Footer";
 
@@ -18,8 +19,8 @@ export default function Home() {
       <div className="min-h-screen bg-slate-50 text-slate-900 scroll-smooth">
         <Navbar scrollToBooking={scrollToBooking} />
         <Hero scrollToBooking={scrollToBooking} />
-        
         <Services />
+        <DoctorsSection />
         <BookingSection />
         <Footer scrollToBooking={scrollToBooking} />
       </div>

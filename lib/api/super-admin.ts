@@ -46,3 +46,29 @@ export async function getSuperAdminDashboard(): Promise<SuperAdminDashboard> {
     pendingUsers: users.filter((user) => !user.isActive),
   };
 }
+
+export async function approveUser(userId: string) {
+  const res = await fetch("/api/admin/users/approve", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId }),
+  });
+  const data = await res.json();
+  if (!res.ok)
+    throw new Error(
+      data.error || "Хэрэглэгчийг баталгаажуулахад алдаа гарлаа.",
+    );
+  return data;
+}
+
+export async function deleteUser(userId: string) {
+  const res = await fetch("/api/admin/users", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId }),
+  });
+  const data = await res.json();
+  if (!res.ok)
+    throw new Error(data.error || "Хэрэглэгч устгахад алдаа гарлаа.");
+  return data;
+}

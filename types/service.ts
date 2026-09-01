@@ -4,6 +4,7 @@ export type ServiceRow = {
   description: string | null;
   durationMin: string;
   price: string;
+  imageUrl?: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

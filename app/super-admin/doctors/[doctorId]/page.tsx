@@ -10,6 +10,8 @@ import {
   Clock3,
   Users,
 } from "lucide-react";
+import { ImageUpload } from "@/components/ui/ImageUpload";
+import { showToast } from "@/components/ui/Toast";
 
 type DoctorAnalytics = {
   doctor: {
@@ -160,12 +162,12 @@ export default function DoctorAnalyticsPage() {
           : current,
       );
       setIsEditing(false);
+      showToast("Эмчийн мэдээлэл амжилттай шинэчлэгдлээ!", "success");
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Эмчийн мэдээллийг шинэчлэхэд алдаа гарлаа",
-      );
+      const errMsg =
+        err instanceof Error ? err.message : "Хадгалахад алдаа гарлаа.";
+      setError(errMsg);
+      showToast(errMsg, "error");
     } finally {
       setSaving(false);
     }
@@ -348,19 +350,18 @@ export default function DoctorAnalyticsPage() {
                       className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 outline-none transition focus:border-emerald-500 focus:bg-white"
                     />
                   </label>
-                  <label className="space-y-2 text-sm font-medium text-slate-600 sm:col-span-2">
-                    <span>Аватар URL</span>
-                    <input
+                  <div className="sm:col-span-2">
+                    <ImageUpload
+                      label="Эмчийн профайл зураг (Profile Image Upload)"
                       value={form.avatarUrl}
-                      onChange={(event) =>
+                      onChange={(url) =>
                         setForm((current) => ({
                           ...current,
-                          avatarUrl: event.target.value,
+                          avatarUrl: url,
                         }))
                       }
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 outline-none transition focus:border-emerald-500 focus:bg-white"
                     />
-                  </label>
+                  </div>
                   <label className="space-y-2 text-sm font-medium text-slate-600 sm:col-span-2">
                     <span>Telegram чат ID</span>
                     <input

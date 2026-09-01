@@ -7,6 +7,7 @@ import {
   CalendarRange,
   ChevronLeft,
   ChevronRight,
+  Layers,
   LayoutGrid,
   LogOut,
   Settings,
@@ -28,28 +29,31 @@ type SidebarSection = {
 
 const navigation: SidebarSection[] = [
   {
-    title: "Overview",
-    items: [{ label: "Dashboard", href: "/super-admin", icon: LayoutGrid }],
-  },
-  {
-    title: "Management",
+    title: "Хяналт",
     items: [
-      { label: "Doctors", href: "/super-admin/doctors", icon: Stethoscope },
-      { label: "Admins", href: "/super-admin/admins", icon: ShieldCheck },
-      { label: "Users", href: "/super-admin/users", icon: Users },
+      { label: "Самбар (Overview)", href: "/super-admin", icon: LayoutGrid },
     ],
   },
   {
-    title: "Operations",
+    title: "Удирдлага",
     items: [
-      { label: "Appointments", href: "/admin", icon: CalendarRange },
-      { label: "Logs", href: "/super-admin/logs", icon: Activity },
+      { label: "Үйлчилгээнүүд", href: "/super-admin/services", icon: Layers },
+      { label: "Эмч нар", href: "/super-admin/doctors", icon: Stethoscope },
+      { label: "Админууд", href: "/super-admin/admins", icon: ShieldCheck },
+      { label: "Хэрэглэгчид", href: "/super-admin/users", icon: Users },
     ],
   },
   {
-    title: "System",
+    title: "Үйл ажиллагаа",
     items: [
-      { label: "Settings", href: "/super-admin/settings", icon: Settings },
+      { label: "Захиалгууд (Ресепшн)", href: "/admin", icon: CalendarRange },
+      { label: "Системийн лог", href: "/super-admin/logs", icon: Activity },
+    ],
+  },
+  {
+    title: "Систем",
+    items: [
+      { label: "Тохиргоо", href: "/super-admin/settings", icon: Settings },
     ],
   },
 ];

@@ -36,16 +36,19 @@ enum UserRole {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  name         String
-  passwordHash String
-  role         UserRole @default(DOCTOR)
-  isActive     Boolean  @default(true)
-  doctorId     String?  @unique
-  doctor       Doctor?  @relation(fields: [doctorId], references: [id], onDelete: SetNull)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String   @id @default(uuid())
+  email          String   @unique
+  name           String
+  phone          String?
+  avatarUrl      String?
+  telegramChatId String?
+  passwordHash   String
+  role           UserRole @default(DOCTOR)
+  isActive       Boolean  @default(true)
+  doctorId       String?  @unique
+  doctor         Doctor?  @relation(fields: [doctorId], references: [id], onDelete: SetNull)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 // 3. ҮЙЛЧИЛГЭЭНИЙ МЭДЭЭЛЭЛ (Services)
@@ -55,6 +58,7 @@ model Service {
   description String? // Товч тайлбар
   durationMin String // Үргэлжлэх хугацаа (минутаар: 30, 60 гэх мэт)
   price       String // Үнэ (Сонголттой)
+  imageUrl    String? // Үйлчилгээний зураг
   isActive    Boolean @default(true) // Идэвхтэй ашиглагдаж байгаа эсэх
 
   appointments Appointment[]
@@ -190,4 +194,11 @@ model PatientNote {
   author String? // Эмч эсвэл Ресепшн
 
   createdAt DateTime @default(now())
+}
+
+// 10. СИСТЕМИЙН ТОХИРГОО (System Settings & Config)
+model SystemSetting {
+  key       String   @id // e.g. "clinic_info", "telegram_config", "registration_policy", "security_config"
+  value     String // JSON string payload
+  updatedAt DateTime @updatedAt
 }

@@ -79,6 +79,10 @@ export async function sessionUser() {
   });
 }
 
+export async function requireSessionUser() {
+  return sessionUser();
+}
+
 export async function requireRole(...roles: AppRole[]) {
   const user = await sessionUser();
   return user && roles.includes(user.role) ? user : null;

@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Copy, Save, Sparkles, Zap } from "lucide-react";
+import { showToast } from "@/components/ui/Toast";
 
 const weekdayLabels = [
   "Ням",
@@ -17,8 +18,8 @@ const weekdayLabels = [
 const defaultWeek = Array.from({ length: 7 }, (_, dayOfWeek) => ({
   dayOfWeek,
   startTime: "09:00",
-  endTime: "17:00",
-  isDayOff: false,
+  endTime: "18:00",
+  isDayOff: dayOfWeek === 0 || dayOfWeek === 6,
 }));
 
 type ScheduleRow = {
@@ -33,11 +34,8 @@ export default function DoctorAvailabilityPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
-
     const load = async () => {
       try {
         const response = await fetch("/api/doctor/availability");
@@ -60,7 +58,7 @@ export default function DoctorAvailabilityPage() {
               ? "09:00"
               : existing.startTime || slot.startTime,
             endTime: existing.isDayOff
-              ? "17:00"
+              ? "18:00"
               : existing.endTime || slot.endTime,
             isDayOff: Boolean(existing.isDayOff),
           };
@@ -78,6 +76,55 @@ export default function DoctorAvailabilityPage() {
     void load();
   }, []);
 
+  // Quick Presets
+  const applyStandardWeek = () => {
+    setSchedule(
+      defaultWeek.map((day) => ({
+        dayOfWeek: day.dayOfWeek,
+        startTime: "09:00",
+        endTime: "18:00",
+        isDayOff: day.dayOfWeek === 0 || day.dayOfWeek === 6, // Mon-Fri work, Sat-Sun off
+      })),
+    );
+  };
+
+  const applyEveryday = () => {
+    setSchedule(
+      defaultWeek.map((day) => ({
+        dayOfWeek: day.dayOfWeek,
+        startTime: "09:00",
+        endTime: "18:00",
+        isDayOff: false,
+      })),
+    );
+  };
+
+  const applyHalfDay = () => {
+    setSchedule(
+      defaultWeek.map((day) => ({
+        dayOfWeek: day.dayOfWeek,
+        startTime: "09:00",
+        endTime: "14:00",
+        isDayOff: day.dayOfWeek === 0 || day.dayOfWeek === 6,
+      })),
+    );
+  };
+
+  const copyMondayToAll = () => {
+    const monday = schedule.find((s) => s.dayOfWeek === 1) || schedule[0];
+    setSchedule((prev) =>
+      prev.map((row) => {
+        if (row.dayOfWeek === 0 || row.dayOfWeek === 6) return row; // keep weekend off
+        return {
+          ...row,
+          startTime: monday.startTime,
+          endTime: monday.endTime,
+          isDayOff: false,
+        };
+      }),
+    );
+  };
+
   const saveSchedule = async () => {
     setSaving(true);
     try {
@@ -89,21 +136,18 @@ export default function DoctorAvailabilityPage() {
       const payload = await response.json();
       if (!response.ok)
         throw new Error(payload.error || "Цагийн хуваарийг хадгалж чадсангүй");
-      alert("Таны ажиллах цагийн хуваарь амжилттай шинэчлэгдлээ.");
+      showToast("Таны ажиллах цагийн хуваарь амжилттай шинэчлэгдлээ.", "success");
     } catch (error) {
-      alert(
+      showToast(
         error instanceof Error
           ? error.message
           : "Цагийн хуваарь хадгалахад алдаа гарлаа.",
+        "error",
       );
     } finally {
       setSaving(false);
     }
   };
-
-  if (!mounted) {
-    return null;
-  }
 
   if (loading) {
     return (
@@ -124,13 +168,13 @@ export default function DoctorAvailabilityPage() {
 
   return (
     <div className="space-y-6 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.24em] text-emerald-600">
-            Захиалгын хуваарь
+            Ажлын цагийн тохиргоо
           </p>
           <h1 className="mt-1 text-2xl font-black text-slate-900">
-            Ажиллах цагийн хуваарь
+            7 хоногийн хуваарь
           </h1>
         </div>
         <Link
@@ -142,11 +186,53 @@ export default function DoctorAvailabilityPage() {
         </Link>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+      {/* QUICK PRESETS BANNER */}
+      <div className="rounded-2xl border border-emerald-100 bg-gradient-to-r from-emerald-50/90 to-cyan-50/70 p-4">
+        <div className="mb-2 flex items-center gap-2">
+          <Zap className="h-4 w-4 text-emerald-600" />
+          <span className="text-xs font-black uppercase tracking-wider text-emerald-950">
+            Хурдан тохируулах загварууд (1-Click Presets)
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <button
+            type="button"
+            onClick={applyStandardWeek}
+            className="rounded-xl border border-emerald-200 bg-white px-3 py-1.5 text-xs font-bold text-emerald-900 shadow-2xs hover:bg-emerald-100"
+          >
+            ⚡ Дав - Баа (09:00 - 18:00, Бям-Ням Амралт)
+          </button>
+          <button
+            type="button"
+            onClick={applyEveryday}
+            className="rounded-xl border border-emerald-200 bg-white px-3 py-1.5 text-xs font-bold text-emerald-900 shadow-2xs hover:bg-emerald-100"
+          >
+            ⚡ Бүх 7 өдөр (09:00 - 18:00)
+          </button>
+          <button
+            type="button"
+            onClick={applyHalfDay}
+            className="rounded-xl border border-emerald-200 bg-white px-3 py-1.5 text-xs font-bold text-emerald-900 shadow-2xs hover:bg-emerald-100"
+          >
+            ⚡ Хагас цаг (09:00 - 14:00)
+          </button>
+          <button
+            type="button"
+            onClick={copyMondayToAll}
+            className="flex items-center gap-1 rounded-xl border border-cyan-200 bg-white px-3 py-1.5 text-xs font-bold text-cyan-900 shadow-2xs hover:bg-cyan-100"
+          >
+            <Copy className="h-3.5 w-3.5" />
+            Даваа гарагийн цагийг бүх ажлын өдөрт хуулах
+          </button>
+        </div>
+      </div>
+
+      {/* Grid of 7 days */}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {schedule.map((day) => (
           <div
             key={day.dayOfWeek}
-            className={`rounded-2xl border p-4 ${
+            className={`rounded-2xl border p-4 transition ${
               day.isDayOff
                 ? "border-slate-200 bg-slate-50"
                 : "border-emerald-200 bg-emerald-50/60"
@@ -156,7 +242,7 @@ export default function DoctorAvailabilityPage() {
               <span className="text-sm font-black text-slate-900">
                 {weekdayLabels[day.dayOfWeek]}
               </span>
-              <label className="flex cursor-pointer items-center gap-2 text-[11px] font-semibold text-slate-600">
+              <label className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-slate-600">
                 <input
                   type="checkbox"
                   checked={day.isDayOff}
@@ -172,27 +258,27 @@ export default function DoctorAvailabilityPage() {
                                 ? "09:00"
                                 : row.startTime || "09:00",
                               endTime: isDayOff
-                                ? "17:00"
-                                : row.endTime || "17:00",
+                                ? "18:00"
+                                : row.endTime || "18:00",
                             }
                           : row,
                       ),
                     );
                   }}
-                  className="h-3.5 w-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                  className="h-3.5 w-3.5 rounded text-emerald-600"
                 />
                 Амрах өдөр
               </label>
             </div>
 
             {day.isDayOff ? (
-              <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white/70 px-3 py-3 text-center text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
-                Ажиллахгүй
+              <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white/70 py-2.5 text-center text-xs font-bold uppercase tracking-wider text-slate-400">
+                Амралтын өдөр
               </div>
             ) : (
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <label className="rounded-xl border border-white bg-white p-2 text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
-                  Эхлэх
+              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                <label className="rounded-xl border border-white bg-white p-2">
+                  <span className="text-[10px] text-slate-400 block font-bold">Эхлэх</span>
                   <input
                     type="time"
                     value={day.startTime}
@@ -205,11 +291,11 @@ export default function DoctorAvailabilityPage() {
                         ),
                       )
                     }
-                    className="mt-2 w-full bg-transparent text-sm font-semibold text-slate-700 outline-none"
+                    className="w-full bg-transparent font-bold text-slate-800 outline-none"
                   />
                 </label>
-                <label className="rounded-xl border border-white bg-white p-2 text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
-                  Дуусах
+                <label className="rounded-xl border border-white bg-white p-2">
+                  <span className="text-[10px] text-slate-400 block font-bold">Дуусах</span>
                   <input
                     type="time"
                     value={day.endTime}
@@ -222,7 +308,7 @@ export default function DoctorAvailabilityPage() {
                         ),
                       )
                     }
-                    className="mt-2 w-full bg-transparent text-sm font-semibold text-slate-700 outline-none"
+                    className="w-full bg-transparent font-bold text-slate-800 outline-none"
                   />
                 </label>
               </div>
@@ -231,14 +317,16 @@ export default function DoctorAvailabilityPage() {
         ))}
       </div>
 
-      <button
-        onClick={saveSchedule}
-        disabled={saving}
-        className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        <Save className="h-4 w-4" />
-        {saving ? "Хадгалж байна…" : "Цагийн хуваарь хадгалах"}
-      </button>
+      <div className="flex justify-end pt-2">
+        <button
+          onClick={saveSchedule}
+          disabled={saving}
+          className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-6 py-3 text-xs font-black text-white shadow-md hover:bg-slate-800 disabled:opacity-60"
+        >
+          <Save className="h-4 w-4" />
+          {saving ? "Хадгалж байна…" : "Хуваарь хадгалах"}
+        </button>
+      </div>
     </div>
   );
 }
