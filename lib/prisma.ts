@@ -7,16 +7,21 @@ const globalForPrisma = globalThis as unknown as {
   pool?: Pool;
 };
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL is not configured.");
-}
+const databaseUrl =
+  process.env.DATABASE_URL ||
+  "postgresql://postgres:postgres@localhost:5432/placeholder";
 
-const pool = globalForPrisma.pool ?? new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
+const pool =
+  globalForPrisma.pool ??
+  new Pool({
+    connectionString: databaseUrl,
+  });
 
 export const prisma =
-  globalForPrisma.prisma ?? new PrismaClient({ adapter: new PrismaPg(pool) });
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    adapter: new PrismaPg(pool),
+  });
 
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;

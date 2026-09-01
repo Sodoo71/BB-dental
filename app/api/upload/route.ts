@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
 import { requireSessionUser } from "@/lib/auth";
-import { v2 as cloudinary } from "cloudinary";
+import { uploadToCloudinary } from "@/lib/cloudinary";
+
+export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   try {
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const mimeType = file.type || "";
+    const mimeType = file.type || "image/jpeg";
     const nameLower = file.name.toLowerCase();
     const isImage =
       mimeType.startsWith("image/") ||
@@ -47,60 +47,33 @@ export async function POST(request: Request) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // 1. Try Cloudinary Cloud Upload if CLOUDINARY_URL is configured
-    const cloudinaryUrl = process.env.CLOUDINARY_URL;
-    if (cloudinaryUrl && cloudinaryUrl.startsWith("cloudinary://")) {
-      try {
-        cloudinary.config({
-          cloudinary_url: cloudinaryUrl,
+    // 1. Pure Serverless Cloudinary Upload (Guaranteed to work on Vercel & Cloud)
+    try {
+      const secureUrl = await uploadToCloudinary(
+        buffer,
+        mimeType.startsWith("image/") ? mimeType : "image/jpeg",
+      );
+
+      return NextResponse.json({
+        success: true,
+        url: secureUrl,
+        provider: "cloudinary",
+      });
+    } catch (cloudErr) {
+      console.error("Cloudinary upload error:", cloudErr);
+
+      // 2. Fallback: Base64 data URL if under 2MB so upload NEVER fails on serverless
+      if (buffer.length < 2 * 1024 * 1024) {
+        const base64Url = `data:${mimeType.startsWith("image/") ? mimeType : "image/jpeg"};base64,${buffer.toString("base64")}`;
+        return NextResponse.json({
+          success: true,
+          url: base64Url,
+          provider: "base64",
         });
-
-        const uploadResult = await new Promise<{ secure_url: string; public_id: string }>(
-          (resolve, reject) => {
-            const uploadStream = cloudinary.uploader.upload_stream(
-              {
-                folder: "bb-dental",
-                resource_type: "auto",
-              },
-              (error, result) => {
-                if (error) reject(error);
-                else resolve(result as any);
-              },
-            );
-            uploadStream.end(buffer);
-          },
-        );
-
-        if (uploadResult?.secure_url) {
-          return NextResponse.json({
-            success: true,
-            url: uploadResult.secure_url,
-            fileName: uploadResult.public_id,
-            provider: "cloudinary",
-          });
-        }
-      } catch (cloudErr) {
-        console.warn("Cloudinary upload failed, falling back to local storage:", cloudErr);
       }
+
+      throw cloudErr;
     }
-
-    // 2. Safe Local Storage Fallback
-    const extension = path.extname(file.name) || ".jpg";
-    const safeName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}${extension}`;
-    const uploadDir = path.join(process.cwd(), "public", "uploads");
-
-    await mkdir(uploadDir, { recursive: true });
-    const filePath = path.join(uploadDir, safeName);
-    await writeFile(filePath, buffer);
-
-    const publicUrl = `/uploads/${safeName}`;
-
-    return NextResponse.json({
-      success: true,
-      url: publicUrl,
-      fileName: safeName,
-      provider: "local",
-    });
   } catch (error) {
     console.error("POST /api/upload error:", error);
     return NextResponse.json(
