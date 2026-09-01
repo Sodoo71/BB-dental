@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState } from "react";
-import { Image as ImageIcon, Loader2, Trash2, UploadCloud } from "lucide-react";
+import { Loader2, Trash2, UploadCloud } from "lucide-react";
 
 type ImageUploadProps = {
   value?: string | null;
@@ -9,6 +9,63 @@ type ImageUploadProps = {
   label?: string;
   className?: string;
 };
+
+async function optimizeImageForUpload(file: File): Promise<File | Blob> {
+  // If SVG or already small (< 1.2MB), keep original
+  if (file.type === "image/svg+xml" || file.size < 1.2 * 1024 * 1024) {
+    return file;
+  }
+
+  return new Promise((resolve) => {
+    try {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const maxDim = 1920;
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve(file);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const cleanName = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
+              resolve(new File([blob], cleanName, { type: "image/jpeg" }));
+            } else {
+              resolve(file);
+            }
+          },
+          "image/jpeg",
+          0.85,
+        );
+      };
+      img.onerror = () => {
+        resolve(file);
+      };
+      img.src = url;
+    } catch {
+      resolve(file);
+    }
+  });
+}
 
 export function ImageUpload({
   value,
@@ -45,17 +102,30 @@ export function ImageUpload({
     setUploading(true);
 
     try {
+      const optimizedFile = await optimizeImageForUpload(file);
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", optimizedFile);
 
       const response = await fetch("/api/upload", {
         method: "POST",
         body: formData,
       });
 
-      const data = await response.json();
+      const responseText = await response.text();
+      let data: any = null;
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        if (response.status === 413 || responseText.includes("Request En")) {
+          throw new Error("Зургийн хэмжээ хэтэрхий том байна.");
+        }
+        throw new Error(
+          responseText || `Серверийн хариу: ${response.status}`,
+        );
+      }
+
       if (!response.ok) {
-        throw new Error(data.error || "Зураг хуулахад алдаа гарлаа.");
+        throw new Error(data?.error || "Зураг хуулахад алдаа гарлаа.");
       }
 
       onChange(data.url);
@@ -114,7 +184,7 @@ export function ImageUpload({
             <div className="flex flex-col items-center gap-2">
               <Loader2 className="h-7 w-7 animate-spin text-cyan-600" />
               <span className="text-xs font-bold text-slate-600">
-                Зураг хуулж байна...
+                Зураг боловсруулж байна...
               </span>
             </div>
           ) : (
@@ -127,7 +197,7 @@ export function ImageUpload({
                   Зураг сонгох эсвэл чирж оруулна уу
                 </p>
                 <p className="mt-0.5 text-[11px] text-slate-400">
-                  JPG, PNG, WEBP файл (хамгийн ихдээ 10MB)
+                  JPG, PNG, WEBP, HEIC файл (Автомат оновчлогдоно)
                 </p>
               </div>
             </>
@@ -138,7 +208,7 @@ export function ImageUpload({
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,.heic,.heif"
         onChange={handleFileChange}
         className="hidden"
       />
