@@ -61,12 +61,27 @@ export async function POST(request: Request) {
       );
     }
 
+    const parsedPrice = Number(price);
+    const slug =
+      typeof body.slug === "string" && body.slug.trim()
+        ? body.slug.trim()
+        : name
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "") || `service-${Date.now()}`;
+    const category =
+      typeof body.category === "string" && body.category.trim()
+        ? body.category.trim()
+        : "GENERAL";
+
     const service = await prisma.service.create({
       data: {
         name,
+        slug,
+        category,
         description: description || null,
-        durationMin: String(parsedDuration),
-        price,
+        durationMin: parsedDuration,
+        price: Number.isFinite(parsedPrice) ? parsedPrice : 0,
         imageUrl: imageUrl || null,
         isActive,
       },
@@ -123,17 +138,18 @@ export async function PUT(request: Request) {
           ? null
           : undefined;
     const durationMin =
-      body.durationMin !== undefined
-        ? String(body.durationMin).trim()
-        : undefined;
-    const price =
-      body.price !== undefined ? String(body.price).trim() : undefined;
+      body.durationMin !== undefined ? Number(body.durationMin) : undefined;
+    const price = body.price !== undefined ? Number(body.price) : undefined;
     const imageUrl =
       typeof body.imageUrl === "string"
         ? body.imageUrl.trim()
         : body.imageUrl === null
           ? null
           : undefined;
+    const category =
+      typeof body.category === "string" && body.category.trim()
+        ? body.category.trim()
+        : undefined;
     const isActive =
       typeof body.isActive === "boolean" ? body.isActive : undefined;
 
@@ -144,9 +160,12 @@ export async function PUT(request: Request) {
         ...(description !== undefined
           ? { description: description || null }
           : {}),
-        ...(durationMin !== undefined ? { durationMin } : {}),
-        ...(price !== undefined ? { price } : {}),
+        ...(durationMin !== undefined && Number.isFinite(durationMin)
+          ? { durationMin }
+          : {}),
+        ...(price !== undefined && Number.isFinite(price) ? { price } : {}),
         ...(imageUrl !== undefined ? { imageUrl: imageUrl || null } : {}),
+        ...(category !== undefined ? { category } : {}),
         ...(isActive !== undefined ? { isActive } : {}),
       },
     });

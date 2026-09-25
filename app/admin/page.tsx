@@ -1,4 +1,6 @@
 "use client";
+import { ActionMenu } from "@/components/ui/ActionMenu";
+import { DialogFrame } from "@/components/ui/DialogFrame";
 
 import React, {
   startTransition,
@@ -19,6 +21,7 @@ import {
   Clock,
   FileText,
   Loader2,
+  Menu,
   MessageSquare,
   Plus,
   PlusCircle,
@@ -117,6 +120,10 @@ export default function ReceptionDashboard() {
   const [filterDate, setFilterDate] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [sendingReminderId, setSendingReminderId] = useState<string | null>(
+    null,
+  );
 
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [services, setServices] = useState<Service[]>([]);
@@ -141,14 +148,17 @@ export default function ReceptionDashboard() {
 
   // Transfer modal state
   const [transferModalOpen, setTransferModalOpen] = useState(false);
-  const [transferringApp, setTransferringApp] = useState<Appointment | null>(null);
+  const [transferringApp, setTransferringApp] = useState<Appointment | null>(
+    null,
+  );
   const [targetDoctorId, setTargetDoctorId] = useState("");
   const [transferReason, setTransferReason] = useState("");
   const [transferring, setTransferring] = useState(false);
 
   // Notes drawer state
   const [notesModalOpen, setNotesModalOpen] = useState(false);
-  const [activeAppForNotes, setActiveAppForNotes] = useState<Appointment | null>(null);
+  const [activeAppForNotes, setActiveAppForNotes] =
+    useState<Appointment | null>(null);
   const [notesList, setNotesList] = useState<AppointmentNote[]>([]);
   const [newNoteText, setNewNoteText] = useState("");
   const [savingNote, setSavingNote] = useState(false);
@@ -237,7 +247,12 @@ export default function ReceptionDashboard() {
   const handleBooking = useCallback(async () => {
     const finalStartTime = forceBooking ? customTime : bookingForm.startTime;
 
-    if (!selectedDoctorId || !selectedServiceId || !selectedDate || !finalStartTime) {
+    if (
+      !selectedDoctorId ||
+      !selectedServiceId ||
+      !selectedDate ||
+      !finalStartTime
+    ) {
       showToast("Эмч, үйлчилгээ, огноо, цагийг бүрэн сонгоно уу.", "error");
       return;
     }
@@ -280,7 +295,12 @@ export default function ReceptionDashboard() {
       showToast("Цаг амжилттай захиалагдлаа.", "success");
       setActiveTab("APPOINTMENTS");
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Захиалга үүсгэхэд алдаа гарлаа.", "error");
+      showToast(
+        error instanceof Error
+          ? error.message
+          : "Захиалга үүсгэхэд алдаа гарлаа.",
+        "error",
+      );
     }
   }, [
     bookingForm,
@@ -302,7 +322,8 @@ export default function ReceptionDashboard() {
           body: JSON.stringify({ status: newStatus }),
         });
         const data = await response.json();
-        if (!response.ok) throw new Error(data.error || "Статус шинэчлэх боломжгүй байна.");
+        if (!response.ok)
+          throw new Error(data.error || "Статус шинэчлэх боломжгүй байна.");
 
         setAppointments((current) =>
           current.map((item) =>
@@ -311,7 +332,12 @@ export default function ReceptionDashboard() {
         );
         showToast("Захиалгын төлөв шинэчлэгдлээ.", "success");
       } catch (error) {
-        showToast(error instanceof Error ? error.message : "Статус шинэчлэхэд алдаа гарлаа.", "error");
+        showToast(
+          error instanceof Error
+            ? error.message
+            : "Статус шинэчлэхэд алдаа гарлаа.",
+          "error",
+        );
       } finally {
         setUpdatingId(null);
       }
@@ -326,14 +352,41 @@ export default function ReceptionDashboard() {
         method: "DELETE",
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Устгах боломжгүй байна.");
+      if (!response.ok)
+        throw new Error(data.error || "Устгах боломжгүй байна.");
 
       setAppointments((current) => current.filter((item) => item.id !== id));
       showToast("Захиалга устгагдлаа.", "success");
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Устгахад алдаа гарлаа.", "error");
+      showToast(
+        error instanceof Error ? error.message : "Устгахад алдаа гарлаа.",
+        "error",
+      );
     }
   }, []);
+
+  const handleSendReminder = async (appointmentId: string) => {
+    setSendingReminderId(appointmentId);
+    try {
+      const res = await fetch("/api/telegram/reminder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ appointmentId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Сануулга илгээхэд алдаа гарлаа.");
+      }
+      showToast(
+        "Telegram сануулга эмч/админ руу амжилттай илгээгдлээ!",
+        "success",
+      );
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Алдаа гарлаа.", "error");
+    } finally {
+      setSendingReminderId(null);
+    }
+  };
 
   // Transfer Appointment
   const handleOpenTransfer = (app: Appointment) => {
@@ -351,14 +404,17 @@ export default function ReceptionDashboard() {
 
     setTransferring(true);
     try {
-      const res = await fetch(`/api/appointments/${transferringApp.id}/transfer`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          targetDoctorId,
-          reason: transferReason.trim(),
-        }),
-      });
+      const res = await fetch(
+        `/api/appointments/${transferringApp.id}/transfer`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            targetDoctorId,
+            reason: transferReason.trim(),
+          }),
+        },
+      );
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Шилжүүлж чадсангүй.");
 
@@ -392,13 +448,17 @@ export default function ReceptionDashboard() {
     if (!activeAppForNotes || !newNoteText.trim()) return;
     setSavingNote(true);
     try {
-      const res = await fetch(`/api/appointments/${activeAppForNotes.id}/notes`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ note: newNoteText.trim() }),
-      });
+      const res = await fetch(
+        `/api/appointments/${activeAppForNotes.id}/notes`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ note: newNoteText.trim() }),
+        },
+      );
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Тэмдэглэл хадгалж чадсангүй.");
+      if (!res.ok)
+        throw new Error(data.error || "Тэмдэглэл хадгалж чадсангүй.");
 
       setNotesList((prev) => [data.data, ...prev]);
       setNewNoteText("");
@@ -424,8 +484,10 @@ export default function ReceptionDashboard() {
         !filterDate ||
         startOfDayTimestamp(appointment.appointmentDate) ===
           startOfDayTimestamp(filterDate);
-      const patientName = appointment.patient.fullName ?? "";
-      const patientPhone = appointment.patient.phone ?? "";
+      const patientName =
+        appointment.patient?.fullName ?? (appointment as any).patientName ?? "";
+      const patientPhone =
+        appointment.patient?.phone ?? (appointment as any).patientPhone ?? "";
       const matchesSearch =
         !query ||
         patientName.toLowerCase().includes(query) ||
@@ -463,21 +525,43 @@ export default function ReceptionDashboard() {
         );
       }).length,
       pending: appointments.filter((item) => item.status === "PENDING").length,
-      confirmed: appointments.filter((item) => item.status === "CONFIRMED").length,
-      completed: appointments.filter((item) => item.status === "COMPLETED").length,
-      cancelled: appointments.filter((item) => item.status === "CANCELLED").length,
+      confirmed: appointments.filter((item) => item.status === "CONFIRMED")
+        .length,
+      completed: appointments.filter((item) => item.status === "COMPLETED")
+        .length,
+      cancelled: appointments.filter((item) => item.status === "CANCELLED")
+        .length,
     };
   }, [appointments]);
 
   // Distinct patients for directory
   const distinctPatients = useMemo(() => {
-    const map = new Map<string, { patient: Appointment["patient"]; count: number; lastDate: string }>();
+    const map = new Map<
+      string,
+      {
+        patient: { id: string; fullName: string; phone: string };
+        count: number;
+        lastDate: string;
+      }
+    >();
     for (const a of appointments) {
-      const p = a.patient;
-      if (!map.has(p.id)) {
-        map.set(p.id, { patient: p, count: 1, lastDate: a.appointmentDate });
+      const id =
+        a.patient?.id ||
+        a.patient?.phone ||
+        (a as any).patientPhone ||
+        (a as any).patientName ||
+        a.id;
+      const fullName =
+        a.patient?.fullName || (a as any).patientName || "Үйлчлүүлэгч";
+      const phone = a.patient?.phone || (a as any).patientPhone || "-";
+      if (!map.has(id)) {
+        map.set(id, {
+          patient: { id, fullName, phone },
+          count: 1,
+          lastDate: a.appointmentDate,
+        });
       } else {
-        const item = map.get(p.id)!;
+        const item = map.get(id)!;
         item.count += 1;
       }
     }
@@ -485,8 +569,8 @@ export default function ReceptionDashboard() {
   }, [appointments]);
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900">
-      <div className="mx-auto flex max-w-[1600px] flex-col gap-6 p-4 md:p-6 xl:flex-row">
+    <div className="min-h-screen bg-background text-slate-900">
+      <div className="mx-auto flex max-w-[1800px] flex-col gap-6 p-4 md:p-6 xl:flex-row xl:gap-8">
         {/* Modern Reception Sidebar */}
         <AdminSidebar
           user={
@@ -499,21 +583,35 @@ export default function ReceptionDashboard() {
           }
           activeTab={activeTab}
           onSelectTab={setActiveTab}
+          mobileOpen={mobileSidebarOpen}
+          onCloseMobile={() => setMobileSidebarOpen(false)}
         />
 
         {/* Main Content Area */}
-        <main className="flex-1 space-y-6">
+        <main id="reception-main" className="staff-content min-w-0 flex-1 space-y-6">
           {/* Top header bar */}
-          <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-2xl font-black text-slate-900">
-                {activeTab === "APPOINTMENTS" && "Өдөр тутмын үзлэгийн цагууд"}
-                {activeTab === "QUICK_BOOK" && "Шуурхай цаг бүртгэх"}
-                {activeTab === "PATIENTS" && "Үйлчлүүлэгчдийн лавлах"}
-              </h1>
-              <p className="text-xs text-slate-500">
-                Үйлчлүүлэгчдийг хүлээн авах, цаг бүртгэх, эмчид шилжүүлэх ба дотоод тэмдэглэл
-              </p>
+          <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setMobileSidebarOpen(true)}
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 shadow-sm transition hover:bg-slate-100 xl:hidden"
+                aria-label="Цэс нээх"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+              <div>
+                <h1 className="text-2xl font-semibold text-slate-900">
+                  {activeTab === "APPOINTMENTS" &&
+                    "Өдөр тутмын үзлэгийн цагууд"}
+                  {activeTab === "QUICK_BOOK" && "Шуурхай цаг бүртгэх"}
+                  {activeTab === "PATIENTS" && "Үйлчлүүлэгчдийн лавлах"}
+                </h1>
+                <p className="text-sm text-slate-500">
+                  Үйлчлүүлэгчдийг хүлээн авах, цаг бүртгэх, эмчид шилжүүлэх ба
+                  дотоод тэмдэглэл
+                </p>
+              </div>
             </div>
 
             <div className="flex items-center gap-3">
@@ -524,7 +622,7 @@ export default function ReceptionDashboard() {
                   void fetchDoctors();
                   void fetchServices();
                 }}
-                className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700 transition hover:bg-slate-100"
+                className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-100"
               >
                 <RefreshCw
                   className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
@@ -540,21 +638,45 @@ export default function ReceptionDashboard() {
               {/* Stats overview */}
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
                 {[
-                  { label: "Нийт", value: stats.total, color: "text-slate-900" },
-                  { label: "Өнөөдөр", value: stats.today, color: "text-cyan-600" },
-                  { label: "Хүлээгдэж буй", value: stats.pending, color: "text-amber-600" },
-                  { label: "Баталгаажсан", value: stats.confirmed, color: "text-emerald-600" },
-                  { label: "Дууссан", value: stats.completed, color: "text-blue-600" },
-                  { label: "Цуцлагдсан", value: stats.cancelled, color: "text-red-600" },
+                  {
+                    label: "Нийт",
+                    value: stats.total,
+                    color: "text-slate-900",
+                  },
+                  {
+                    label: "Өнөөдөр",
+                    value: stats.today,
+                    color: "text-brand-600",
+                  },
+                  {
+                    label: "Хүлээгдэж буй",
+                    value: stats.pending,
+                    color: "text-amber-600",
+                  },
+                  {
+                    label: "Баталгаажсан",
+                    value: stats.confirmed,
+                    color: "text-emerald-600",
+                  },
+                  {
+                    label: "Дууссан",
+                    value: stats.completed,
+                    color: "text-brand-600",
+                  },
+                  {
+                    label: "Цуцлагдсан",
+                    value: stats.cancelled,
+                    color: "text-red-600",
+                  },
                 ].map((card) => (
                   <div
                     key={card.label}
                     className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
                   >
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <p className="min-h-10 text-sm font-semibold text-slate-500">
                       {card.label}
                     </p>
-                    <div className={`mt-1.5 text-2xl font-black ${card.color}`}>
+                    <div className={`mt-1.5 text-2xl font-semibold ${card.color}`}>
                       {card.value}
                     </div>
                   </div>
@@ -562,14 +684,14 @@ export default function ReceptionDashboard() {
               </div>
 
               {/* Table section */}
-              <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="flex flex-wrap gap-1.5">
                     {STATUS_TABS.map((tab) => (
                       <button
                         key={tab.id}
                         onClick={() => setFilterStatus(tab.id)}
-                        className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${
+                        className={`rounded-xl px-3 py-1.5 text-sm font-bold transition ${
                           filterStatus === tab.id
                             ? "bg-slate-900 text-white shadow-sm"
                             : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -580,11 +702,12 @@ export default function ReceptionDashboard() {
                     ))}
                   </div>
 
-                  <div className="flex flex-wrap gap-2.5 sm:items-center">
+                  <div className="grid min-w-0 grid-cols-1 gap-2.5 sm:flex sm:flex-wrap sm:items-center">
                     <select
+                      aria-label="Эмчээр шүүх"
                       value={filterDoctorId}
                       onChange={(e) => setFilterDoctorId(e.target.value)}
-                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 outline-none"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 outline-none"
                     >
                       <option value="ALL">Бүх эмч нар</option>
                       {doctors.map((doctor) => (
@@ -595,9 +718,10 @@ export default function ReceptionDashboard() {
                     </select>
 
                     <select
+                      aria-label="Үйлчилгээгээр шүүх"
                       value={filterServiceId}
                       onChange={(e) => setFilterServiceId(e.target.value)}
-                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 outline-none"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 outline-none"
                     >
                       <option value="ALL">Бүх үйлчилгээ</option>
                       {services.map((service) => (
@@ -609,33 +733,37 @@ export default function ReceptionDashboard() {
 
                     <input
                       type="date"
+                      aria-label="Огноогоор шүүх"
                       value={filterDate}
                       onChange={(e) => setFilterDate(e.target.value)}
-                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 outline-none"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 outline-none"
                     />
 
                     <div className="relative w-full sm:w-56">
                       <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                       <input
+                        aria-label="Үйлчлүүлэгчийн нэр, утсаар хайх"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="Нэр, утсаар хайх..."
-                        className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-xs outline-none"
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm outline-none"
                       />
                     </div>
                   </div>
                 </div>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-500">
+                <div className="table-scroll" tabIndex={0} role="region" aria-label="Цаг захиалгын хүснэгт">
+                  <table className="w-full min-w-[1000px] table-fixed text-left text-sm">
+                    <thead className="border-b border-slate-200 bg-slate-50 text-sm font-semibold text-slate-500">
                       <tr>
-                        <th className="p-4">Үйлчлүүлэгч</th>
-                        <th className="p-4">Огноо & Цаг</th>
-                        <th className="p-4">Үйлчилгээ</th>
-                        <th className="p-4">Хариуцсан эмч</th>
-                        <th className="p-4">Төлөв</th>
-                        <th className="p-4 text-right">Үйлдлүүд</th>
+                        <th className="w-[200px] px-3 py-3 text-sm">Үйлчлүүлэгч</th>
+                        <th className="w-[130px] px-3 py-3 text-sm">Огноо & Цаг</th>
+                        <th className="w-[190px] px-3 py-3 text-sm">Үйлчилгээ</th>
+                        <th className="w-[180px] px-3 py-3 text-sm">Хариуцсан эмч</th>
+                        <th className="w-[180px] px-3 py-3 text-sm">Төлөв</th>
+                        <th className="w-[120px] px-3 py-3 text-right text-sm">
+                          Үйлдлүүд
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -651,106 +779,58 @@ export default function ReceptionDashboard() {
                       ) : (
                         filteredAppointments.map((app) => (
                           <tr key={app.id} className="hover:bg-slate-50/60">
-                            <td className="p-4">
-                              <div className="font-bold text-slate-900">
-                                {app.patient.fullName}
+                            <td className="px-3 py-3">
+                              <div className="truncate font-bold text-slate-900">
+                                {app.patient?.fullName ||
+                                  (app as any).patientName ||
+                                  "Үйлчлүүлэгч"}
                               </div>
-                              <div className="text-xs text-slate-500">
-                                {app.patient.phone}
+                              <div className="truncate text-sm text-slate-500">
+                                {app.patient?.phone ||
+                                  (app as any).patientPhone ||
+                                  "-"}
                               </div>
                               {app.chiefComplaint && (
-                                <div className="mt-0.5 text-[11px] text-slate-400 line-clamp-1">
+                                <div className="mt-0.5 truncate text-sm text-slate-400">
                                   Зовиур: {app.chiefComplaint}
                                 </div>
                               )}
                             </td>
-                            <td className="p-4">
+                            <td className="px-3 py-3">
                               <div className="font-semibold text-slate-900">
                                 {new Date(
                                   app.appointmentDate,
                                 ).toLocaleDateString("mn-MN")}
                               </div>
-                              <div className="text-xs font-bold text-cyan-600">
+                              <div className="text-sm font-bold text-brand-600">
                                 {app.startTime}
                               </div>
                             </td>
-                            <td className="p-4 text-slate-700">
+                            <td className="truncate px-3 py-3 text-slate-700">
                               {app.service?.name || "-"}
                             </td>
-                            <td className="p-4 text-slate-700">
+                            <td className="truncate px-3 py-3 text-slate-700">
                               <span className="font-semibold text-slate-900">
                                 {app.doctor?.name || "Хуваарилаагүй"}
                               </span>
                             </td>
-                            <td className="p-4">
+                            <td className="whitespace-nowrap px-3 py-3">
                               <StatusBadge status={app.status} />
                             </td>
-                            <td className="p-4">
-                              <div className="flex items-center justify-end gap-1.5">
-                                {/* Transfer Button */}
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenTransfer(app)}
-                                  className="rounded-xl border border-purple-200 bg-purple-50 p-2 text-purple-700 transition hover:bg-purple-100"
-                                  title="Эмч рүү шилжүүлэх (Transfer)"
-                                >
-                                  <ArrowRightLeft className="h-4 w-4" />
-                                </button>
-
-                                {/* Notes Button */}
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenNotes(app)}
-                                  className="rounded-xl border border-blue-200 bg-blue-50 p-2 text-blue-700 transition hover:bg-blue-100"
-                                  title="Дотоод тэмдэглэл"
-                                >
-                                  <MessageSquare className="h-4 w-4" />
-                                </button>
-
-                                {app.status === "PENDING" && (
-                                  <button
-                                    onClick={() =>
-                                      handleStatusChange(app.id, "CONFIRMED")
-                                    }
-                                    disabled={updatingId === app.id}
-                                    className="rounded-xl bg-emerald-50 p-2 text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50"
-                                    title="Баталгаажуулах"
-                                  >
-                                    <Check className="h-4 w-4" />
-                                  </button>
-                                )}
-                                {app.status === "CONFIRMED" && (
-                                  <button
-                                    onClick={() =>
-                                      handleStatusChange(app.id, "COMPLETED")
-                                    }
-                                    disabled={updatingId === app.id}
-                                    className="rounded-xl bg-blue-50 p-2 text-blue-700 transition hover:bg-blue-100 disabled:opacity-50"
-                                    title="Үзлэг дууссан"
-                                  >
-                                    <Clock className="h-4 w-4" />
-                                  </button>
-                                )}
-                                {app.status !== "CANCELLED" && (
-                                  <button
-                                    onClick={() =>
-                                      handleStatusChange(app.id, "CANCELLED")
-                                    }
-                                    disabled={updatingId === app.id}
-                                    className="rounded-xl bg-amber-50 p-2 text-amber-700 transition hover:bg-amber-100 disabled:opacity-50"
-                                    title="Цуцлах"
-                                  >
-                                    <X className="h-4 w-4" />
-                                  </button>
-                                )}
-                                <button
-                                  onClick={() => handleDelete(app.id)}
+                            <td className="px-3 py-3">
+                              <div className="flex justify-end">
+                                <ActionMenu
+                                  label={`Захиалгын үйлдлүүд: ${app.patient?.fullName || "Үйлчлүүлэгч"}`}
                                   disabled={updatingId === app.id}
-                                  className="rounded-xl bg-red-50 p-2 text-red-700 transition hover:bg-red-100 disabled:opacity-50"
-                                  title="Устгах"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
+                                  actions={[
+                                    { label: "Эмч рүү шилжүүлэх", icon: <ArrowRightLeft className="h-4 w-4 text-purple-600" />, onSelect: () => handleOpenTransfer(app) },
+                                    { label: "Дотоод тэмдэглэл", icon: <MessageSquare className="h-4 w-4 text-brand-600" />, onSelect: () => { void handleOpenNotes(app); } },
+                                    ...(app.status === "PENDING" ? [{ label: "Баталгаажуулах", icon: <Check className="h-4 w-4 text-emerald-600" />, onSelect: () => { void handleStatusChange(app.id, "CONFIRMED"); } }] : []),
+                                    ...(app.status === "CONFIRMED" ? [{ label: "Үзлэг дууссан", icon: <Clock className="h-4 w-4 text-brand-600" />, onSelect: () => { void handleStatusChange(app.id, "COMPLETED"); } }] : []),
+                                    ...(app.status !== "CANCELLED" ? [{ label: "Цуцлах", icon: <X className="h-4 w-4 text-amber-600" />, onSelect: () => { void handleStatusChange(app.id, "CANCELLED"); } }] : []),
+                                    { label: "Устгах", icon: <Trash2 className="h-4 w-4" />, destructive: true, onSelect: () => { void handleDelete(app.id); } },
+                                  ]}
+                                />
                               </div>
                             </td>
                           </tr>
@@ -766,23 +846,23 @@ export default function ReceptionDashboard() {
           {/* TAB 2: QUICK BOOK */}
           {activeTab === "QUICK_BOOK" && (
             <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                 <div className="mb-6 flex items-center justify-between">
                   <div>
-                    <h2 className="text-xl font-black text-slate-900">
+                    <h2 className="text-lg font-semibold text-slate-900">
                       Шуурхай цаг захиалах
                     </h2>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-sm text-slate-500">
                       Утсаар эсвэл биеэр ирсэн үйлчлүүлэгчид цаг товлох
                     </p>
                   </div>
 
-                  <label className="flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-bold">
+                  <label className="flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm font-bold">
                     <input
                       type="checkbox"
                       checked={forceBooking}
                       onChange={(e) => setForceBooking(e.target.checked)}
-                      className="h-4 w-4 rounded text-cyan-600"
+                      className="h-4 w-4 rounded text-brand-600"
                     />
                     <Zap className="h-4 w-4 text-amber-500" />
                     <span>Тусгай цаг оноох</span>
@@ -790,7 +870,7 @@ export default function ReceptionDashboard() {
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <label className="space-y-1.5 text-xs font-bold text-slate-700">
+                  <label className="space-y-1.5 text-sm font-bold text-slate-700">
                     <span>Эмч сонгох *</span>
                     <select
                       value={selectedDoctorId}
@@ -800,13 +880,14 @@ export default function ReceptionDashboard() {
                       <option value="">Сонгох</option>
                       {doctors.map((doctor) => (
                         <option key={doctor.id} value={doctor.id}>
-                          {doctor.name} {doctor.title ? `(${doctor.title})` : ""}
+                          {doctor.name}{" "}
+                          {doctor.title ? `(${doctor.title})` : ""}
                         </option>
                       ))}
                     </select>
                   </label>
 
-                  <label className="space-y-1.5 text-xs font-bold text-slate-700">
+                  <label className="space-y-1.5 text-sm font-bold text-slate-700">
                     <span>Үйлчилгээ сонгох *</span>
                     <select
                       value={selectedServiceId}
@@ -822,7 +903,7 @@ export default function ReceptionDashboard() {
                     </select>
                   </label>
 
-                  <label className="space-y-1.5 text-xs font-bold text-slate-700">
+                  <label className="space-y-1.5 text-sm font-bold text-slate-700">
                     <span>Огноо *</span>
                     <input
                       type="date"
@@ -832,7 +913,7 @@ export default function ReceptionDashboard() {
                     />
                   </label>
 
-                  <label className="space-y-1.5 text-xs font-bold text-slate-700">
+                  <label className="space-y-1.5 text-sm font-bold text-slate-700">
                     <span>Эхлэх төлөв</span>
                     <select
                       value={bookingForm.status}
@@ -844,12 +925,14 @@ export default function ReceptionDashboard() {
                       }
                       className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-sm font-semibold outline-none"
                     >
-                      <option value="CONFIRMED">Баталгаажсан (Шууд товлох)</option>
+                      <option value="CONFIRMED">
+                        Баталгаажсан (Шууд товлох)
+                      </option>
                       <option value="PENDING">Хүлээгдэж буй</option>
                     </select>
                   </label>
 
-                  <label className="space-y-1.5 text-xs font-bold text-slate-700 sm:col-span-2">
+                  <label className="space-y-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
                     <span>Өвчтөний бүтэн нэр *</span>
                     <input
                       value={bookingForm.patientName}
@@ -864,7 +947,7 @@ export default function ReceptionDashboard() {
                     />
                   </label>
 
-                  <label className="space-y-1.5 text-xs font-bold text-slate-700 sm:col-span-2">
+                  <label className="space-y-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
                     <span>Утасны дугаар *</span>
                     <input
                       value={bookingForm.patientPhone}
@@ -879,7 +962,7 @@ export default function ReceptionDashboard() {
                     />
                   </label>
 
-                  <label className="space-y-1.5 text-xs font-bold text-slate-700 sm:col-span-2">
+                  <label className="space-y-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
                     <span>Зовиур / Тэмдэглэл</span>
                     <textarea
                       value={bookingForm.chiefComplaint}
@@ -899,23 +982,23 @@ export default function ReceptionDashboard() {
                 {/* Slot selection */}
                 <div className="mt-5">
                   {forceBooking ? (
-                    <label className="block text-xs font-bold text-slate-700">
+                    <label className="block text-sm font-bold text-slate-700">
                       Хүссэн цагаа шууд оруулна уу:
                       <input
                         type="time"
                         value={customTime}
                         onChange={(e) => setCustomTime(e.target.value)}
-                        className="mt-2 block w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-base font-bold outline-none"
+                        className="mt-2 block w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-sm font-bold outline-none"
                       />
                     </label>
                   ) : (
                     <div>
-                      <span className="mb-2 block text-xs font-bold text-slate-700">
+                      <span className="mb-2 block text-sm font-bold text-slate-700">
                         Боломжит цагууд:
                       </span>
                       {slotLoading ? (
-                        <div className="flex items-center gap-2 py-4 text-xs text-slate-500">
-                          <Loader2 className="h-4 w-4 animate-spin text-cyan-600" />
+                        <div className="flex items-center gap-2 py-4 text-sm text-slate-500">
+                          <Loader2 className="h-4 w-4 animate-spin text-brand-600" />
                           <span>Цагуудыг шалгаж байна...</span>
                         </div>
                       ) : availableSlots.length > 0 ? (
@@ -930,10 +1013,10 @@ export default function ReceptionDashboard() {
                                   startTime: slot,
                                 }))
                               }
-                              className={`rounded-xl border px-3 py-2 text-xs font-bold transition ${
+                              className={`rounded-xl border px-3 py-2 text-sm font-bold transition ${
                                 bookingForm.startTime === slot
-                                  ? "border-cyan-600 bg-cyan-600 text-white shadow-sm"
-                                  : "border-slate-200 bg-slate-50 text-slate-700 hover:border-cyan-400 hover:bg-cyan-50"
+                                  ? "border-brand-600 bg-brand-600 text-white shadow-sm"
+                                  : "border-slate-200 bg-slate-50 text-slate-700 hover:border-brand-400 hover:bg-brand-50"
                               }`}
                             >
                               {slot}
@@ -941,8 +1024,9 @@ export default function ReceptionDashboard() {
                           ))}
                         </div>
                       ) : (
-                        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-xs text-slate-500">
-                          Энэ өдөр ердийн боломжит цаг олдсонгүй. &quot;Тусгай цаг оноох&quot; сонголтоор цаг оруулж болно.
+                        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-500">
+                          Энэ өдөр ердийн боломжит цаг олдсонгүй. &quot;Тусгай
+                          цаг оноох&quot; сонголтоор цаг оруулж болно.
                         </div>
                       )}
                     </div>
@@ -952,7 +1036,7 @@ export default function ReceptionDashboard() {
                 <button
                   type="button"
                   onClick={handleBooking}
-                  className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 py-3.5 text-sm font-black text-white shadow-md transition hover:bg-slate-800"
+                  className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 py-3.5 text-sm font-semibold text-white shadow-md transition hover:bg-slate-800"
                 >
                   <PlusCircle className="h-4 w-4" />
                   Захиалга баталгаажуулах
@@ -960,17 +1044,17 @@ export default function ReceptionDashboard() {
               </div>
 
               {/* Side Summary */}
-              <div className="rounded-3xl border border-slate-200 bg-slate-950 p-6 text-white shadow-lg">
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-400">
+              <div className="rounded-2xl border border-slate-200 bg-slate-950 p-6 text-white shadow-lg">
+                <p className="text-sm font-semibold text-brand-400">
                   Захиалгын мэдээлэл
                 </p>
-                <h3 className="mt-1 text-lg font-black">
+                <h3 className="mt-1 text-lg font-semibold">
                   {selectedDoctorId
                     ? doctors.find((d) => d.id === selectedDoctorId)?.name
                     : "Эмч сонгоогүй"}
                 </h3>
 
-                <div className="mt-6 space-y-4 text-xs">
+                <div className="mt-6 space-y-4 text-sm">
                   <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                     <span className="text-slate-400">Үйлчилгээ</span>
                     <span className="font-bold text-white">
@@ -984,7 +1068,7 @@ export default function ReceptionDashboard() {
                   </div>
                   <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                     <span className="text-slate-400">Цаг</span>
-                    <span className="font-bold text-cyan-400">
+                    <span className="font-bold text-brand-400">
                       {forceBooking
                         ? customTime
                         : bookingForm.startTime || "Сонгоогүй"}
@@ -997,13 +1081,13 @@ export default function ReceptionDashboard() {
 
           {/* TAB 3: PATIENTS DIRECTORY */}
           {activeTab === "PATIENTS" && (
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div>
-                  <h2 className="text-xl font-black text-slate-900">
+                  <h2 className="text-lg font-semibold text-slate-900">
                     Үйлчлүүлэгчдийн лавлах сан
                   </h2>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-sm text-slate-500">
                     Бүртгэлтэй нийт өвчтөнүүд болон тэдний үзлэгийн тоо
                   </p>
                 </div>
@@ -1016,19 +1100,25 @@ export default function ReceptionDashboard() {
                     className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-100 text-cyan-800 font-bold">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-100 text-brand-800 font-bold">
                         {patient.fullName.slice(0, 2).toUpperCase()}
                       </div>
                       <div>
                         <h4 className="font-bold text-slate-900">
                           {patient.fullName}
                         </h4>
-                        <p className="text-xs text-slate-500">{patient.phone}</p>
+                        <p className="text-sm text-slate-500">
+                          {patient.phone}
+                        </p>
                       </div>
                     </div>
-                    <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-2.5 text-xs text-slate-600">
-                      <span>Үзүүлсэн тоо: <strong>{count} удаа</strong></span>
-                      <span>Сүүлд: {new Date(lastDate).toLocaleDateString("mn-MN")}</span>
+                    <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-2.5 text-sm text-slate-600">
+                      <span>
+                        Үзүүлсэн тоо: <strong>{count} удаа</strong>
+                      </span>
+                      <span>
+                        Сүүлд: {new Date(lastDate).toLocaleDateString("mn-MN")}
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -1040,18 +1130,20 @@ export default function ReceptionDashboard() {
 
       {/* Transfer Appointment Modal */}
       {transferModalOpen && transferringApp && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl space-y-4">
+        <DialogFrame onClose={() => setTransferModalOpen(false)} label="Эмч рүү шилжүүлэх" size="max-w-md">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-lg space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-purple-600">
+                <p className="text-sm font-semibold text-purple-600">
                   Өвчтөн шилжүүлэх
                 </p>
-                <h3 className="text-lg font-black text-slate-900">
-                  {transferringApp.patient.fullName}
+                <h3 className="text-lg font-semibold text-slate-900">
+                  {transferringApp.patient?.fullName ||
+                    (transferringApp as any).patientName ||
+                    "Үйлчлүүлэгч"}
                 </h3>
               </div>
-              <button
+              <button aria-label="Хаах"
                 type="button"
                 onClick={() => setTransferModalOpen(false)}
                 className="text-slate-400 hover:text-slate-600"
@@ -1060,16 +1152,21 @@ export default function ReceptionDashboard() {
               </button>
             </div>
 
-            <div className="rounded-2xl bg-purple-50 p-3.5 text-xs text-purple-950">
+            <div className="rounded-2xl bg-purple-50 p-3.5 text-sm text-purple-950">
               <p>
-                Одоогийн эмч: <strong>{transferringApp.doctor?.name || "Байхгүй"}</strong>
+                Одоогийн эмч:{" "}
+                <strong>{transferringApp.doctor?.name || "Байхгүй"}</strong>
               </p>
               <p className="mt-1 text-slate-600">
-                Огноо: {new Date(transferringApp.appointmentDate).toLocaleDateString("mn-MN")} {transferringApp.startTime}
+                Огноо:{" "}
+                {new Date(transferringApp.appointmentDate).toLocaleDateString(
+                  "mn-MN",
+                )}{" "}
+                {transferringApp.startTime}
               </p>
             </div>
 
-            <div className="space-y-3 text-xs">
+            <div className="space-y-3 text-sm">
               <label className="block space-y-1 font-bold text-slate-700">
                 <span>Шилжүүлэн авах эмч *</span>
                 <select
@@ -1102,7 +1199,7 @@ export default function ReceptionDashboard() {
               <button
                 type="button"
                 onClick={() => setTransferModalOpen(false)}
-                className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50"
               >
                 Цуцлах
               </button>
@@ -1110,29 +1207,35 @@ export default function ReceptionDashboard() {
                 type="button"
                 onClick={handleExecuteTransfer}
                 disabled={transferring}
-                className="rounded-xl bg-purple-600 px-5 py-2 text-xs font-bold text-white shadow-md transition hover:bg-purple-500 disabled:opacity-50"
+                className="rounded-xl bg-purple-600 px-5 py-2 text-sm font-bold text-white shadow-md transition hover:bg-purple-500 disabled:opacity-50"
               >
                 {transferring ? "Шилжүүлж байна..." : "Шилжүүлэх"}
               </button>
             </div>
           </div>
-        </div>
+        </DialogFrame>
       )}
 
       {/* Internal Notes Modal */}
       {notesModalOpen && activeAppForNotes && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl space-y-4">
+        <DialogFrame onClose={() => setNotesModalOpen(false)} label="Дотоод тэмдэглэл" size="max-w-lg">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-lg space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-blue-600">
+                <p className="text-sm font-semibold text-brand-600">
                   Дотоод тэмдэглэл
                 </p>
-                <h3 className="text-lg font-black text-slate-900">
-                  {activeAppForNotes.patient.fullName} · {activeAppForNotes.patient.phone}
+                <h3 className="text-lg font-semibold text-slate-900">
+                  {activeAppForNotes.patient?.fullName ||
+                    (activeAppForNotes as any).patientName ||
+                    "Үйлчлүүлэгч"}{" "}
+                  ·{" "}
+                  {activeAppForNotes.patient?.phone ||
+                    (activeAppForNotes as any).patientPhone ||
+                    ""}
                 </h3>
               </div>
-              <button
+              <button aria-label="Хаах"
                 type="button"
                 onClick={() => setNotesModalOpen(false)}
                 className="text-slate-400 hover:text-slate-600"
@@ -1148,34 +1251,38 @@ export default function ReceptionDashboard() {
                 value={newNoteText}
                 onChange={(e) => setNewNoteText(e.target.value)}
                 placeholder="Шинэ тэмдэглэл бичих (ж: 15 минутын дараа залгах, харшилтай)..."
-                className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs outline-none focus:border-blue-400 focus:bg-white"
+                className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-brand-400 focus:bg-white"
               />
               <button
                 type="button"
                 onClick={handleAddNote}
                 disabled={savingNote || !newNoteText.trim()}
-                className="flex items-center justify-center rounded-2xl bg-blue-600 px-4 text-xs font-bold text-white shadow-sm hover:bg-blue-500 disabled:opacity-50"
+                className="flex items-center justify-center rounded-2xl bg-brand-600 px-4 text-sm font-bold text-white shadow-sm hover:bg-brand-500 disabled:opacity-50"
               >
-                {savingNote ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                {savingNote ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
               </button>
             </div>
 
             {/* Notes List */}
             <div className="max-h-60 overflow-y-auto space-y-2.5 pt-2">
               {notesList.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-xs text-slate-400">
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-400">
                   Одоогоор бичигдсэн тэмдэглэл байхгүй байна.
                 </div>
               ) : (
                 notesList.map((n) => (
                   <div
                     key={n.id}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs"
+                    className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm"
                   >
                     <p className="text-slate-800 leading-relaxed font-medium">
                       {n.note}
                     </p>
-                    <div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-400">
+                    <div className="mt-1.5 flex items-center justify-between text-sm text-slate-400">
                       <span>{n.author || "Ажилтан"}</span>
                       <span>
                         {new Date(n.createdAt).toLocaleString("mn-MN")}
@@ -1190,13 +1297,13 @@ export default function ReceptionDashboard() {
               <button
                 type="button"
                 onClick={() => setNotesModalOpen(false)}
-                className="rounded-xl bg-slate-900 px-5 py-2 text-xs font-bold text-white"
+                className="rounded-xl bg-slate-900 px-5 py-2 text-sm font-bold text-white"
               >
                 Хаах
               </button>
             </div>
           </div>
-        </div>
+        </DialogFrame>
       )}
     </div>
   );
@@ -1206,31 +1313,31 @@ function StatusBadge({ status }: { status: string }) {
   switch (status) {
     case "PENDING":
       return (
-        <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+        <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-sm font-semibold text-amber-700">
           <AlertCircle className="h-3 w-3" /> Хүлээгдэж буй
         </span>
       );
     case "CONFIRMED":
       return (
-        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-sm font-semibold text-emerald-700">
           <CheckCircle2 className="h-3 w-3" /> Баталгаажсан
         </span>
       );
     case "COMPLETED":
       return (
-        <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+        <span className="inline-flex items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-2.5 py-1 text-sm font-semibold text-brand-700">
           <Clock className="h-3 w-3" /> Дууссан
         </span>
       );
     case "CANCELLED":
       return (
-        <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">
+        <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-sm font-semibold text-red-700">
           <XCircle className="h-3 w-3" /> Цуцлагдсан
         </span>
       );
     case "NO_SHOW":
       return (
-        <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+        <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-sm font-semibold text-slate-700">
           <Users className="h-3 w-3" /> Ирсэнгүй
         </span>
       );

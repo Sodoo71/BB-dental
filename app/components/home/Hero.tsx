@@ -1,73 +1,10 @@
 "use client";
-import React from "react";
-import Image from "next/image";
-import { Sparkles } from "lucide-react";
-
-export default function Hero({
-  scrollToBooking,
-}: {
-  scrollToBooking: () => void;
-}) {
-  return (
-    <header className="relative overflow-hidden bg-gradient-to-r from-[#01788c] via-[#028da3] to-[#01b5cb] pt-12 pb-28 text-white sm:pt-16 sm:pb-36 lg:pb-40">
-      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12">
-          {/* Зүүн талын текст хэсэг */}
-          <div className="z-10 lg:col-span-7">
-            <h1 className="mt-6 text-4xl font-extrabold tracking-tight sm:text-5xl lg:text-6xl leading-tight">
-              Эрүүл инээмсэглэл, <br />
-              <span className="text-cyan-200">Төгс чанар.</span>
-            </h1>
-
-            <p className="mt-6 max-w-xl text-base font-normal leading-relaxed text-cyan-50/90 sm:text-lg">
-              Бид хамгийн сүүлийн үеийн дэвшилтэт технологи, мэргэжлийн өндөр
-              түвшний эмч нарын баг бүрэлдэхүүнтэйгээр таны шүдний эрүүл мэндийг
-              найдвартай хамгаална.
-            </p>
-
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <button
-                onClick={scrollToBooking}
-                className="rounded-full bg-white px-8 py-3.5 text-sm font-bold text-[#01788c] shadow-lg transition-all hover:bg-cyan-50 hover:shadow-xl active:scale-95"
-              >
-                Онлайн цаг захиалах
-              </button>
-              <a
-                href="#services"
-                className="rounded-full border border-white/30 bg-white/10 px-8 py-3.5 text-center text-sm font-semibold text-white backdrop-blur-md transition-all hover:bg-white/20 active:scale-95"
-              >
-                Үйлчилгээнүүд үзэх
-              </a>
-            </div>
-          </div>
-
-          {/* Баруун талын зураг (Tooth Character) */}
-          <div className="relative z-10 flex justify-center lg:col-span-5 lg:justify-end">
-            <div className="relative h-72 w-72 sm:h-96 sm:w-96 lg:h-[420px] lg:w-[420px]">
-              <Image
-                src="/img-1.png"
-                alt="Tooth Character"
-                fill
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                className="object-contain drop-shadow-2xl"
-                priority
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Доод талын цагаан долгион (Wave SVG) */}
-      <div className="absolute bottom-0 left-0 right-0 w-full overflow-hidden leading-none">
-        <svg
-          className="relative block w-full h-16 sm:h-24 lg:h-32 text-white"
-          viewBox="0 0 1200 120"
-          preserveAspectRatio="none"
-          fill="currentColor"
-        >
-          <path d="M0,0 C150,90 350,-40 500,65 C650,170 900,10 1200,40 L1200,120 L0,120 Z"></path>
-        </svg>
-      </div>
-    </header>
-  );
+import { ArrowDown, ArrowUpRight, CalendarDays, Clock3, Stethoscope } from "lucide-react";
+export default function Hero({ scrollToBooking }: { scrollToBooking: () => void }) {
+  return <header className="border-b border-slate-200 bg-parchment">
+    <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 py-14 sm:px-8 sm:py-20 lg:grid-cols-[1.15fr_.85fr] lg:gap-20 lg:py-24">
+      <div><p className="eyebrow mb-6 flex items-center gap-3"><span className="h-px w-9 bg-gold" />BB DENTAL CLINIC</p><h1 className="max-w-2xl text-4xl font-normal leading-[1.2] text-brand-700 sm:text-5xl lg:text-6xl">Эрүүл инээмсэглэл.<br /><span className="text-[#88702a]">Танд зориулсан<br className="hidden sm:block" /> халамж.</span></h1><p className="mt-7 max-w-lg text-base leading-8 text-slate-600">Шүдний эрүүл мэнддээ цаг гаргаарай. Үйлчилгээ, эмч болон өөрт тохирох цагаа сонгон үзлэгийн захиалгаа хялбар бүртгүүлээрэй.</p><div className="mt-9 flex flex-wrap gap-3"><button type="button" onClick={scrollToBooking} className="button-primary px-6 py-3.5">Үзлэгийн цаг авах<ArrowUpRight size={17} /></button><a href="#services" className="button-secondary bg-transparent px-6 py-3.5">Үйлчилгээ үзэх<ArrowDown size={16} /></a></div></div>
+      <div className="relative rounded-2xl bg-brand-700 p-7 text-white sm:p-10"><div className="mb-9 flex items-center justify-between border-b border-white/15 pb-6"><div><p className="text-[10px] tracking-[.2em] text-gold">ТАНЫ ДАРААГИЙН ҮЗЛЭГ</p><h2 className="mt-3 font-serif text-2xl font-normal">Цаг авахад хялбар.</h2></div><CalendarDays size={30} strokeWidth={1.2} className="text-gold" /></div><div className="space-y-7">{[{ icon: Stethoscope, label: "Үйлчилгээгээ сонгох", text: "Танд хэрэгтэй тусламж, үйлчилгээ" }, { icon: CalendarDays, label: "Эмч, өдрөө сонгох", text: "Эмчийн боломжит хуваариас" }, { icon: Clock3, label: "Цагаа баталгаажуулах", text: "Мэдээллээ оруулж захиалгаа илгээх" }].map(({ icon: Icon, label, text }, index) => <div key={label} className="flex items-center gap-4"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/15 text-gold"><Icon size={19} strokeWidth={1.5} /></span><div className="flex-1"><p className="text-sm font-medium">{label}</p><p className="mt-1 text-xs text-brand-100">{text}</p></div><span className="text-xs text-brand-200">0{index + 1}</span></div>)}</div><button type="button" onClick={scrollToBooking} className="mt-9 flex min-h-12 w-full items-center justify-between rounded-xl bg-white px-5 text-sm font-medium text-brand-700 hover:bg-parchment">Захиалгаа эхлүүлэх<ArrowUpRight size={18} /></button></div>
+    </div>
+  </header>;
 }

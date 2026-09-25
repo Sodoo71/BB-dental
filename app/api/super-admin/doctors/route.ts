@@ -11,7 +11,7 @@ function isSameDay(date: Date, target: Date) {
 }
 
 export async function GET() {
-  const user = await requireRole("SUPER_ADMIN");
+  const user = await requireRole("SUPER_ADMIN", "ADMIN");
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }

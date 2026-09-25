@@ -1,3 +1,4 @@
+import { ModeSwitcher } from "@/components/auth/ModeSwitcher";
 import { redirect } from "next/navigation";
 import { SuperAdminLayout as DashboardShell } from "@/components/super-admin/layout";
 import { sessionUser } from "@/lib/auth";
@@ -13,9 +14,9 @@ export default async function SuperAdminLayout({
     redirect("/login");
   }
 
-  if (user.role !== "SUPER_ADMIN") {
-    redirect(user.role === "ADMIN" ? "/admin" : "/unauthorized");
+  if (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN") {
+    redirect("/unauthorized");
   }
 
-  return <DashboardShell user={user}>{children}</DashboardShell>;
+  return <DashboardShell user={user}><ModeSwitcher doctorId={user.doctorId} />{children}</DashboardShell>;
 }

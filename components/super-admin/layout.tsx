@@ -16,7 +16,8 @@ export function SuperAdminLayout({
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900">
+    <div className="min-h-screen bg-background text-slate-900">
+      <a className="skip-link" href="#admin-main">Үндсэн хэсэг рүү очих</a>
       <div className="flex min-h-screen">
         <SuperAdminSidebar
           user={user}
@@ -34,7 +35,7 @@ export function SuperAdminLayout({
             onToggleCollapse={() => setSidebarCollapsed((current) => !current)}
           />
 
-          <main className="flex-1 p-4 md:p-6">
+          <main id="admin-main" tabIndex={-1} className="staff-content flex-1 p-4 sm:p-6 lg:p-8">
             <div className="mx-auto max-w-7xl">{children}</div>
           </main>
         </div>

@@ -17,7 +17,7 @@ type ExceptionItem = {
 const typeLabelMap: Record<string, { label: string; color: string }> = {
   DAY_OFF: { label: "Бүтэн өдөр амрах", color: "bg-red-100 text-red-700 border-red-200" },
   BLOCKED_RANGE: { label: "Зарим цагийг хаах", color: "bg-amber-100 text-amber-800 border-amber-200" },
-  SCHEDULE_OVERRIDE: { label: "Ажлын цаг өөрчлөх", color: "bg-blue-100 text-blue-700 border-blue-200" },
+  SCHEDULE_OVERRIDE: { label: "Ажлын цаг өөрчлөх", color: "bg-brand-100 text-brand-700 border-brand-200" },
 };
 
 export default function DoctorExceptionsPage() {
@@ -111,13 +111,13 @@ export default function DoctorExceptionsPage() {
   };
 
   return (
-    <div className="space-y-6 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="space-y-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.24em] text-emerald-600">
             Чөлөө & Онцгой хуваарь
           </p>
-          <h1 className="mt-1 text-2xl font-black text-slate-900">
+          <h1 className="mt-1 text-2xl font-semibold text-slate-900">
             Чөлөө бүртгэх
           </h1>
         </div>
@@ -131,7 +131,7 @@ export default function DoctorExceptionsPage() {
       </div>
 
       {/* Creation form */}
-      <form onSubmit={submit} className="rounded-3xl border border-slate-200 bg-slate-50 p-5 space-y-4">
+      <form onSubmit={submit} className="rounded-2xl border border-slate-200 bg-slate-50 p-5 space-y-4">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <label className="text-xs font-bold text-slate-700 space-y-1">
             <span>Огноо *</span>
@@ -232,8 +232,8 @@ export default function DoctorExceptionsPage() {
       </form>
 
       {/* List of active exceptions */}
-      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
-        <h2 className="text-base font-black text-slate-900">
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+        <h2 className="text-base font-semibold text-slate-900">
           Бүртгэлтэй чөлөө ба онцгой хуваариуд
         </h2>
 
@@ -261,7 +261,7 @@ export default function DoctorExceptionsPage() {
                 >
                   <div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-black text-slate-900">
+                      <span className="text-sm font-semibold text-slate-900">
                         {item.date}
                       </span>
                       <span

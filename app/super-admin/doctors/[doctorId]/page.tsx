@@ -182,7 +182,7 @@ export default function DoctorAnalyticsPage() {
     return (
       <main className="min-h-screen bg-slate-100 p-6 text-slate-900">
         <div className="mx-auto max-w-7xl">
-          <div className="rounded-3xl bg-white p-6 shadow-sm">
+          <div className="rounded-2xl bg-white p-6 shadow-sm">
             Аналитик мэдээллийг ачаалж байна…
           </div>
         </div>
@@ -193,8 +193,8 @@ export default function DoctorAnalyticsPage() {
   if (error || !data) {
     return (
       <main className="min-h-screen bg-slate-100 p-6">
-        <div className="mx-auto max-w-2xl rounded-3xl bg-white p-8 shadow-sm">
-          <h1 className="text-2xl font-black text-slate-900">
+        <div className="mx-auto max-w-2xl rounded-2xl bg-white p-8 shadow-sm">
+          <h1 className="text-2xl font-semibold text-slate-900">
             Аналитик боломжгүй байна
           </h1>
           <p className="mt-3 text-slate-600">
@@ -216,7 +216,7 @@ export default function DoctorAnalyticsPage() {
   return (
     <main className="min-h-screen bg-slate-100 p-4 text-slate-900 md:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
-        <header className="rounded-3xl bg-slate-950 p-6 text-white shadow-lg shadow-slate-200">
+        <header className="rounded-2xl bg-slate-950 p-6 text-white shadow-lg shadow-slate-200">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-4">
               <Link
@@ -229,7 +229,7 @@ export default function DoctorAnalyticsPage() {
                 <p className="text-xs font-bold tracking-[0.24em] text-emerald-400">
                   ЭМЧИЙН АНАЛИТИК
                 </p>
-                <h1 className="mt-1 text-3xl font-black">{doctor.name}</h1>
+                <h1 className="mt-1 text-3xl font-semibold">{doctor.name}</h1>
               </div>
             </div>
             <div className="rounded-2xl border border-slate-700 bg-slate-900/60 px-4 py-3 text-sm">
@@ -262,7 +262,7 @@ export default function DoctorAnalyticsPage() {
           ].map((item) => (
             <div
               key={item.label}
-              className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
+              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
             >
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-slate-500">
@@ -270,7 +270,7 @@ export default function DoctorAnalyticsPage() {
                 </p>
                 <item.icon className="h-5 w-5 text-emerald-600" />
               </div>
-              <p className="mt-5 text-3xl font-black text-slate-900">
+              <p className="mt-5 text-3xl font-semibold text-slate-900">
                 {item.value}
               </p>
             </div>
@@ -278,9 +278,9 @@ export default function DoctorAnalyticsPage() {
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[1.1fr_.9fr]">
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-black text-slate-900">
+              <h2 className="text-lg font-semibold text-slate-900">
                 Эмчийн профайл
               </h2>
               {!isEditing && (
@@ -426,13 +426,13 @@ export default function DoctorAnalyticsPage() {
                   <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">
                     Нэр
                   </p>
-                  <p className="mt-2 text-xl font-black">{doctor.name}</p>
+                  <p className="mt-2 text-xl font-semibold">{doctor.name}</p>
                 </div>
                 <div className="rounded-2xl bg-slate-50 p-4">
                   <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">
                     Мэргэшил
                   </p>
-                  <p className="mt-2 text-xl font-black">
+                  <p className="mt-2 text-xl font-semibold">
                     {doctor.title || "Заагаагүй"}
                   </p>
                 </div>
@@ -464,8 +464,8 @@ export default function DoctorAnalyticsPage() {
             )}
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-black text-slate-900">Төлөвийн тойм</h2>
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-slate-900">Төлөвийн тойм</h2>
             <div className="mt-5 space-y-4">
               {Object.entries(data.statusBreakdown).map(([key, value]) => (
                 <div key={key}>
@@ -488,20 +488,20 @@ export default function DoctorAnalyticsPage() {
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-black text-slate-900">Ажлын нэгтгэл</h2>
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-slate-900">Ажлын нэгтгэл</h2>
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <div className="rounded-2xl bg-slate-50 p-4">
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
                   Ажиллах өдрүүд
                 </p>
-                <p className="mt-2 text-2xl font-black">{stats.workingDays}</p>
+                <p className="mt-2 text-2xl font-semibold">{stats.workingDays}</p>
               </div>
               <div className="rounded-2xl bg-slate-50 p-4">
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
                   Цаг авалттай өдрүүд
                 </p>
-                <p className="mt-2 text-2xl font-black">
+                <p className="mt-2 text-2xl font-semibold">
                   {stats.appointmentDays}
                 </p>
               </div>
@@ -509,7 +509,7 @@ export default function DoctorAnalyticsPage() {
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
                   Дууссан өдрүүд
                 </p>
-                <p className="mt-2 text-2xl font-black">
+                <p className="mt-2 text-2xl font-semibold">
                   {stats.completedDays}
                 </p>
               </div>
@@ -517,13 +517,13 @@ export default function DoctorAnalyticsPage() {
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
                   Амралтын өдрүүд
                 </p>
-                <p className="mt-2 text-2xl font-black">{stats.dayOffDays}</p>
+                <p className="mt-2 text-2xl font-semibold">{stats.dayOffDays}</p>
               </div>
             </div>
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-black text-slate-900">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-slate-900">
               Долоо хоногийн хуваарь
             </h2>
             <div className="mt-5 space-y-2">
@@ -551,8 +551,8 @@ export default function DoctorAnalyticsPage() {
         </section>
 
         <section className="grid gap-6 lg:grid-cols-[1fr_1fr]">
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-black text-slate-900">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-slate-900">
               Сүүлийн цаг авалтууд
             </h2>
             <div className="mt-4 space-y-3">
@@ -567,7 +567,7 @@ export default function DoctorAnalyticsPage() {
                     className="rounded-2xl border border-slate-200 p-3"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <p className="font-black text-slate-800">
+                      <p className="font-semibold text-slate-800">
                         {appointment.patientName}
                       </p>
                       <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-700">
@@ -587,8 +587,8 @@ export default function DoctorAnalyticsPage() {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-black text-slate-900">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-slate-900">
               Чөлөө / Онцгой хуваарь
             </h2>
             <div className="mt-4 space-y-3">
@@ -603,7 +603,7 @@ export default function DoctorAnalyticsPage() {
                     className="rounded-2xl border border-slate-200 p-3"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <p className="font-black text-slate-800">
+                      <p className="font-semibold text-slate-800">
                         {exception.type}
                       </p>
                       <span className="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-amber-700">

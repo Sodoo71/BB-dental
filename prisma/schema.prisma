@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../app/generated/prisma"
@@ -10,29 +5,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-}
-
-// 1. ХҮЙСИЙН ЭНУМ
-enum Gender {
-  MALE // Эрэгтэй
-  FEMALE // Эмэгтэй
-  OTHER // Бусад
-}
-
-// 2. ЗАХИАЛГЫН ТӨЛӨВ
-enum AppointmentStatus {
-  PENDING // Хүлээгдэж буй (Шинээр ирсэн)
-  CONFIRMED // Утсаар ярьж баталгаажуулсан
-  COMPLETED // Ирж үзүүлээд дууссан
-  CANCELLED // Цуцлагдсан
-  NO_SHOW // Цагтаа ирээгүй
-}
-
-enum UserRole {
-  PATIENT
-  SUPER_ADMIN
-  ADMIN
-  DOCTOR
 }
 
 model User {
@@ -45,71 +17,79 @@ model User {
   passwordHash   String
   role           UserRole @default(DOCTOR)
   isActive       Boolean  @default(true)
+  status         AccountStatus @default(ACTIVE)
+  sessions       Session[]
   doctorId       String?  @unique
-  doctor         Doctor?  @relation(fields: [doctorId], references: [id], onDelete: SetNull)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+  doctor         Doctor?  @relation(fields: [doctorId], references: [id])
+
+  @@index([role])
 }
 
-// 3. ҮЙЛЧИЛГЭЭНИЙ МЭДЭЭЛЭЛ (Services)
 model Service {
-  id          String  @id @default(uuid())
-  name        String // Үйлчилгээний нэр (ж: Шүд ломбодох, Суваг цэвэрлэх)
-  description String? // Товч тайлбар
-  durationMin String // Үргэлжлэх хугацаа (минутаар: 30, 60 гэх мэт)
-  price       String // Үнэ (Сонголттой)
-  imageUrl    String? // Үйлчилгээний зураг
-  isActive    Boolean @default(true) // Идэвхтэй ашиглагдаж байгаа эсэх
+  id               String        @id @default(uuid())
+  name             String
+  slug             String        @unique
+  description      String?
+  shortDescription String?
+  price            Int           @default(0)
+  durationMin      Int           @default(30)
+  category         String
+  imageUrl         String?
+  keywords         String?
+  sortOrder        Int           @default(0)
+  isActive         Boolean       @default(true)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  appointments     Appointment[]
 
-  appointments Appointment[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-}
-
-// 4. ЭМЧИЙН МЭДЭЭЛЭЛ (Doctors)
-enum DoctorAvailabilityType {
-  DAY_OFF
-  BLOCKED_RANGE
-  SCHEDULE_OVERRIDE
+  @@index([category])
+  @@index([isActive])
+  @@index([slug])
 }
 
 model Doctor {
-  id             String  @id @default(uuid())
-  name           String // Эмчийн нэр
-  title          String? // Цол/Мэргэшил (ж: Ахлах эмч, Гажиг засалч)
-  phone          String? // Эмчийн холбогдох дугаар
-  email          String?
-  telegramChatId String? // Захиалгын мэдэгдэл хүлээн авах Telegram chat ID
-  avatarUrl      String? // Эмчийн зураг
-  isActive       Boolean @default(true)
-  imageUrl       String?
-
-  schedules              DoctorSchedule[]
-  availabilityExceptions DoctorAvailabilityException[]
-  appointments           Appointment[]
-  user                   User?
+  id                     String                        @id @default(uuid())
+  name                   String
+  specialty              String
+  title                  String?
+  description            String?
+  experience             Int                           @default(5)
+  phone                  String?
+  email                  String?
+  telegramChatId         String?
+  avatarUrl              String?
+  imageUrl               String?
+  isActive               Boolean                       @default(true)
+  sortOrder              Int                           @default(0)
   createdAt              DateTime                      @default(now())
   updatedAt              DateTime                      @updatedAt
+  appointments           Appointment[]
+  availabilityExceptions DoctorAvailabilityException[]
+  schedules              DoctorSchedule[]
+  user                   User?
+
+  @@index([isActive])
 }
 
-// 5. ЭМЧИЙН АЖИЛЛАХ ЦАГИЙН ХУВААРЬ (Weekly Schedule)
 model DoctorSchedule {
-  id       String @id @default(uuid())
-  doctorId String
-  doctor   Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
-
-  dayOfWeek Int // Долоо хоногийн өдөр (0: Ням, 1: Даваа, ..., 6: Бямба)
-  startTime String // Эхлэх цаг (ж: "09:00")
-  endTime   String // Дуусах цаг (ж: "18:00")
-  isDayOff  Boolean @default(false) // Амралтын өдөр эсэх
+  id        String  @id @default(uuid())
+  doctorId  String
+  dayOfWeek Int
+  startTime String
+  endTime   String
+  isActive  Boolean @default(true)
+  isDayOff  Boolean @default(false)
+  doctor    Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
 
   @@unique([doctorId, dayOfWeek])
+  @@index([doctorId])
 }
 
 model DoctorAvailabilityException {
   id        String                 @id @default(uuid())
   doctorId  String
-  doctor    Doctor                 @relation(fields: [doctorId], references: [id], onDelete: Cascade)
   date      DateTime
   type      DoctorAvailabilityType @default(BLOCKED_RANGE)
   startTime String?
@@ -118,87 +98,169 @@ model DoctorAvailabilityException {
   isActive  Boolean                @default(true)
   createdAt DateTime               @default(now())
   updatedAt DateTime               @updatedAt
+  doctor    Doctor                 @relation(fields: [doctorId], references: [id], onDelete: Cascade)
 
   @@index([doctorId, date])
 }
 
-// 6. ҮЙЛЧЛҮҮЛЭГЧИЙН МЭДЭЭЛЭЛ (Patients / Clients)
 model Patient {
-  id       String  @id @default(uuid())
-  phone    String  @unique // Утасны дугаараар давтан хэрэглэгчийг танина
-  fullName String // Бүтэн нэр
-  age      Int? // Нас
-  gender   Gender? // Хүйс
-
+  id           String        @id @default(uuid())
+  phone        String        @unique
+  fullName     String
+  email        String?
+  age          Int?
+  gender       Gender?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
   appointments Appointment[]
-  notes        PatientNote[] // Үйлчлүүлэгчид хамаарах эмчийн/ресепшний тэмдэглэлүүд
+  notes        PatientNote[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  @@index([phone])
 }
 
-// 7. ЗАХИАЛГЫН МЭДЭЭЛЭЛ (Appointments)
 model Appointment {
-  id String @id @default(uuid())
-
-  // Холбоосууд
-  patientId String
-  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
-
-  serviceId String
-  service   Service @relation(fields: [serviceId], references: [id])
-
-  doctorId String? // Сонгосон эмч (заавал биш байж болно)
-  doctor   Doctor? @relation(fields: [doctorId], references: [id])
-
-  // Цаг ба Өдөр
-  appointmentDate DateTime // Сонгосон өдөр (жишээ нь: 2026-08-25)
-  startTime       String // Эхлэх цаг (жишээ нь: "14:00")
-  endTime         String // Дуусах цаг (жишээ нь: "14:30")
-
-  // Төлөв ба Төрөл
-  status   AppointmentStatus @default(PENDING)
-  isRepeat Boolean           @default(false) // Давтан үзлэг эсэх
-
-  // Хэрэглэгчийн цаг авахдаа үлдээсэн тайлбар/зовж буй асуудал
-  chiefComplaint String? // ж: "Баруун доод араа шүд өвдөж байна"
-
-  notes AppointmentNote[] // Тухайн захиалга дээр ресепшний бичих тэмдэглэл
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String            @id @default(uuid())
+  patientName     String
+  patientPhone    String
+  patientEmail    String?
+  note            String?
+  chiefComplaint  String?
+  appointmentDate DateTime
+  startTime       String
+  endTime         String
+  status          AppointmentStatus @default(PENDING)
+  isRepeat        Boolean           @default(false)
+  doctorId        String?
+  serviceId       String
+  patientId       String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  doctor          Doctor?           @relation(fields: [doctorId], references: [id])
+  patient         Patient?          @relation(fields: [patientId], references: [id])
+  service         Service           @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  notes           AppointmentNote[]
 
   @@index([appointmentDate])
-  @@index([patientId])
+  @@index([doctorId, appointmentDate])
+  @@index([patientPhone])
+  @@index([status])
 }
 
-// 8. ЗАХИАЛГЫН ТЭМДЭГЛЭЛ (Ресепшн утасдаж ярьсан тэмдэглэл)
 model AppointmentNote {
   id            String      @id @default(uuid())
   appointmentId String
+  note          String
+  author        String?
+  createdAt     DateTime    @default(now())
   appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
 
-  note   String // ж: "Утсаа авахгүй байна, 15 минутын дараа дахин залгах", "10 минут хоцорно гэсэн"
-  author String? // Тэмдэглэл бичсэн ажилтны нэр
-
-  createdAt DateTime @default(now())
+  @@index([appointmentId])
 }
 
-// 9. ҮЙЛЧЛҮҮЛЭГЧИЙН ЕРӨНХИЙ ТЭМДЭГЛЭЛ (Patient Profile Notes)
 model PatientNote {
-  id        String  @id @default(uuid())
+  id        String   @id @default(uuid())
   patientId String
-  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
-
-  note   String // ж: "Тарианаас харшилтай", "Хүүхэд нь дагуулж ирдэг", "Даралт ихэсдэг"
-  author String? // Эмч эсвэл Ресепшн
-
+  note      String
+  author    String?
   createdAt DateTime @default(now())
+  patient   Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
 }
 
-// 10. СИСТЕМИЙН ТОХИРГОО (System Settings & Config)
 model SystemSetting {
-  key       String   @id // e.g. "clinic_info", "telegram_config", "registration_policy", "security_config"
-  value     String // JSON string payload
+  key       String   @id
+  value     String
   updatedAt DateTime @updatedAt
+}
+
+model ClinicSetting {
+  id        String   @id
+  key       String   @unique
+  value     String
+  updatedAt DateTime
+
+  @@index([key])
+}
+
+model Review {
+  id          String   @id
+  patientName String
+  rating      Int      @default(5)
+  comment     String
+  serviceName String?
+  isApproved  Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@index([isApproved])
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum UserRole {
+  RECEPTION
+  SUPER_ADMIN
+  ADMIN
+  DOCTOR
+  PATIENT
+}
+
+enum DoctorAvailabilityType {
+  DAY_OFF
+  BLOCKED_RANGE
+  SCHEDULE_OVERRIDE
+}
+
+
+enum AccountStatus {
+  PENDING
+  ACTIVE
+  REJECTED
+  SUSPENDED
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model AuthRateLimit {
+  key       String   @id
+  count     Int      @default(1)
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  actorId   String?
+  action    String
+  entity    String
+  entityId  String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([actorId, createdAt])
+  @@index([createdAt])
 }

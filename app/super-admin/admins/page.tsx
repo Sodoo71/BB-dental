@@ -51,41 +51,41 @@ export default function SuperAdminAdminsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Admins"
-        description="Manage system administrators and access rights."
+        title="Админууд"
+        description="Эмнэлгийн удирдлагын ажилтнууд болон хандах эрх."
         action={
           <Link
             href="/admin"
             className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
           >
             <UserCog className="h-4 w-4" />
-            Admin Panel
+            Ресепшний самбар
           </Link>
         }
       />
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 bg-slate-50 px-5 py-3 text-sm font-semibold text-slate-700">
-          Administrator roster
+          Удирдлагын ажилтнууд
         </div>
 
         {loading ? (
           <div className="p-6 text-sm text-slate-500">
-            Loading administrators...
+            Мэдээлэл ачаалж байна…
           </div>
         ) : admins.length === 0 ? (
           <div className="p-6 text-sm text-slate-500">
-            No administrators found.
+            Админ бүртгэгдээгүй байна.
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
+            <div className="table-scroll" tabIndex={0} role="region" aria-label="Мэдээллийн хүснэгт"><table className="min-w-full text-left text-sm">
               <thead className="bg-slate-50 text-slate-600">
                 <tr>
-                  <th className="px-5 py-3 font-medium">Name</th>
-                  <th className="px-5 py-3 font-medium">Role</th>
-                  <th className="px-5 py-3 font-medium">Email</th>
-                  <th className="px-5 py-3 font-medium">Status</th>
+                  <th className="px-5 py-3 font-medium">Нэр</th>
+                  <th className="px-5 py-3 font-medium">Эрх</th>
+                  <th className="px-5 py-3 font-medium">И-мэйл</th>
+                  <th className="px-5 py-3 font-medium">Төлөв</th>
                 </tr>
               </thead>
               <tbody>
@@ -104,7 +104,7 @@ export default function SuperAdminAdminsPage() {
                       </div>
                     </td>
                     <td className="px-5 py-4">
-                      <span className="inline-flex rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-700">
+                      <span className="inline-flex rounded-full bg-brand-100 px-2.5 py-1 text-xs font-semibold text-brand-700">
                         {getRoleLabel(admin.role)}
                       </span>
                     </td>
@@ -118,13 +118,13 @@ export default function SuperAdminAdminsPage() {
                             : "bg-amber-100 text-amber-700",
                         ].join(" ")}
                       >
-                        {admin.isActive ? "Active" : "Pending"}
+                        {admin.isActive ? "Идэвхтэй" : "Идэвхгүй"}
                       </span>
                     </td>
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           </div>
         )}
       </div>

@@ -46,11 +46,10 @@ export default function SuperAdminSettingsPage() {
 
   // Section 2: Telegram
   const [telegramConfig, setTelegramConfig] = useState({
-    botToken: "8758601589:AAFqJ_IWnBcy8lCw9Vs-iq2ZJsX9NmUZilo",
-    channelId: "8411351733",
+    channelId: "",
     enabled: true,
   });
-  const [testChatId, setTestChatId] = useState("8411351733");
+  const [testChatId, setTestChatId] = useState("");
   const [savingTelegram, setSavingTelegram] = useState(false);
   const [testingTelegram, setTestingTelegram] = useState(false);
 
@@ -61,7 +60,9 @@ export default function SuperAdminSettingsPage() {
   });
   const [savingPolicy, setSavingPolicy] = useState(false);
 
-  // Section 4: Diagnostics & Health
+  // Section 4: Security Policy
+
+  // Section 5: Diagnostics & Health
   const [pingData, setPingData] = useState<{
     latencyMs: number;
     status: string;
@@ -93,7 +94,6 @@ export default function SuperAdminSettingsPage() {
     };
 
     void loadSettings();
-    void handlePing();
   }, []);
 
   // Save Section 1: Clinic Info
@@ -163,7 +163,6 @@ export default function SuperAdminSettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chatId: testChatId.trim(),
-          botToken: telegramConfig.botToken,
         }),
       });
       const data = await res.json();
@@ -207,6 +206,7 @@ export default function SuperAdminSettingsPage() {
       setSavingPolicy(false);
     }
   };
+
 
   // Diagnostics: Ping Database
   const handlePing = async () => {
@@ -304,13 +304,13 @@ export default function SuperAdminSettingsPage() {
         description="Эмнэлгийн мэдээлэл, мэдэгдлийн суваг, бүртгэлийн бодлого ба өгөгдлийн сангийн өөртөө үйлчлэх оношилгоо."
       />
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* CARD 1: CLINIC INFO */}
-        <div className="flex flex-col justify-between rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex min-w-0 flex-col justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <form onSubmit={handleSaveClinic} className="space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-50 text-cyan-600">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
                   <Building2 className="h-5 w-5" />
                 </div>
                 <div>
@@ -333,7 +333,7 @@ export default function SuperAdminSettingsPage() {
                   onChange={(e) =>
                     setClinicInfo((p) => ({ ...p, clinicName: e.target.value }))
                   }
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-sm font-semibold outline-none focus:border-cyan-500 focus:bg-white"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-sm font-semibold outline-none focus:border-brand-500 focus:bg-white"
                 />
               </label>
 
@@ -346,7 +346,7 @@ export default function SuperAdminSettingsPage() {
                     onChange={(e) =>
                       setClinicInfo((p) => ({ ...p, phone: e.target.value }))
                     }
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-sm font-semibold outline-none focus:border-cyan-500 focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-sm font-semibold outline-none focus:border-brand-500 focus:bg-white"
                   />
                 </label>
 
@@ -359,7 +359,7 @@ export default function SuperAdminSettingsPage() {
                     onChange={(e) =>
                       setClinicInfo((p) => ({ ...p, email: e.target.value }))
                     }
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-sm font-semibold outline-none focus:border-cyan-500 focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-sm font-semibold outline-none focus:border-brand-500 focus:bg-white"
                   />
                 </label>
               </div>
@@ -372,7 +372,7 @@ export default function SuperAdminSettingsPage() {
                   onChange={(e) =>
                     setClinicInfo((p) => ({ ...p, address: e.target.value }))
                   }
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-sm font-semibold outline-none focus:border-cyan-500 focus:bg-white"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-sm font-semibold outline-none focus:border-brand-500 focus:bg-white"
                 />
               </label>
 
@@ -386,7 +386,7 @@ export default function SuperAdminSettingsPage() {
                       workingHoursNote: e.target.value,
                     }))
                   }
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-sm font-semibold outline-none focus:border-cyan-500 focus:bg-white"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-sm font-semibold outline-none focus:border-brand-500 focus:bg-white"
                 />
               </label>
             </div>
@@ -395,7 +395,7 @@ export default function SuperAdminSettingsPage() {
               <button
                 type="submit"
                 disabled={savingClinic}
-                className="flex items-center gap-2 rounded-xl bg-cyan-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-cyan-500 disabled:opacity-50"
+                className="flex items-center gap-2 rounded-xl bg-brand-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-brand-500 disabled:opacity-50"
               >
                 {savingClinic ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -409,11 +409,11 @@ export default function SuperAdminSettingsPage() {
         </div>
 
         {/* CARD 2: TELEGRAM NOTIFICATIONS */}
-        <div className="flex flex-col justify-between rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex min-w-0 flex-col justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <form onSubmit={handleSaveTelegram} className="space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
                   <Send className="h-5 w-5" />
                 </div>
                 <div>
@@ -428,41 +428,27 @@ export default function SuperAdminSettingsPage() {
             </div>
 
             <div className="space-y-3 text-xs">
-              <label className="block space-y-1 font-bold text-slate-700">
-                <span>Telegram Bot Token</span>
-                <input
-                  type="text"
-                  value={telegramConfig.botToken}
-                  onChange={(e) =>
-                    setTelegramConfig((p) => ({
-                      ...p,
-                      botToken: e.target.value,
-                    }))
-                  }
-                  placeholder="8188162232:AAH9..."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-sm font-semibold outline-none focus:border-blue-500 focus:bg-white"
-                />
-              </label>
+              <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-600">Telegram холболтын нууц түлхүүрийг системийн хариуцсан ажилтан тохируулна.</p>
 
               {/* Telegram Test Box */}
-              <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4 space-y-2.5">
+              <div className="rounded-2xl border border-brand-100 bg-brand-50/70 p-4 space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-blue-900">
+                  <span className="font-bold text-brand-900">
                     💡 Телеграм мэдэгдлийг турших:
                   </span>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row">
                   <input
                     value={testChatId}
                     onChange={(e) => setTestChatId(e.target.value)}
                     placeholder="Таны Telegram Chat ID эсвэл @username..."
-                    className="flex-1 rounded-xl border border-blue-200 bg-white px-3 py-2 text-xs outline-none"
+                    className="flex-1 rounded-xl border border-brand-200 bg-white px-3 py-2 text-xs outline-none"
                   />
                   <button
                     type="button"
                     onClick={handleTestTelegram}
                     disabled={testingTelegram}
-                    className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-blue-500 disabled:opacity-50"
+                    className="flex items-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-brand-500 disabled:opacity-50"
                   >
                     {testingTelegram ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -472,7 +458,7 @@ export default function SuperAdminSettingsPage() {
                     <span>Тест илгээх</span>
                   </button>
                 </div>
-                <p className="text-[11px] text-blue-700">
+                <p className="text-[11px] text-brand-700">
                   Мэдэгдэл очихгүй бол Телеграм дээрээ bot руугаа орж{" "}
                   <strong>/start</strong> дарсан эсэхээ шалгаарай.
                 </p>
@@ -483,7 +469,7 @@ export default function SuperAdminSettingsPage() {
               <button
                 type="submit"
                 disabled={savingTelegram}
-                className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-blue-500 disabled:opacity-50"
+                className="flex items-center gap-2 rounded-xl bg-brand-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-brand-500 disabled:opacity-50"
               >
                 {savingTelegram ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -497,7 +483,7 @@ export default function SuperAdminSettingsPage() {
         </div>
 
         {/* CARD 3: REGISTRATION POLICY */}
-        <div className="flex flex-col justify-between rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex min-w-0 flex-col justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <form onSubmit={handleSavePolicy} className="space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-3">
@@ -576,12 +562,21 @@ export default function SuperAdminSettingsPage() {
           </form>
         </div>
 
-        {/* CARD 4: SELF-SERVICE SYSTEM HEALTH & DIAGNOSTICS */}
-        <div className="flex flex-col justify-between rounded-3xl border border-slate-800 bg-slate-950 p-6 text-white shadow-lg">
+        {/* CARD 4: SECURITY & ACCESS CONTROL */}
+        <div className="flex min-w-0 flex-col justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="space-y-4">
+            <h3 className="font-bold text-slate-900">Аюулгүй байдал</h3>
+            <p className="text-sm text-slate-600">Нэвтрэх хугацаа 12 цаг. Нэг и-мэйлээр 15 минутад 8 удаа нэвтрэх оролдлого хийх боломжтой. Шинэ нууц үг 12-оос доошгүй тэмдэгттэй байна. Системээс гарах, нууц үг болон ажилтны эрх өөрчлөхөд өмнөх нэвтрэлт хүчингүй болно.</p>
+            <p className="text-sm text-slate-500">Засварын горим болон онлайн захиалгыг идэвхжүүлэх/хаах тохиргоо одоогоор хөгжүүлэгдээгүй.</p>
+          </div>
+        </div>
+
+        {/* CARD 5: SELF-SERVICE SYSTEM HEALTH & DIAGNOSTICS */}
+        <div className="flex min-w-0 flex-col justify-between rounded-2xl border border-slate-800 bg-slate-950 p-6 text-white shadow-lg">
           <div className="space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-cyan-400">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-brand-400">
                   <Activity className="h-5 w-5" />
                 </div>
                 <div>
@@ -613,7 +608,7 @@ export default function SuperAdminSettingsPage() {
                 <span className="text-[10px] uppercase font-bold text-slate-400 block">
                   Баазын хариу өгөх хугацаа
                 </span>
-                <span className="text-base font-black text-emerald-400">
+                <span className="text-base font-semibold text-emerald-400">
                   {pingData
                     ? `${pingData.latencyMs} ms (Маш хурдан)`
                     : "Шалгаж байна..."}
@@ -624,7 +619,7 @@ export default function SuperAdminSettingsPage() {
                 <span className="text-[10px] uppercase font-bold text-slate-400 block">
                   Төлөв & Холболт
                 </span>
-                <span className="text-base font-black text-cyan-400 flex items-center gap-1">
+                <span className="text-base font-semibold text-brand-400 flex items-center gap-1">
                   <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Идэвхтэй
                   (Secure)
                 </span>
@@ -656,7 +651,7 @@ export default function SuperAdminSettingsPage() {
                   type="button"
                   onClick={handleExportBackup}
                   disabled={exportingBackup}
-                  className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-cyan-900/40 bg-cyan-950/30 p-2.5 text-xs font-bold text-cyan-300 transition hover:bg-cyan-900/50 disabled:opacity-50"
+                  className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-brand-900/40 bg-brand-950/30 p-2.5 text-xs font-bold text-brand-300 transition hover:bg-brand-900/50 disabled:opacity-50"
                 >
                   {exportingBackup ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

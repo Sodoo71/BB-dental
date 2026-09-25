@@ -1,84 +1,24 @@
 "use client";
-
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { ChevronDown, LogOut, Settings, UserCircle2 } from "lucide-react";
-import { useState } from "react";
-
-export function SuperAdminUserMenu({
-  user,
-}: {
-  user: { name: string | null; email: string | null; role: string };
-}) {
-  const router = useRouter();
+import { ChevronDown, Settings } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
+import LogoutButton from "@/components/auth/LogoutButton";
+import { getRoleLabel } from "@/lib/roles";
+export function SuperAdminUserMenu({ user }: { user: { name: string | null; email: string | null; role: string } }) {
   const [open, setOpen] = useState(false);
-
-  const handleLogout = async () => {
-    try {
-      await fetch("/api/auth/logout", { method: "POST" });
-    } catch {
-      // Ignore and proceed to login.
-    } finally {
-      setOpen(false);
-      router.push("/login");
-      router.refresh();
-    }
-  };
-
-  const initials = (user.name || user.email || "SA")
-    .split(" ")
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-left shadow-sm transition hover:border-slate-300"
-      >
-        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">
-          {initials}
-        </div>
-        <div className="hidden text-left sm:block">
-          <div className="text-sm font-semibold text-slate-800">
-            {user.name || "System Administrator"}
-          </div>
-          <div className="text-[11px] text-slate-500">{user.role}</div>
-        </div>
-        <ChevronDown className="h-4 w-4 text-slate-500" />
-      </button>
-
-      {open ? (
-        <div className="absolute right-0 z-30 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
-          <Link
-            href="/super-admin/settings"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-          >
-            <UserCircle2 className="h-4 w-4" />
-            Profile
-          </Link>
-          <Link
-            href="/super-admin/settings"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-          >
-            <Settings className="h-4 w-4" />
-            Settings
-          </Link>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-red-600 transition hover:bg-red-50"
-          >
-            <LogOut className="h-4 w-4" />
-            Logout
-          </button>
-        </div>
-      ) : null}
-    </div>
-  );
+  const container = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const id = useId();
+  useEffect(() => {
+    if (!open) return;
+    const pointer = (event: PointerEvent) => { if (!container.current?.contains(event.target as Node)) setOpen(false); };
+    const keyboard = (event: KeyboardEvent) => { if (event.key === "Escape") { setOpen(false); trigger.current?.focus(); } };
+    document.addEventListener("pointerdown", pointer);
+    document.addEventListener("keydown", keyboard);
+    return () => { document.removeEventListener("pointerdown", pointer); document.removeEventListener("keydown", keyboard); };
+  }, [open]);
+  return <div ref={container} className="relative min-w-0">
+    <button ref={trigger} type="button" aria-label="Хэрэглэгчийн цэс" aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)} className="flex min-h-11 items-center gap-3 rounded-xl px-2 py-1.5 text-left hover:bg-slate-50"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-100 bg-parchment text-xs font-medium text-brand-700">{(user.name || "BB").slice(0, 2)}</span><span className="hidden max-w-40 sm:block"><span className="block truncate text-sm font-medium text-slate-800">{user.name}</span><span className="block text-[11px] text-slate-500">{getRoleLabel(user.role)}</span></span><ChevronDown size={15} className="text-slate-500" /></button>
+    {open && <div id={id} className="absolute right-0 z-30 mt-3 w-60 rounded-xl border border-slate-200 bg-white p-3 shadow-lg"><p className="mb-2 truncate border-b border-slate-100 px-2 pb-3 text-xs text-slate-500">{user.email}</p><Link href="/super-admin/settings" onClick={() => setOpen(false)} className="mb-2 flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm text-slate-700 hover:bg-slate-50"><Settings size={16} />Тохиргоо</Link><LogoutButton label="Системээс гарах" /></div>}
+  </div>;
 }

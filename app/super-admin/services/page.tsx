@@ -1,4 +1,5 @@
 "use client";
+import { DialogFrame } from "@/components/ui/DialogFrame";
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -21,6 +22,7 @@ import { showToast } from "@/components/ui/Toast";
 type ServiceItem = {
   id: string;
   name: string;
+  category?: string | null;
   description?: string | null;
   durationMin: string | number;
   price?: string | number | null;
@@ -36,11 +38,14 @@ export default function SuperAdminServicesPage() {
   const [filterActive, setFilterActive] = useState<string>("ALL");
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [editingService, setEditingService] = useState<ServiceItem | null>(null);
+  const [editingService, setEditingService] = useState<ServiceItem | null>(
+    null,
+  );
   const [saving, setSaving] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
+    category: "GENERAL",
     description: "",
     durationMin: "30",
     price: "50000",
@@ -69,6 +74,7 @@ export default function SuperAdminServicesPage() {
     setEditingService(null);
     setFormData({
       name: "",
+      category: "GENERAL",
       description: "",
       durationMin: "30",
       price: "",
@@ -82,6 +88,7 @@ export default function SuperAdminServicesPage() {
     setEditingService(service);
     setFormData({
       name: service.name,
+      category: service.category || "GENERAL",
       description: service.description || "",
       durationMin: String(service.durationMin),
       price: String(service.price || ""),
@@ -110,7 +117,8 @@ export default function SuperAdminServicesPage() {
           }),
         });
         const data = await response.json();
-        if (!response.ok) throw new Error(data.error || "Шинэчлэхэд алдаа гарлаа.");
+        if (!response.ok)
+          throw new Error(data.error || "Шинэчлэхэд алдаа гарлаа.");
       } else {
         const response = await fetch("/api/services", {
           method: "POST",
@@ -118,14 +126,18 @@ export default function SuperAdminServicesPage() {
           body: JSON.stringify(formData),
         });
         const data = await response.json();
-        if (!response.ok) throw new Error(data.error || "Үүсгэхэд алдаа гарлаа.");
+        if (!response.ok)
+          throw new Error(data.error || "Үүсгэхэд алдаа гарлаа.");
       }
 
       setModalOpen(false);
       await loadServices();
       showToast("Үйлчилгээ амжилттай хадгалагдлаа.", "success");
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Хадгалах үед алдаа гарлаа.", "error");
+      showToast(
+        err instanceof Error ? err.message : "Хадгалах үед алдаа гарлаа.",
+        "error",
+      );
     } finally {
       setSaving(false);
     }
@@ -145,7 +157,10 @@ export default function SuperAdminServicesPage() {
       await loadServices();
       showToast(`"${service.name}" үйлчилгээг устгалаа.`, "success");
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Устгахад алдаа гарлаа.", "error");
+      showToast(
+        err instanceof Error ? err.message : "Устгахад алдаа гарлаа.",
+        "error",
+      );
     }
   };
 
@@ -183,7 +198,7 @@ export default function SuperAdminServicesPage() {
         }
       />
 
-      <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         {/* Filters */}
         <div className="flex flex-col gap-4 border-b border-slate-200 bg-slate-50 p-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-2">
@@ -249,14 +264,21 @@ export default function SuperAdminServicesPage() {
                       />
                     </div>
                   ) : (
-                    <div className="flex h-28 w-full items-center justify-center bg-gradient-to-r from-cyan-50 to-blue-50 text-cyan-600">
+                    <div className="flex h-28 w-full items-center justify-center bg-gradient-to-r from-brand-50 to-brand-50 text-brand-600">
                       <Sparkles className="h-8 w-8" />
                     </div>
                   )}
 
                   <div className="p-4">
                     <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-bold text-slate-900">{service.name}</h3>
+                      <div>
+                        <span className="mb-1 inline-flex rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-bold text-brand-700">
+                          {service.category || "GENERAL"}
+                        </span>
+                        <h3 className="font-bold text-slate-900">
+                          {service.name}
+                        </h3>
+                      </div>
                       <span
                         className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                           service.isActive !== false
@@ -279,7 +301,7 @@ export default function SuperAdminServicesPage() {
                     <span className="font-semibold text-slate-600">
                       ⏱ {service.durationMin} минут
                     </span>
-                    <span className="font-black text-slate-900">
+                    <span className="font-semibold text-slate-900">
                       {service.price
                         ? `${String(service.price).toLocaleString()}₮`
                         : "Үнэгүй"}
@@ -313,21 +335,21 @@ export default function SuperAdminServicesPage() {
 
       {/* Add / Edit Modal */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4 backdrop-blur-sm">
+        <DialogFrame onClose={() => setModalOpen(false)} label="Үйлчилгээний мэдээлэл" size="max-w-lg">
           <form
             onSubmit={handleSave}
-            className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl space-y-4"
+            className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-lg space-y-4"
           >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                   {editingService ? "Үйлчилгээ засах" : "Шинэ үйлчилгээ"}
                 </p>
-                <h3 className="text-lg font-black text-slate-900">
+                <h3 className="text-lg font-semibold text-slate-900">
                   {editingService ? editingService.name : "Үйлчилгээ бүртгэх"}
                 </h3>
               </div>
-              <button
+              <button aria-label="Хаах"
                 type="button"
                 onClick={() => setModalOpen(false)}
                 className="text-slate-400 hover:text-slate-600"
@@ -363,6 +385,23 @@ export default function SuperAdminServicesPage() {
                 />
               </label>
 
+              <label className="block space-y-1 font-bold text-slate-700">
+                <span>Үйлчилгээний ангилал *</span>
+                <select
+                  value={formData.category}
+                  onChange={(e) =>
+                    setFormData((p) => ({ ...p, category: e.target.value }))
+                  }
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-sm font-semibold outline-none focus:border-slate-400"
+                >
+                  <option value="GENERAL">Ерөнхий үзлэг</option>
+                  <option value="PREVENTION">Урьдчилан сэргийлэлт</option>
+                  <option value="TREATMENT">Эмчилгээ</option>
+                  <option value="COSMETIC">Гоо сайхан</option>
+                  <option value="SURGERY">Мэс ажилбар</option>
+                </select>
+              </label>
+
               <div className="grid grid-cols-2 gap-3">
                 <label className="block space-y-1 font-bold text-slate-700">
                   <span>Үргэлжлэх хугацаа (минут) *</span>
@@ -373,7 +412,10 @@ export default function SuperAdminServicesPage() {
                     max="480"
                     value={formData.durationMin}
                     onChange={(e) =>
-                      setFormData((p) => ({ ...p, durationMin: e.target.value }))
+                      setFormData((p) => ({
+                        ...p,
+                        durationMin: e.target.value,
+                      }))
                     }
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-sm font-semibold outline-none focus:border-slate-400"
                   />
@@ -433,7 +475,7 @@ export default function SuperAdminServicesPage() {
               </button>
             </div>
           </form>
-        </div>
+        </DialogFrame>
       )}
     </div>
   );

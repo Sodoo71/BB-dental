@@ -1,4 +1,5 @@
 "use client";
+import { DialogFrame } from "@/components/ui/DialogFrame";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -87,7 +88,7 @@ const weekdayLabels = [
 const statusLabelMap: Record<string, { label: string; bg: string; text: string }> = {
   PENDING: { label: "Хүлээгдэж буй", bg: "bg-amber-50 border-amber-200", text: "text-amber-700" },
   CONFIRMED: { label: "Баталгаажсан", bg: "bg-emerald-50 border-emerald-200", text: "text-emerald-700" },
-  COMPLETED: { label: "Дууссан", bg: "bg-blue-50 border-blue-200", text: "text-blue-700" },
+  COMPLETED: { label: "Дууссан", bg: "bg-brand-50 border-brand-200", text: "text-brand-700" },
   CANCELLED: { label: "Цуцлагдсан", bg: "bg-red-50 border-red-200", text: "text-red-700" },
   NO_SHOW: { label: "Ирээгүй", bg: "bg-slate-100 border-slate-200", text: "text-slate-700" },
 };
@@ -326,14 +327,14 @@ export default function DoctorCalendarPage() {
   return (
     <div className="space-y-6">
       {/* Header & Controls */}
-      <div className="flex flex-col gap-4 rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-bold uppercase tracking-[0.24em] text-emerald-600">
               Эмчийн портал
             </span>
           </div>
-          <h1 className="mt-1 text-2xl font-black text-slate-900">
+          <h1 className="mt-1 text-2xl font-semibold text-slate-900">
             Сарын ажлын хуваарь & Календарь
           </h1>
           <p className="text-xs text-slate-500">
@@ -358,7 +359,7 @@ export default function DoctorCalendarPage() {
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <span className="min-w-[140px] text-center text-xs font-black text-slate-900">
+            <span className="min-w-[140px] text-center text-xs font-semibold text-slate-900">
               {year} он · {month + 1}-р сар
             </span>
             <button
@@ -378,7 +379,7 @@ export default function DoctorCalendarPage() {
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
             Нийт захиалга
           </p>
-          <p className="mt-1 text-2xl font-black text-slate-900">
+          <p className="mt-1 text-2xl font-semibold text-slate-900">
             {appointments.length}
           </p>
         </div>
@@ -386,7 +387,7 @@ export default function DoctorCalendarPage() {
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
             Баталгаажсан
           </p>
-          <p className="mt-1 text-2xl font-black text-emerald-600">
+          <p className="mt-1 text-2xl font-semibold text-emerald-600">
             {appointments.filter((a) => a.status === "CONFIRMED").length}
           </p>
         </div>
@@ -394,7 +395,7 @@ export default function DoctorCalendarPage() {
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
             Дууссан үзлэг
           </p>
-          <p className="mt-1 text-2xl font-black text-blue-600">
+          <p className="mt-1 text-2xl font-semibold text-brand-600">
             {appointments.filter((a) => a.status === "COMPLETED").length}
           </p>
         </div>
@@ -402,21 +403,31 @@ export default function DoctorCalendarPage() {
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
             Хүлээгдэж буй
           </p>
-          <p className="mt-1 text-2xl font-black text-amber-600">
+          <p className="mt-1 text-2xl font-semibold text-amber-600">
             {appointments.filter((a) => a.status === "PENDING").length}
           </p>
         </div>
       </div>
 
+      <section aria-label="Сарын календарь" className="surface p-3 sm:hidden">
+        <div className="mb-2 grid grid-cols-7 text-center text-[10px] text-slate-500">{weekdayLabels.map((label) => <span key={label}>{label.slice(0, 2)}</span>)}</div>
+        {loading ? <p role="status" className="py-10 text-center text-sm text-slate-500">Хуваарь ачаалж байна…</p> : <div className="grid grid-cols-7 gap-1">{calendarCells.map((cell, index) => {
+          if (!cell) return <span key={`empty-mobile-${index}`} />;
+          const count = appointmentsByDate[cell.dateString]?.length ?? 0;
+          return <button key={cell.dateString} type="button" aria-label={`${cell.dateString}, ${count} үзлэг`} aria-pressed={selectedDay === cell.dateString} onClick={() => setSelectedDay(cell.dateString)} className={`flex min-h-14 flex-col items-center justify-center rounded-lg border text-xs ${cell.isToday ? "border-brand-700 bg-brand-700 text-white" : "border-slate-100 text-slate-700 hover:bg-brand-50"}`}><span className="font-semibold">{cell.dayNumber}</span>{count > 0 ? <span className={`mt-1 text-[9px] ${cell.isToday ? "text-white" : "text-brand-600"}`}>{count} үзлэг</span> : <span className="mt-1 h-3" />}</button>;
+        })}</div>}
+        <p className="mt-3 text-center text-[11px] text-slate-500">Өдрөө дарж үзлэгийн цагуудыг харна уу.</p>
+      </section>
+
       {/* Full Monthly Grid */}
-      <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
+      <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm sm:block" role="region" aria-label="Сарын календарь" tabIndex={0}>
         {loading ? (
           <div className="flex h-96 items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
           </div>
         ) : (
-          <div>
-            <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50 text-center text-xs font-black text-slate-600">
+          <div className="min-w-[700px]">
+            <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50 text-center text-xs font-semibold text-slate-600">
               {weekdayLabels.map((label, idx) => (
                 <div
                   key={label}
@@ -444,6 +455,10 @@ export default function DoctorCalendarPage() {
                 return (
                   <div
                     key={cell.dateString}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${cell.dateString}, ${dayApps.length} цаг захиалга`}
+                    onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedDay(cell.dateString); } }}
                     onClick={() => setSelectedDay(cell.dateString)}
                     className={`group min-h-[120px] cursor-pointer p-2.5 transition sm:min-h-[135px] ${
                       cell.isToday
@@ -453,7 +468,7 @@ export default function DoctorCalendarPage() {
                   >
                     <div className="flex items-center justify-between">
                       <span
-                        className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-black ${
+                        className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
                           cell.isToday
                             ? "bg-emerald-600 text-white shadow-sm"
                             : "text-slate-800"
@@ -506,19 +521,19 @@ export default function DoctorCalendarPage() {
 
       {/* Selected Day Details Modal */}
       {selectedDay && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4 backdrop-blur-sm">
-          <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-[32px] bg-white p-6 shadow-2xl space-y-4">
+        <DialogFrame onClose={() => setSelectedDay(null)} label="Өдрийн цаг захиалга" size="max-w-2xl">
+          <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-lg space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">
                   Өдрийн цаг захиалгууд
                 </p>
-                <h2 className="text-xl font-black text-slate-900">
+                <h2 className="text-xl font-semibold text-slate-900">
                   {selectedDay} ·{" "}
                   {weekdayLabels[new Date(`${selectedDay}T00:00:00`).getDay()]}
                 </h2>
               </div>
-              <button
+              <button aria-label="Хаах"
                 type="button"
                 onClick={() => setSelectedDay(null)}
                 className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
@@ -548,7 +563,7 @@ export default function DoctorCalendarPage() {
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="text-base font-black text-slate-900">
+                            <span className="text-base font-semibold text-slate-900">
                               {app.startTime} – {app.endTime}
                             </span>
                             <span
@@ -587,7 +602,7 @@ export default function DoctorCalendarPage() {
                           <button
                             type="button"
                             onClick={() => handleOpenNotes(app)}
-                            className="rounded-xl border border-blue-200 bg-blue-50 p-2 text-blue-700 hover:bg-blue-100"
+                            className="rounded-xl border border-brand-200 bg-brand-50 p-2 text-brand-700 hover:bg-brand-100"
                             title="Дотоод тэмдэглэл"
                           >
                             <MessageSquare className="h-4 w-4" />
@@ -608,7 +623,7 @@ export default function DoctorCalendarPage() {
                               type="button"
                               onClick={() => handleStatusChange(app.id, "COMPLETED")}
                               disabled={updatingId === app.id}
-                              className="rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-500 disabled:opacity-50"
+                              className="rounded-xl bg-brand-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-brand-500 disabled:opacity-50"
                             >
                               Дууссан
                             </button>
@@ -641,23 +656,23 @@ export default function DoctorCalendarPage() {
               </button>
             </div>
           </div>
-        </div>
+        </DialogFrame>
       )}
 
       {/* Transfer Modal */}
       {transferModalOpen && transferringApp && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl space-y-4">
+        <DialogFrame onClose={() => setTransferModalOpen(false)} label="Эмч рүү шилжүүлэх" size="max-w-md">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-lg space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-purple-600">
                   Өвчтөн шилжүүлэх
                 </p>
-                <h3 className="text-lg font-black text-slate-900">
+                <h3 className="text-lg font-semibold text-slate-900">
                   {transferringApp.patient.fullName}
                 </h3>
               </div>
-              <button
+              <button aria-label="Хаах"
                 type="button"
                 onClick={() => setTransferModalOpen(false)}
                 className="text-slate-400 hover:text-slate-600"
@@ -713,23 +728,23 @@ export default function DoctorCalendarPage() {
               </button>
             </div>
           </div>
-        </div>
+        </DialogFrame>
       )}
 
       {/* Notes Modal */}
       {notesModalOpen && activeAppForNotes && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl space-y-4">
+        <DialogFrame onClose={() => setNotesModalOpen(false)} label="Дотоод тэмдэглэл" size="max-w-lg">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-lg space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-blue-600">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-brand-600">
                   Дотоод тэмдэглэл
                 </p>
-                <h3 className="text-lg font-black text-slate-900">
+                <h3 className="text-lg font-semibold text-slate-900">
                   {activeAppForNotes.patient.fullName} · {activeAppForNotes.patient.phone}
                 </h3>
               </div>
-              <button
+              <button aria-label="Хаах"
                 type="button"
                 onClick={() => setNotesModalOpen(false)}
                 className="text-slate-400 hover:text-slate-600"
@@ -744,13 +759,13 @@ export default function DoctorCalendarPage() {
                 value={newNoteText}
                 onChange={(e) => setNewNoteText(e.target.value)}
                 placeholder="Шинэ тэмдэглэл бичих (ж: Даралт ихтэй, эм уусан)..."
-                className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs outline-none focus:border-blue-400"
+                className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs outline-none focus:border-brand-400"
               />
               <button
                 type="button"
                 onClick={handleAddNote}
                 disabled={savingNote || !newNoteText.trim()}
-                className="flex items-center justify-center rounded-2xl bg-blue-600 px-4 text-xs font-bold text-white shadow-sm hover:bg-blue-500 disabled:opacity-50"
+                className="flex items-center justify-center rounded-2xl bg-brand-600 px-4 text-xs font-bold text-white shadow-sm hover:bg-brand-500 disabled:opacity-50"
               >
                 {savingNote ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               </button>
@@ -789,7 +804,7 @@ export default function DoctorCalendarPage() {
               </button>
             </div>
           </div>
-        </div>
+        </DialogFrame>
       )}
     </div>
   );

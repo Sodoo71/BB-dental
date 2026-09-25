@@ -1,133 +1,46 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/auth";
-
-const getRealDefaultSettings = (): Record<string, Record<string, unknown>> => ({
-  clinic_info: {
-    clinicName: "BB Dental Clinic",
-    phone: "+976 9596-3531",
-    email: process.env.SUPER_ADMIN_EMAIL || "sodoosodbileg71@gmail.com",
-    address:
-      "БГД, 12-р хороо, 3, 4-р хороолол, Бичлийн аркны автобусны буудал дээр, Азифармтай эмийн сангийн 3 давхарт, BB Dental Clinic",
-    workingHoursNote:
-      "Даваа - Баасан: 09:00 - 19:00 | Бямба - Ням: 10:00 - 18:00",
-  },
-  telegram_config: {
-    botToken:
-      process.env.TELEGRAM_BOT_TOKEN ||
-      "8758601589:AAFqJ_IWnBcy8lCw9Vs-iq2ZJsX9NmUZilo",
-    channelId: process.env.ADMIN_CHAT_ID || "8411351733",
-    enabled: true,
-  },
-  registration_policy: {
-    autoApproveDoctors: false,
-    defaultDuration: "30",
-  },
-  security_config: {
-    maintenanceMode: false,
-    allowPublicBooking: true,
-    requireStrongPassword: true,
-  },
+import { requirePermission } from "@/lib/auth";
+import { apiError, HttpError } from "@/lib/security/http";
+const schemas = {
+  clinic_info: z.object({ clinicName: z.string().trim().min(1).max(120), phone: z.string().max(40), email: z.union([z.literal(""), z.string().email()]), address: z.string().max(1000), workingHoursNote: z.string().max(1000) }),
+  telegram_config: z.object({ channelId: z.string().max(100).default(""), enabled: z.boolean() }),
+  registration_policy: z.object({ autoApproveDoctors: z.boolean(), defaultDuration: z.string().regex(/^\d{1,3}$/).default("30") }),
+  security_config: z.object({ maintenanceMode: z.boolean(), allowPublicBooking: z.boolean(), requireStrongPassword: z.literal(true), sessionTimeoutHours: z.literal("12"), maxFailedLogins: z.literal("8") }),
+};
+const defaults = () => ({
+  clinic_info: { clinicName: "BB Dental Clinic", phone: "", email: "", address: "", workingHoursNote: "" },
+  telegram_config: { channelId: process.env.TELEGRAM_CHAT_ID || process.env.ADMIN_CHAT_ID || "", enabled: true },
+  registration_policy: { autoApproveDoctors: false, defaultDuration: "30" },
+  security_config: { maintenanceMode: false, allowPublicBooking: true, requireStrongPassword: true, sessionTimeoutHours: "12", maxFailedLogins: "8" },
 });
-
 export async function GET() {
-  const user = await requireRole("SUPER_ADMIN", "ADMIN");
-  if (!user) {
-    return NextResponse.json({ error: "Хандах эрхгүй байна." }, { status: 403 });
-  }
-
-  const defaultSettings = getRealDefaultSettings();
-
   try {
-    let rows: Array<{ key: string; value: string }> = [];
-    try {
-      rows = await prisma.systemSetting.findMany();
-    } catch {
-      try {
-        rows = await prisma.$queryRawUnsafe<Array<{ key: string; value: string }>>(
-          `SELECT "key", "value" FROM "SystemSetting"`
-        );
-      } catch {
-        rows = [];
-      }
-    }
-
-    const result: Record<string, Record<string, unknown>> = { ...defaultSettings };
-
+    if (!await requirePermission("settings:manage")) throw new HttpError(403, "Хандах эрхгүй байна.");
+    const rows = await prisma.systemSetting.findMany({ where: { key: { in: Object.keys(schemas) } } });
+    const result: Record<string, unknown> = defaults();
     for (const row of rows) {
+      const key = row.key as keyof typeof schemas;
       try {
-        result[row.key] = {
-          ...(defaultSettings[row.key] || {}),
-          ...JSON.parse(row.value),
-        };
-      } catch {
-        // use default
-      }
+        const parsed = schemas[key].safeParse(JSON.parse(row.value));
+        if (parsed.success) result[key] = parsed.data;
+      } catch { /* Invalid legacy settings use safe defaults. */ }
     }
-
     return NextResponse.json({ success: true, data: result });
-  } catch (error) {
-    console.error("GET /api/super-admin/settings error:", error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Тохиргоо ачаалахад алдаа гарлаа." },
-      { status: 500 },
-    );
-  }
+  } catch (error) { return apiError(error); }
 }
-
 export async function POST(request: Request) {
-  const user = await requireRole("SUPER_ADMIN", "ADMIN");
-  if (!user) {
-    return NextResponse.json({ error: "Хандах эрхгүй байна." }, { status: 403 });
-  }
-
   try {
-    const body = await request.json();
-    const section = typeof body.section === "string" ? body.section.trim() : "";
-    const data = body.data && typeof body.data === "object" ? body.data : null;
-
-    if (!section || !data) {
-      return NextResponse.json(
-        { error: "Тохиргооны хэсэг болон өгөгдөл шаардлагатай." },
-        { status: 400 },
-      );
-    }
-
-    const valueStr = JSON.stringify(data);
-
-    try {
-      const saved = await prisma.systemSetting.upsert({
-        where: { key: section },
-        create: { key: section, value: valueStr },
-        update: { value: valueStr },
-      });
-
-      return NextResponse.json({
-        success: true,
-        data: JSON.parse(saved.value),
-        message: "Тохиргоо амжилттай хадгалагдлаа.",
-      });
-    } catch (upsertErr) {
-      console.warn("Prisma upsert warning, trying raw SQL query:", upsertErr);
-      await prisma.$executeRawUnsafe(
-        `INSERT INTO "SystemSetting" ("key", "value", "updatedAt")
-         VALUES ($1, $2, NOW())
-         ON CONFLICT ("key") DO UPDATE SET "value" = $2, "updatedAt" = NOW()`,
-        section,
-        valueStr,
-      );
-
-      return NextResponse.json({
-        success: true,
-        data,
-        message: "Тохиргоо амжилттай хадгалагдлаа.",
-      });
-    }
-  } catch (error) {
-    console.error("POST /api/super-admin/settings error:", error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Тохиргоо хадгалахад алдаа гарлаа." },
-      { status: 500 },
-    );
-  }
+    const actor = await requirePermission("settings:manage");
+    if (!actor) throw new HttpError(403, "Хандах эрхгүй байна.");
+    const body = z.object({ section: z.enum(["clinic_info", "telegram_config", "registration_policy", "security_config"]), data: z.unknown() }).parse(await request.json());
+    const data = schemas[body.section].parse(body.data);
+    if (body.section === "security_config") throw new HttpError(400, "Security policy is currently managed by the server. These controls are read-only.");
+    await prisma.$transaction(async (tx) => {
+      await tx.systemSetting.upsert({ where: { key: body.section }, create: { key: body.section, value: JSON.stringify(data) }, update: { value: JSON.stringify(data) } });
+      await tx.auditLog.create({ data: { actorId: actor.id, action: "SETTINGS_UPDATED", entity: "SystemSetting", entityId: body.section } });
+    });
+    return NextResponse.json({ success: true, data, message: "Тохиргоо амжилттай хадгалагдлаа." });
+  } catch (error) { return apiError(error); }
 }

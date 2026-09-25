@@ -11,8 +11,8 @@ type ImageUploadProps = {
 };
 
 async function optimizeImageForUpload(file: File): Promise<File | Blob> {
-  // If SVG or already small (< 1.2MB), keep original
-  if (file.type === "image/svg+xml" || file.size < 1.2 * 1024 * 1024) {
+  // Keep small raster images at their original quality.
+  if (file.size < 1.2 * 1024 * 1024) {
     return file;
   }
 
@@ -58,6 +58,7 @@ async function optimizeImageForUpload(file: File): Promise<File | Blob> {
         );
       };
       img.onerror = () => {
+        URL.revokeObjectURL(url);
         resolve(file);
       };
       img.src = url;
@@ -81,20 +82,12 @@ export function ImageUpload({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const nameLower = file.name.toLowerCase();
-    const isLikelyImage =
-      file.type.startsWith("image/") ||
-      nameLower.endsWith(".heic") ||
-      nameLower.endsWith(".heif") ||
-      nameLower.endsWith(".jpg") ||
-      nameLower.endsWith(".jpeg") ||
-      nameLower.endsWith(".png") ||
-      nameLower.endsWith(".webp") ||
-      nameLower.endsWith(".svg") ||
-      nameLower.endsWith(".gif");
-
-    if (!isLikelyImage) {
-      setError("Зөвхөн зургийн файл (PNG, JPG, WEBP, HEIC) сонгоно уу.");
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setError("Зөвхөн JPG, PNG, WEBP зураг сонгоно уу.");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setError("Зургийн хэмжээ 8 MB-аас их байна.");
       return;
     }
 
@@ -112,7 +105,7 @@ export function ImageUpload({
       });
 
       const responseText = await response.text();
-      let data: any = null;
+      let data: { url?: string; error?: string } = {};
       try {
         data = JSON.parse(responseText);
       } catch {
@@ -128,6 +121,7 @@ export function ImageUpload({
         throw new Error(data?.error || "Зураг хуулахад алдаа гарлаа.");
       }
 
+      if (typeof data.url !== "string") throw new Error("Зураг хуулахад алдаа гарлаа.");
       onChange(data.url);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Хуулахад алдаа гарлаа.");
@@ -158,9 +152,10 @@ export function ImageUpload({
             alt="Uploaded image"
             className="h-44 w-full object-cover"
           />
-          <div className="absolute inset-0 flex items-center justify-center gap-2 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="absolute inset-0 flex items-center justify-center gap-2 bg-slate-950/40 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 max-sm:opacity-100 transition-opacity">
             <button
               type="button"
+              aria-label="Зураг солих"
               onClick={() => fileInputRef.current?.click()}
               className="rounded-xl bg-white px-3 py-1.5 text-xs font-bold text-slate-900 shadow-md hover:bg-slate-100"
             >
@@ -168,6 +163,7 @@ export function ImageUpload({
             </button>
             <button
               type="button"
+              aria-label="Зураг хасах"
               onClick={handleRemove}
               className="rounded-xl bg-red-600 px-3 py-1.5 text-xs font-bold text-white shadow-md hover:bg-red-700"
             >
@@ -176,39 +172,41 @@ export function ImageUpload({
           </div>
         </div>
       ) : (
-        <div
+        <button
+          type="button"
+          disabled={uploading}
           onClick={() => fileInputRef.current?.click()}
-          className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 p-6 text-center cursor-pointer transition hover:border-cyan-500 hover:bg-cyan-50/40"
+          className="flex w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 p-6 text-center cursor-pointer transition hover:border-brand-500 hover:bg-brand-50/40"
         >
           {uploading ? (
             <div className="flex flex-col items-center gap-2">
-              <Loader2 className="h-7 w-7 animate-spin text-cyan-600" />
+              <Loader2 className="h-7 w-7 animate-spin text-brand-600" />
               <span className="text-xs font-bold text-slate-600">
                 Зураг боловсруулж байна...
               </span>
             </div>
           ) : (
             <>
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-cyan-600 shadow-sm">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-brand-600 shadow-sm">
                 <UploadCloud className="h-5 w-5" />
               </div>
               <div>
                 <p className="text-xs font-bold text-slate-800">
-                  Зураг сонгох эсвэл чирж оруулна уу
+                  Зураг сонгох
                 </p>
                 <p className="mt-0.5 text-[11px] text-slate-400">
-                  JPG, PNG, WEBP, HEIC файл (Автомат оновчлогдоно)
+                  JPG, PNG, WEBP · 8 MB хүртэл
                 </p>
               </div>
             </>
           )}
-        </div>
+        </button>
       )}
 
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*,.heic,.heif"
+        accept="image/jpeg,image/png,image/webp"
         onChange={handleFileChange}
         className="hidden"
       />

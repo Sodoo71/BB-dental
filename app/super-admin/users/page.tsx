@@ -1,4 +1,5 @@
 "use client";
+import { DialogFrame } from "@/components/ui/DialogFrame";
 
 import Link from "next/link";
 import {
@@ -16,7 +17,7 @@ import {
   UsersRound,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/super-admin/page-header";
 import { approveUser, deleteUser } from "@/lib/api/super-admin";
 import { getRoleLabel } from "@/lib/roles";
@@ -32,12 +33,15 @@ type UserRow = {
   telegramChatId?: string | null;
   role: string;
   isActive: boolean;
+  status: "PENDING" | "ACTIVE" | "REJECTED" | "SUSPENDED";
   doctorId?: string | null;
   doctorTitle?: string | null;
   createdAt?: string;
 };
 
 export default function SuperAdminUsersPage() {
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,15 +67,15 @@ export default function SuperAdminUsersPage() {
     password: "",
   });
 
-  const loadUsers = async () => {
-    setLoading(true);
-    setError(null);
+  const loadUsers = useCallback(async () => {
     try {
-      const response = await fetch("/api/admin/users");
+      const response = await fetch(`/api/admin/users?page=${page}`);
+      setError(null);
       const payload = await response.json();
       if (!response.ok)
         throw new Error(payload.error || "Хэрэглэгчдийг ачаалж чадсангүй");
       setUsers(payload.data || []);
+      setTotal(payload.pagination?.total ?? 0);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Мэдээлэл татахад алдаа гарлаа.",
@@ -79,11 +83,24 @@ export default function SuperAdminUsersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page]);
 
   useEffect(() => {
-    void loadUsers();
-  }, []);
+    const controller = new AbortController();
+    fetch(`/api/admin/users?page=${page}`, { signal: controller.signal })
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || "Мэдээлэл татахад алдаа гарлаа.");
+        setUsers(payload.data || []);
+        setTotal(payload.pagination?.total ?? 0);
+        setError(null);
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setError(error instanceof Error ? error.message : "Мэдээлэл татахад алдаа гарлаа.");
+      })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [page]);
 
   const openAddModal = () => {
     setEditingUser(null);
@@ -121,8 +138,8 @@ export default function SuperAdminUsersPage() {
       showToast("Нэр болон и-мэйл хаяг шаардлагатай.", "error");
       return;
     }
-    if (!editingUser && (!formData.password || formData.password.length < 6)) {
-      showToast("Нууц үг хамгийн багадаа 6 тэмдэгт байх ёстой.", "error");
+    if (!editingUser && (!formData.password || formData.password.length < 12)) {
+      showToast("Нууц үг хамгийн багадаа 12 тэмдэгт байх ёстой.", "error");
       return;
     }
 
@@ -195,14 +212,25 @@ export default function SuperAdminUsersPage() {
     }
   };
 
+  const handleReject = async (userId: string) => {
+    setProcessingId(userId);
+    try {
+      const response = await fetch("/api/admin/users/approve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId, status: "REJECTED" }) });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error);
+      await loadUsers();
+    } catch (error) { showToast(error instanceof Error ? error.message : "Алдаа гарлаа.", "error"); }
+    finally { setProcessingId(null); }
+  };
+
   const handleDelete = async (userId: string, name: string) => {
-    if (!confirm(`${name} хэрэглэгчийг бүрмөсөн устгах уу?`)) return;
+    if (!confirm(`${name} хэрэглэгчийн эрхийг түдгэлзүүлэх үү?`)) return;
 
     setProcessingId(userId);
     try {
       await deleteUser(userId);
       await loadUsers();
-      showToast(`${name} хэрэглэгчийг устгалаа.`, "success");
+      showToast(`${name} хэрэглэгчийн эрхийг түдгэлзүүллээ.`, "success");
     } catch (err) {
       showToast(
         err instanceof Error ? err.message : "Устгахад алдаа гарлаа.",
@@ -219,8 +247,7 @@ export default function SuperAdminUsersPage() {
       const matchesRole = filterRole === "ALL" || u.role === filterRole;
       const matchesStatus =
         filterStatus === "ALL" ||
-        (filterStatus === "ACTIVE" && u.isActive) ||
-        (filterStatus === "PENDING" && !u.isActive);
+        u.status === filterStatus;
       const matchesSearch =
         !q ||
         u.name.toLowerCase().includes(q) ||
@@ -250,7 +277,7 @@ export default function SuperAdminUsersPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col gap-3 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
@@ -269,7 +296,8 @@ export default function SuperAdminUsersPage() {
           >
             <option value="ALL">Бүх эрх</option>
             <option value="DOCTOR">Эмч</option>
-            <option value="ADMIN">Ресепшн / Админ</option>
+            <option value="ADMIN">Админ</option>
+            <option value="RECEPTION">Ресепшн</option>
             <option value="SUPER_ADMIN">Super Admin</option>
             <option value="PATIENT">Өвчтөн</option>
           </select>
@@ -282,12 +310,14 @@ export default function SuperAdminUsersPage() {
             <option value="ALL">Бүх төлөв</option>
             <option value="ACTIVE">Идэвхтэй</option>
             <option value="PENDING">Хүлээгдэж буй</option>
+            <option value="REJECTED">Татгалзсан</option>
+            <option value="SUSPENDED">Түдгэлзүүлсэн</option>
           </select>
         </div>
       </div>
 
       {/* Users Table */}
-      <div className="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center p-12 text-slate-500">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-900 border-t-transparent mr-3" />
@@ -297,7 +327,7 @@ export default function SuperAdminUsersPage() {
           <div className="p-6 text-sm text-red-600 bg-red-50">{error}</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
+            <div className="table-scroll" tabIndex={0} role="region" aria-label="Мэдээллийн хүснэгт"><table className="w-full text-left text-sm">
               <thead className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-500">
                 <tr>
                   <th className="p-4">Хэрэглэгч</th>
@@ -345,9 +375,9 @@ export default function SuperAdminUsersPage() {
                         <span
                           className={`inline-block rounded-lg px-2.5 py-1 text-xs font-bold ${
                             u.role === "SUPER_ADMIN"
-                              ? "bg-violet-100 text-violet-800"
+                              ? "bg-brand-100 text-brand-800"
                               : u.role === "ADMIN"
-                                ? "bg-cyan-100 text-cyan-800"
+                                ? "bg-brand-100 text-brand-800"
                                 : u.role === "DOCTOR"
                                   ? "bg-emerald-100 text-emerald-800"
                                   : "bg-slate-100 text-slate-700"
@@ -366,7 +396,7 @@ export default function SuperAdminUsersPage() {
                           {u.phone || "—"}
                         </div>
                         {u.telegramChatId && (
-                          <div className="text-[11px] text-blue-600 font-semibold">
+                          <div className="text-[11px] text-brand-600 font-semibold">
                             TG: {u.telegramChatId}
                           </div>
                         )}
@@ -378,7 +408,7 @@ export default function SuperAdminUsersPage() {
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-700 border border-amber-200">
-                            Зөвшөөрөл хүлээж буй
+                            {u.status}
                           </span>
                         )}
                       </td>
@@ -389,6 +419,7 @@ export default function SuperAdminUsersPage() {
                       </td>
                       <td className="p-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          {u.status === "PENDING" && <button type="button" title="Бүртгэлээс татгалзах" disabled={processingId === u.id} onClick={() => handleReject(u.id)} className="min-h-11 rounded-xl px-3 text-red-700">Татгалзах</button>}
                           {!u.isActive && (
                             <button
                               type="button"
@@ -413,7 +444,7 @@ export default function SuperAdminUsersPage() {
                             onClick={() => handleDelete(u.id, u.name)}
                             disabled={processingId === u.id}
                             className="rounded-xl bg-red-50 p-2 text-red-600 hover:bg-red-100 disabled:opacity-50"
-                            title="Хэрэглэгч устгах"
+                            title="Хэрэглэгчийн эрхийг түдгэлзүүлэх"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -423,25 +454,31 @@ export default function SuperAdminUsersPage() {
                   ))
                 )}
               </tbody>
-            </table>
+            </table></div>
           </div>
         )}
       </div>
 
+      <nav aria-label="Staff pages" className="flex items-center justify-between gap-3">
+        <button className="min-h-11 rounded-lg border px-4 disabled:opacity-40" disabled={page === 1 || loading} onClick={() => setPage((p) => p - 1)}>Өмнөх</button>
+        <span className="text-sm">{page} / {Math.max(1, Math.ceil(total / 50))} · {total} ажилтан</span>
+        <button className="min-h-11 rounded-lg border px-4 disabled:opacity-40" disabled={page * 50 >= total || loading} onClick={() => setPage((p) => p + 1)}>Дараах</button>
+      </nav>
+      <p className="text-xs text-slate-500">Шүүлтүүр энэ хуудсанд үйлчилнэ.</p>
       {/* ADD / EDIT MODAL */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4 backdrop-blur-sm overflow-y-auto">
-          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl space-y-4 my-8">
+        <DialogFrame onClose={() => setModalOpen(false)} label="Ажилтны мэдээлэл" size="max-w-lg">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-lg space-y-4 my-8">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-cyan-600">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-brand-600">
                   {editingUser ? "Хэрэглэгч засах" : "Шинэ хэрэглэгч"}
                 </p>
-                <h3 className="text-lg font-black text-slate-900">
+                <h3 className="text-lg font-semibold text-slate-900">
                   {editingUser ? editingUser.name : "Шинэ ажилтан бүртгэх"}
                 </h3>
               </div>
-              <button
+              <button aria-label="Хаах"
                 type="button"
                 onClick={() => setModalOpen(false)}
                 className="text-slate-400 hover:text-slate-600"
@@ -453,7 +490,7 @@ export default function SuperAdminUsersPage() {
             <form onSubmit={handleSaveUser} className="space-y-4 text-xs">
               {/* Profile Image Upload */}
               <ImageUpload
-                label="Профайл зураг (Avatar Upload)"
+                label="Профайл зураг"
                 value={formData.avatarUrl}
                 onChange={(url) =>
                   setFormData((p) => ({ ...p, avatarUrl: url }))
@@ -527,7 +564,8 @@ export default function SuperAdminUsersPage() {
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-sm font-semibold outline-none"
                   >
                     <option value="DOCTOR">Эмч (Doctor)</option>
-                    <option value="ADMIN">Ресепшн / Админ (Admin)</option>
+                    <option value="ADMIN">Админ</option>
+                    <option value="RECEPTION">Ресепшн</option>
                     <option value="SUPER_ADMIN">
                       Супер Админ (Super Admin)
                     </option>
@@ -539,10 +577,14 @@ export default function SuperAdminUsersPage() {
                   <span>
                     {editingUser
                       ? "Шинэ нууц үг (Хоосон үлдээж болно)"
-                      : "Нууц үг (min 6) *"}
+                      : "Нууц үг (12-оос доошгүй тэмдэгт) *"}
                   </span>
                   <input
                     type="password"
+                    minLength={12}
+                    maxLength={256}
+                    required={!editingUser}
+                    autoComplete="new-password"
                     value={formData.password}
                     onChange={(e) =>
                       setFormData((p) => ({ ...p, password: e.target.value }))
@@ -583,7 +625,7 @@ export default function SuperAdminUsersPage() {
               </div>
             </form>
           </div>
-        </div>
+        </DialogFrame>
       )}
     </div>
   );

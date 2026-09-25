@@ -8,7 +8,7 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }, // 2. Promise болгож төрлийг нь засав
 ) {
-  const user = await requireRole("ADMIN", "SUPER_ADMIN");
+  const user = await requireRole("ADMIN", "SUPER_ADMIN", "RECEPTION");
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   try {
@@ -56,7 +56,7 @@ export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }, // 2. Promise болгож төрлийг нь засав
 ) {
-  const user = await requireRole("ADMIN", "SUPER_ADMIN");
+  const user = await requireRole("ADMIN", "SUPER_ADMIN", "RECEPTION");
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   try {

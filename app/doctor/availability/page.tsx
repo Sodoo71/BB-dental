@@ -151,7 +151,7 @@ export default function DoctorAvailabilityPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-3 rounded-[28px] border border-slate-200 bg-white p-6 text-slate-500 shadow-sm">
+      <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-6 text-slate-500 shadow-sm">
         <div className="h-5 w-5 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
         <span>Таны ажиллах цагийн хуваарийг уншиж байна…</span>
       </div>
@@ -160,20 +160,20 @@ export default function DoctorAvailabilityPage() {
 
   if (error) {
     return (
-      <div className="rounded-[28px] border border-red-200 bg-red-50 p-6 text-sm text-red-600 shadow-sm">
+      <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-600 shadow-sm">
         {error}
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="space-y-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.24em] text-emerald-600">
             Ажлын цагийн тохиргоо
           </p>
-          <h1 className="mt-1 text-2xl font-black text-slate-900">
+          <h1 className="mt-1 text-2xl font-semibold text-slate-900">
             7 хоногийн хуваарь
           </h1>
         </div>
@@ -187,10 +187,10 @@ export default function DoctorAvailabilityPage() {
       </div>
 
       {/* QUICK PRESETS BANNER */}
-      <div className="rounded-2xl border border-emerald-100 bg-gradient-to-r from-emerald-50/90 to-cyan-50/70 p-4">
+      <div className="rounded-2xl border border-emerald-100 bg-gradient-to-r from-emerald-50/90 to-brand-50/70 p-4">
         <div className="mb-2 flex items-center gap-2">
           <Zap className="h-4 w-4 text-emerald-600" />
-          <span className="text-xs font-black uppercase tracking-wider text-emerald-950">
+          <span className="text-xs font-semibold uppercase tracking-wider text-emerald-950">
             Хурдан тохируулах загварууд (1-Click Presets)
           </span>
         </div>
@@ -219,7 +219,7 @@ export default function DoctorAvailabilityPage() {
           <button
             type="button"
             onClick={copyMondayToAll}
-            className="flex items-center gap-1 rounded-xl border border-cyan-200 bg-white px-3 py-1.5 text-xs font-bold text-cyan-900 shadow-2xs hover:bg-cyan-100"
+            className="flex items-center gap-1 rounded-xl border border-brand-200 bg-white px-3 py-1.5 text-xs font-bold text-brand-900 shadow-2xs hover:bg-brand-100"
           >
             <Copy className="h-3.5 w-3.5" />
             Даваа гарагийн цагийг бүх ажлын өдөрт хуулах
@@ -239,7 +239,7 @@ export default function DoctorAvailabilityPage() {
             }`}
           >
             <div className="flex items-center justify-between">
-              <span className="text-sm font-black text-slate-900">
+              <span className="text-sm font-semibold text-slate-900">
                 {weekdayLabels[day.dayOfWeek]}
               </span>
               <label className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-slate-600">
@@ -321,7 +321,7 @@ export default function DoctorAvailabilityPage() {
         <button
           onClick={saveSchedule}
           disabled={saving}
-          className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-6 py-3 text-xs font-black text-white shadow-md hover:bg-slate-800 disabled:opacity-60"
+          className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-6 py-3 text-xs font-semibold text-white shadow-md hover:bg-slate-800 disabled:opacity-60"
         >
           <Save className="h-4 w-4" />
           {saving ? "Хадгалж байна…" : "Хуваарь хадгалах"}

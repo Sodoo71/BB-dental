@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
+import { notifyDoctorOnTelegram } from "@/lib/telegram";
 import {
   ensureAppointmentSlotIsAvailable,
   parseDateInput,
@@ -18,7 +19,7 @@ function addMinutes(startTime: string, durationMin: number) {
 }
 
 export async function GET(request: Request) {
-  const user = await requireRole("ADMIN", "SUPER_ADMIN");
+  const user = await requireRole("ADMIN", "SUPER_ADMIN", "RECEPTION");
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
@@ -64,6 +65,8 @@ export async function GET(request: Request) {
     }
     if (patient) {
       where.OR = [
+        { patientName: { contains: patient, mode: "insensitive" } },
+        { patientPhone: { contains: patient } },
         { patient: { fullName: { contains: patient, mode: "insensitive" } } },
         { patient: { phone: { contains: patient } } },
       ];
@@ -71,11 +74,23 @@ export async function GET(request: Request) {
 
     const appointments = await prisma.appointment.findMany({
       where,
-      include: { patient: true, doctor: true, service: true },
+      include: { patient: true, doctor: true, service: true, notes: true },
       orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json({ success: true, data: appointments });
+    const mapped = appointments.map((app) => ({
+      ...app,
+      patient: app.patient || {
+        id: app.patientId || app.id,
+        fullName: app.patientName,
+        phone: app.patientPhone,
+        age: null,
+        gender: null,
+      },
+      notes: app.notes || [],
+    }));
+
+    return NextResponse.json({ success: true, data: mapped });
   } catch (error: unknown) {
     console.error("❌ [GET /api/admin/appointments Error]:", error);
     return NextResponse.json(
@@ -90,7 +105,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const user = await requireRole("ADMIN", "SUPER_ADMIN");
+  const user = await requireRole("ADMIN", "SUPER_ADMIN", "RECEPTION");
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
@@ -152,6 +167,12 @@ export async function POST(request: Request) {
       where: { id: doctorId, isActive: true },
       select: { id: true },
     });
+    if (!doctor) {
+      return NextResponse.json(
+        { error: "Сонгосон эмч олдсонгүй эсвэл идэвхгүй байна." },
+        { status: 404 },
+      );
+    }
     const force = body.force === true;
 
     if (!force) {
@@ -187,14 +208,16 @@ export async function POST(request: Request) {
     }
 
     const appointment = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`${doctorId}:${date.toISOString().slice(0, 10)}`}))`;
+
       const match = patientId
         ? await tx.patient.findUnique({
             where: { id: patientId },
-            select: { id: true },
+            select: { id: true, fullName: true, phone: true },
           })
         : await tx.patient.findUnique({
             where: { phone: patientPhone },
-            select: { id: true },
+            select: { id: true, fullName: true, phone: true },
           });
 
       const patientRecord =
@@ -204,6 +227,7 @@ export async function POST(request: Request) {
             phone: patientPhone || `${Date.now()}`,
             fullName: patientName,
           },
+          select: { id: true, fullName: true, phone: true },
         }));
 
       const existing = await tx.appointment.findFirst({
@@ -236,6 +260,8 @@ export async function POST(request: Request) {
 
       return tx.appointment.create({
         data: {
+          patientName: patientRecord.fullName,
+          patientPhone: patientRecord.phone,
           patientId: patientRecord.id,
           serviceId,
           doctorId,
@@ -253,6 +279,34 @@ export async function POST(request: Request) {
         },
       });
     });
+
+    if (doctorId && serviceId) {
+      try {
+        const doc = await prisma.doctor.findUnique({
+          where: { id: doctorId },
+          select: { name: true, telegramChatId: true },
+        });
+        const srv = await prisma.service.findUnique({
+          where: { id: serviceId },
+          select: { name: true },
+        });
+        if (doc?.telegramChatId && srv) {
+          await notifyDoctorOnTelegram({
+            chatId: doc.telegramChatId,
+            appointmentId: appointment.id,
+            doctorName: doc.name,
+            patientName: appointment.patientName,
+            patientPhone: appointment.patientPhone,
+            serviceName: srv.name,
+            appointmentDate: appointment.appointmentDate,
+            startTime: appointment.startTime,
+            chiefComplaint: appointment.chiefComplaint,
+          });
+        }
+      } catch (tgErr) {
+        console.error("Telegram admin appointment notify error:", tgErr);
+      }
+    }
 
     return NextResponse.json(
       { success: true, data: appointment },

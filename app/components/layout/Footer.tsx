@@ -11,15 +11,15 @@ export default function Footer({
   return (
     <footer
       id="contact"
-      className="border-t border-slate-800 bg-slate-950 text-slate-400"
+      className="border-t border-brand-800 bg-brand-700 text-brand-100"
     >
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
         <div className="grid gap-10 lg:grid-cols-4">
           {/* Brand */}
           <div>
             <div className="flex items-center gap-2 text-white">
-              <Sparkles className="h-6 w-6 text-cyan-400" />
-              <span className="text-xl font-black">BB DENTAL</span>
+              <Sparkles className="h-6 w-6 text-gold" />
+              <span className="text-xl font-semibold">BB DENTAL</span>
             </div>
 
             <p className="mt-4 text-sm leading-relaxed">
@@ -34,12 +34,12 @@ export default function Footer({
 
             <ul className="mt-4 space-y-3 text-sm">
               <li className="flex items-center gap-2">
-                <Clock className="h-4 w-4 shrink-0 text-cyan-400" />
+                <Clock className="h-4 w-4 shrink-0 text-gold" />
                 <span>Даваа - Баасан | 09:00-19:00</span>
               </li>
 
               <li className="flex items-center gap-2">
-                <Clock className="h-4 w-4 shrink-0 text-cyan-400" />
+                <Clock className="h-4 w-4 shrink-0 text-gold" />
                 <span>Бямба - Ням | 10:00-18:00</span>
               </li>
             </ul>
@@ -55,7 +55,7 @@ export default function Footer({
                   href="tel:+97695963531"
                   className="flex items-center gap-2 transition-colors hover:text-white"
                 >
-                  <Phone className="h-4 w-4 shrink-0 text-cyan-400" />
+                  <Phone className="h-4 w-4 shrink-0 text-gold" />
                   <span>+976 9596-3531</span>
                 </a>
               </li>
@@ -67,7 +67,7 @@ export default function Footer({
                   rel="noopener noreferrer"
                   className="flex items-start gap-2 transition-colors hover:text-white"
                 >
-                  <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-cyan-400" />
+                  <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-gold" />
 
                   <span>
                     БГД, 12-р хороо, 3, 4-р хороолол,
@@ -89,7 +89,7 @@ export default function Footer({
 
             <button
               onClick={scrollToBooking}
-              className="mt-4 w-full rounded-xl bg-cyan-600 py-3 text-sm font-bold text-white transition-colors hover:bg-cyan-500"
+              className="mt-4 w-full rounded-xl bg-brand-600 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-500"
             >
               Одоо цаг авах
             </button>

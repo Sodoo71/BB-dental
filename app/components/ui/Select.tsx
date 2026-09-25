@@ -17,8 +17,8 @@ export default function Select({
   loading: boolean;
 }) {
   return (
-    <label className="block rounded-2xl border border-slate-200 p-3.5 text-sm transition focus-within:border-cyan-600">
-      <span className="mb-1.5 flex items-center gap-2 text-xs font-bold text-cyan-600">
+    <label className="block rounded-2xl border border-slate-200 p-3.5 text-sm transition focus-within:border-brand-600">
+      <span className="mb-1.5 flex items-center gap-2 text-xs font-bold text-brand-600">
         {icon}
         {label}
       </span>

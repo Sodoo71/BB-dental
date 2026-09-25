@@ -51,16 +51,17 @@ export function Toaster() {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed top-5 right-5 z-[9999] flex flex-col gap-2.5 max-w-md w-full pointer-events-none px-4 sm:px-0">
+    <div className="fixed bottom-4 left-4 right-4 z-[9999] flex flex-col gap-2.5 pointer-events-none sm:bottom-6 sm:left-auto sm:right-6 sm:w-96">
       {toasts.map((toast) => (
         <div
+          role={toast.type === "error" ? "alert" : "status"}
           key={toast.id}
-          className={`pointer-events-auto flex items-start gap-3 rounded-2xl border p-4 shadow-2xl backdrop-blur-md transition-all duration-300 animate-in slide-in-from-top-4 fade-in ${
+          className={`pointer-events-auto flex items-start gap-3 rounded-2xl border p-4 shadow-lg  transition-all duration-300 animate-in slide-in-from-top-4 fade-in ${
             toast.type === "success"
               ? "border-emerald-200 bg-white/95 text-emerald-950 shadow-emerald-500/10"
               : toast.type === "error"
                 ? "border-red-200 bg-white/95 text-red-950 shadow-red-500/10"
-                : "border-cyan-200 bg-white/95 text-cyan-950 shadow-cyan-500/10"
+                : "border-brand-200 bg-white/95 text-brand-950 shadow-brand-500/10"
           }`}
         >
           <div className="shrink-0 mt-0.5">
@@ -75,7 +76,7 @@ export function Toaster() {
               </div>
             )}
             {toast.type === "info" && (
-              <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-cyan-100 text-cyan-600">
+              <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-brand-100 text-brand-600">
                 <Info className="h-4 w-4" />
               </div>
             )}
@@ -89,8 +90,9 @@ export function Toaster() {
 
           <button
             type="button"
+            aria-label="Мэдэгдэл хаах"
             onClick={() => removeToast(toast.id)}
-            className="shrink-0 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
           >
             <X className="h-3.5 w-3.5" />
           </button>

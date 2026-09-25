@@ -8,9 +8,7 @@ export type CloudinaryConfig = {
 
 export function getCloudinaryConfig(): CloudinaryConfig | null {
   // 1. Try parsing CLOUDINARY_URL
-  const rawUrl =
-    process.env.CLOUDINARY_URL ||
-    "cloudinary://218191536118228:q5WxiD11WUT3ivZmlbGRPy-NXKY@dbev6dzt1";
+  const rawUrl = process.env.CLOUDINARY_URL;
 
   if (rawUrl && rawUrl.startsWith("cloudinary://")) {
     const match = rawUrl.match(/^cloudinary:\/\/([^:]+):([^@]+)@(.+)$/);

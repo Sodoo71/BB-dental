@@ -126,6 +126,8 @@ export async function POST(req: Request) {
     });
 
     const appointment = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`${doctorId}:${date.toISOString().slice(0, 10)}`}))`;
+
       const existing = await tx.appointment.findFirst({
         where: {
           doctorId,
@@ -175,6 +177,8 @@ export async function POST(req: Request) {
 
       return tx.appointment.create({
         data: {
+          patientName: normalizedName,
+          patientPhone: normalizedPhone,
           patientId: patient.id,
           serviceId: service.id,
           doctorId: doctor.id,
@@ -200,6 +204,7 @@ export async function POST(req: Request) {
       try {
         notificationSent = await notifyDoctorOnTelegram({
           chatId: doctor.telegramChatId,
+          appointmentId: appointment.id,
           doctorName: doctor.name,
           patientName: patient.fullName,
           patientPhone: patient.phone,

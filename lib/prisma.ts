@@ -9,9 +9,11 @@ const globalForPrisma = globalThis as unknown as {
   dbUrl?: string;
 };
 
-const rawDbUrl =
-  process.env.DATABASE_URL?.trim() ||
-  "postgresql://neondb_owner:npg_DA7cev5GBxrQ@ep-cold-breeze-azyxz1o0-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require";
+const rawDbUrl = process.env.DATABASE_URL?.trim();
+
+if (!rawDbUrl) {
+  throw new Error("DATABASE_URL is required to initialize Prisma.");
+}
 
 // Clean channel_binding parameter for optimal serverless pg/Vercel compatibility
 const cleanDbUrl = rawDbUrl
@@ -22,9 +24,8 @@ const cleanDbUrl = rawDbUrl
 if (!globalForPrisma.pool || globalForPrisma.dbUrl !== cleanDbUrl) {
   globalForPrisma.pool = new Pool({
     connectionString: cleanDbUrl,
-    ssl: { rejectUnauthorized: false },
-    max: 2, // Serverless recommended pool size per lambda container
-    idleTimeoutMillis: 15000,
+    max: 10, // Generous pool size for concurrent Next.js API route handling
+    idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 15000, // Allow Neon cold-start wake up
   });
   globalForPrisma.dbUrl = cleanDbUrl;

@@ -36,7 +36,7 @@ export async function GET(
   _request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const user = await requireRole("SUPER_ADMIN");
+  const user = await requireRole("SUPER_ADMIN", "ADMIN");
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
@@ -153,8 +153,8 @@ export async function GET(
 
   const recentAppointments = appointments.slice(0, 8).map((appointment) => ({
     id: appointment.id,
-    patientName: appointment.patient.fullName,
-    patientPhone: appointment.patient.phone,
+    patientName: appointment.patient?.fullName || appointment.patientName,
+    patientPhone: appointment.patient?.phone || appointment.patientPhone,
     serviceName: appointment.service.name,
     appointmentDate: appointment.appointmentDate,
     startTime: appointment.startTime,
@@ -206,7 +206,7 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const user = await requireRole("SUPER_ADMIN");
+  const user = await requireRole("SUPER_ADMIN", "ADMIN");
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }

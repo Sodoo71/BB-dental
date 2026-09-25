@@ -2,6 +2,7 @@ export type Doctor = { id: string; name: string; title: string | null };
 export type Service = {
   id: string;
   name: string;
+  category?: string | null;
   durationMin: number;
   price: string | number | null;
 };

@@ -12,16 +12,9 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json().catch(() => ({}));
-    const botToken =
-      typeof body.botToken === "string" && body.botToken.trim()
-        ? body.botToken.trim()
-        : process.env.TELEGRAM_BOT_TOKEN ||
-          "8758601589:AAFqJ_IWnBcy8lCw9Vs-iq2ZJsX9NmUZilo";
-
-    const chatId =
-      typeof body.chatId === "string" && body.chatId.trim()
-        ? body.chatId.trim()
-        : process.env.ADMIN_CHAT_ID || "8411351733";
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = typeof body.chatId === "string" ? body.chatId.trim() : process.env.TELEGRAM_CHAT_ID || process.env.ADMIN_CHAT_ID;
+    if (!botToken) return NextResponse.json({ error: "Telegram is not configured." }, { status: 503 });
 
     if (!chatId) {
       return NextResponse.json(
@@ -64,7 +57,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("POST /api/telegram/test error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Тест мэдэгдэл илгээхэд алдаа гарлаа." },
+      { error: "Тест мэдэгдэл илгээхэд алдаа гарлаа." },
       { status: 500 },
     );
   }

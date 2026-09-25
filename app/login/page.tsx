@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Loader2, LockKeyhole, Mail } from "lucide-react";
-import Image from "next/image";
+import { AuthShell } from "@/components/layout/AuthShell";
 import { getDashboardRouteForRole } from "@/lib/roles";
 
 export default function LoginPage() {
@@ -69,22 +69,14 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="grid min-h-screen place-items-center bg-gradient-to-br from-slate-950 via-blue-900 to-blue-600 p-4">
+    <AuthShell>
       <form
         onSubmit={submit}
-        className="w-full max-w-md rounded-[28px] bg-white p-7 shadow-2xl sm:p-9"
+        className="w-full max-w-md"
       >
         <div className="mb-8 flex flex-col items-center text-center">
-          <Image
-            src="/logo.jpg"
-            alt="BB Dental Clinic"
-            width={120}
-            height={40}
-            priority
-            className="mx-auto h-12 w-auto rounded-2xl object-contain"
-          />
-          <h1 className="mt-3 text-3xl font-black text-slate-900">
-            Удирдлагын нэвтрэх хэсэг
+          <h1 className="page-title">
+            Системд нэвтрэх
           </h1>
           <p className="mt-2 text-sm text-slate-500">
             Эрхтэй хэрэглэгчийн мэдээллээр нэвтэрнэ үү.
@@ -92,7 +84,7 @@ export default function LoginPage() {
         </div>
 
         {error && (
-          <p className="mb-4 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">
+          <p role="alert" className="mb-4 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">
             {error}
           </p>
         )}
@@ -103,10 +95,11 @@ export default function LoginPage() {
             <Mail className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
             <input
               required
+              autoComplete="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 py-3 pl-11 pr-3 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-xl border border-slate-200 py-3 pl-11 pr-3 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
               placeholder="admin@example.com"
             />
           </div>
@@ -118,13 +111,15 @@ export default function LoginPage() {
             <LockKeyhole className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
             <input
               required
+              autoComplete="current-password"
               type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 py-3 pl-11 pr-11 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-xl border border-slate-200 py-3 pl-11 pr-11 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
             />
             <button
               type="button"
+              aria-label={showPassword ? "Нууц үг нуух" : "Нууц үг харах"}
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
             >
@@ -139,7 +134,7 @@ export default function LoginPage() {
 
         <button
           disabled={loading}
-          className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 font-black text-white hover:bg-blue-700 disabled:opacity-60"
+          className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 py-3 font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
         >
           {loading && <Loader2 className="h-5 w-5 animate-spin" />}
           Нэвтрэх
@@ -149,12 +144,12 @@ export default function LoginPage() {
           Шинэ хэрэглэгч үү?{" "}
           <Link
             href="/register"
-            className="font-bold text-blue-600 underline hover:text-blue-700"
+            className="font-bold text-brand-600 underline hover:text-brand-700"
           >
-            Бүртгүүлэх (Sign Up)
+            Бүртгүүлэх
           </Link>
         </p>
       </form>
-    </main>
+    </AuthShell>
   );
 }

@@ -1,104 +1,37 @@
-import { createHmac, randomUUID, scryptSync, timingSafeEqual } from "crypto";
+import { activeSessionUser } from "@/lib/auth/session-state";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
+import { hasPermission, type Permission } from "@/lib/permissions/policy";
+import { newSessionToken, sessionTokenHash, validSessionToken, SESSION_COOKIE, SESSION_SECONDS } from "@/lib/auth/session-token";
+export { hashPassword, verifyPassword } from "@/lib/auth/password";
+export { getDashboardRouteForRole, getRoleLabel, type AppRole } from "@/lib/roles";
+import type { AppRole } from "@/lib/roles";
 
-const COOKIE = "smilecare_session";
-const secret = () =>
-  process.env.AUTH_SECRET ?? "smilecare-dev-secret-change-me";
-
-export type AppRole = "PATIENT" | "SUPER_ADMIN" | "ADMIN" | "DOCTOR";
-
-export const getDashboardRouteForRole = (role: string | null | undefined) => {
-  switch (role) {
-    case "SUPER_ADMIN":
-      return "/super-admin";
-    case "DOCTOR":
-      return "/doctor";
-    case "ADMIN":
-      return "/admin";
-    default:
-      return "/login";
-  }
-};
-
-export const getRoleLabel = (role: string | null | undefined) => {
-  switch (role) {
-    case "SUPER_ADMIN":
-      return "Super Admin";
-    case "ADMIN":
-      return "Admin";
-    case "DOCTOR":
-      return "Doctor";
-    case "PATIENT":
-      return "Patient";
-    default:
-      return "User";
-  }
-};
-
-export const hashPassword = (password: string) => {
-  const salt = randomUUID();
-  return `${salt}:${scryptSync(password, salt, 64).toString("hex")}`;
-};
-export const verifyPassword = (password: string, hash: string) => {
-  if (typeof password !== "string" || typeof hash !== "string") return false;
-
-  const [salt, value] = hash.split(":");
-  if (!salt || !value || !/^[0-9a-fA-F]+$/.test(value)) return false;
-
-  try {
-    const derived = scryptSync(password, salt, 64);
-    return timingSafeEqual(derived, Buffer.from(value, "hex"));
-  } catch {
-    return false;
-  }
-};
-const sign = (value: string) =>
-  createHmac("sha256", secret()).update(value).digest("base64url");
 export async function sessionUser() {
-  const token = (await cookies()).get(COOKIE)?.value;
-  if (!token) return null;
-
-  const [id, signature] = token.split(".");
-  if (
-    !id ||
-    !signature ||
-    !timingSafeEqual(Buffer.from(signature), Buffer.from(sign(id)))
-  )
-    return null;
-
-  return prisma.user.findFirst({
-    where: { id, isActive: true },
-    select: {
-      id: true,
-      role: true,
-      doctorId: true,
-      name: true,
-      email: true,
-    },
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!token || !validSessionToken(token)) return null;
+  const session = await prisma.session.findUnique({
+    where: { tokenHash: sessionTokenHash(token) },
+    select: { expiresAt: true, user: { select: { id: true, role: true, status: true, isActive: true, doctorId: true, name: true, email: true } } },
   });
+  return activeSessionUser(session);
 }
-
-export async function requireSessionUser() {
-  return sessionUser();
-}
-
+export const requireSessionUser = sessionUser;
 export async function requireRole(...roles: AppRole[]) {
   const user = await sessionUser();
-  return user && roles.includes(user.role) ? user : null;
+  return user && (roles.includes(user.role) || (roles.includes("DOCTOR") && Boolean(user.doctorId) && (user.role === "ADMIN" || user.role === "SUPER_ADMIN"))) ? user : null;
 }
-
-export const sessionCookie = (id: string) => {
-  const expires = new Date(Date.now() + 1000 * 60 * 60 * 12);
-
-  return {
-    name: COOKIE,
-    value: `${id}.${sign(id)}`,
-    httpOnly: true,
-    sameSite: "lax" as const,
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 12,
-    expires,
-  };
-};
+export async function requirePermission(permission: Permission) {
+  const user = await sessionUser();
+  return hasPermission(user, permission) ? user : null;
+}
+export async function sessionCookie(id: string) {
+  const token = newSessionToken();
+  const expires = new Date(Date.now() + SESSION_SECONDS * 1000);
+  await prisma.session.create({ data: { userId: id, tokenHash: sessionTokenHash(token), expiresAt: expires } });
+  return { name: SESSION_COOKIE, value: token, httpOnly: true, sameSite: "lax" as const, secure: process.env.NODE_ENV === "production", path: "/", maxAge: SESSION_SECONDS, expires };
+}
+export async function revokeCurrentSession() {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (token && validSessionToken(token)) await prisma.session.deleteMany({ where: { tokenHash: sessionTokenHash(token) } });
+}

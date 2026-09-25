@@ -30,7 +30,7 @@ export async function POST(
       include: { doctor: true, patient: true },
     });
 
-    if (!appointment) {
+    if (!appointment || (user.role === "DOCTOR" && appointment.doctorId !== user.doctorId)) {
       return NextResponse.json({ error: "Захиалга олдсонгүй." }, { status: 404 });
     }
 
@@ -38,7 +38,7 @@ export async function POST(
       where: { id: targetDoctorId },
     });
 
-    if (!targetDoctor) {
+    if (!targetDoctor || !targetDoctor.isActive || targetDoctor.id === appointment.doctorId) {
       return NextResponse.json({ error: "Шилжүүлэх эмч олдсонгүй." }, { status: 404 });
     }
 

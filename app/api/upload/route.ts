@@ -1,89 +1,26 @@
 import { NextResponse } from "next/server";
 import { requireSessionUser } from "@/lib/auth";
 import { uploadToCloudinary } from "@/lib/cloudinary";
-
-export const dynamic = "force-dynamic";
-
+import { apiError, HttpError } from "@/lib/security/http";
+import { detectImageMime, MAX_IMAGE_BYTES } from "@/lib/security/image";
+import { rateLimit } from "@/lib/security/rate-limit";
 export async function POST(request: Request) {
   try {
     const user = await requireSessionUser();
-    if (!user) {
-      return NextResponse.json(
-        { error: "Нэвтрэх хугацаа дууссан байна. Дахин нэвтэрнэ үү." },
-        { status: 401 },
-      );
-    }
-
+    if (!user || user.role === "PATIENT") throw new HttpError(403, "Хандах эрхгүй байна.");
+    await rateLimit("profile-upload", user.id, 30);
+    const size = Number(request.headers.get("content-length"));
+    if (size > MAX_IMAGE_BYTES + 65536) throw new HttpError(413, "Файлын хэмжээ хэтэрсэн байна.");
     const formData = await request.formData();
-    const file = formData.get("file") as File | null;
-
-    if (!file) {
-      return NextResponse.json(
-        { error: "Хуулах зураг олдсонгүй." },
-        { status: 400 },
-      );
-    }
-
-    const mimeType = file.type || "image/jpeg";
-    const nameLower = file.name.toLowerCase();
-    const isImage =
-      mimeType.startsWith("image/") ||
-      nameLower.endsWith(".heic") ||
-      nameLower.endsWith(".heif") ||
-      nameLower.endsWith(".jpg") ||
-      nameLower.endsWith(".jpeg") ||
-      nameLower.endsWith(".png") ||
-      nameLower.endsWith(".webp") ||
-      nameLower.endsWith(".svg") ||
-      nameLower.endsWith(".gif");
-
-    if (!isImage) {
-      return NextResponse.json(
-        { error: "Зөвхөн зургийн файл (JPG, PNG, WEBP, HEIC г.м) оруулна уу." },
-        { status: 400 },
-      );
-    }
-
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-
-    // 1. Pure Serverless Cloudinary Upload (Guaranteed to work on Vercel & Cloud)
-    try {
-      const secureUrl = await uploadToCloudinary(
-        buffer,
-        mimeType.startsWith("image/") ? mimeType : "image/jpeg",
-      );
-
-      return NextResponse.json({
-        success: true,
-        url: secureUrl,
-        provider: "cloudinary",
-      });
-    } catch (cloudErr) {
-      console.error("Cloudinary upload error:", cloudErr);
-
-      // 2. Fallback: Base64 data URL if under 2MB so upload NEVER fails on serverless
-      if (buffer.length < 2 * 1024 * 1024) {
-        const base64Url = `data:${mimeType.startsWith("image/") ? mimeType : "image/jpeg"};base64,${buffer.toString("base64")}`;
-        return NextResponse.json({
-          success: true,
-          url: base64Url,
-          provider: "base64",
-        });
-      }
-
-      throw cloudErr;
-    }
-  } catch (error) {
-    console.error("POST /api/upload error:", error);
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Зураг байршуулахад алдаа гарлаа.",
-      },
-      { status: 500 },
-    );
-  }
+    const file = formData.get("file");
+    if (!(file instanceof File) || file.size === 0) throw new HttpError(400, "Зургийн файл сонгоно уу.");
+    if (file.size > MAX_IMAGE_BYTES) throw new HttpError(413, "Файлын хэмжээ 8 MB-аас их байна.");
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const mime = detectImageMime(buffer);
+    if (!mime || (file.type && file.type !== mime)) throw new HttpError(400, "Зөвхөн JPG, PNG, WEBP зураг оруулна уу.");
+    // Public profile/service images only. Medical assets require a separate private delivery workflow.
+    const url = await uploadToCloudinary(buffer, mime, "bb-dental/profiles");
+    await (await import("@/lib/prisma")).prisma.auditLog.create({ data: { actorId: user.id, action: "PROFILE_IMAGE_UPLOADED", entity: "User", entityId: user.id } });
+    return NextResponse.json({ success: true, url, provider: "cloudinary" });
+  } catch (error) { return apiError(error); }
 }

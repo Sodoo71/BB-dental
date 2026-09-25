@@ -61,7 +61,7 @@ type OverviewResponse = {
 const statusClassMap: Record<string, string> = {
   PENDING: "border-amber-200 bg-amber-50 text-amber-700",
   CONFIRMED: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  COMPLETED: "border-blue-200 bg-blue-50 text-blue-700",
+  COMPLETED: "border-brand-200 bg-brand-50 text-brand-700",
   CANCELLED: "border-red-200 bg-red-50 text-red-700",
   NO_SHOW: "border-slate-200 bg-slate-100 text-slate-700",
 };
@@ -129,7 +129,7 @@ export default function DoctorDashboardPage() {
 
   if (loading) {
     return (
-      <div className="space-y-5 rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="h-8 w-48 animate-pulse rounded-xl bg-slate-200" />
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           {Array.from({ length: 5 }).map((_, index) => (
@@ -145,8 +145,8 @@ export default function DoctorDashboardPage() {
 
   if (error || !data) {
     return (
-      <div className="rounded-[28px] border border-red-200 bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-black text-slate-900">
+      <div className="rounded-2xl border border-red-200 bg-white p-6 shadow-sm">
+        <h1 className="text-2xl font-semibold text-slate-900">
           Хянах самбар боломжгүй байна
         </h1>
         <p className="mt-2 text-slate-600">
@@ -163,10 +163,10 @@ export default function DoctorDashboardPage() {
       <header className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.28em] text-emerald-600">
+            <p className="text-sm font-semibold text-emerald-600">
               Эмчийн ажиллах хэсэг
             </p>
-            <h1 className="mt-2 text-3xl font-black text-slate-900">
+            <h1 className="mt-2 text-2xl font-semibold text-slate-900">
               {greeting}, Др. {data.doctor.name}
             </h1>
             <p className="mt-2 text-sm text-slate-500">
@@ -192,13 +192,13 @@ export default function DoctorDashboardPage() {
             label: "Өнөөдрийн цаг авалт",
             value: data.stats.todayAppointments,
             icon: CalendarDays,
-            tone: "text-sky-600",
+            tone: "text-brand-600",
           },
           {
             label: "Ирээдүйд болох",
             value: data.stats.upcoming,
             icon: Clock3,
-            tone: "text-violet-600",
+            tone: "text-brand-600",
           },
           {
             label: "Өнөөдөр үзсэн",
@@ -216,32 +216,32 @@ export default function DoctorDashboardPage() {
             label: "Өнөөдрийн ажиллах цаг",
             value: workingHours,
             icon: Stethoscope,
-            tone: "text-cyan-600",
+            tone: "text-brand-600",
           },
         ].map(({ label, value, icon: Icon, tone }) => (
           <div
             key={label}
-            className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm"
+            className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
           >
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-bold uppercase tracking-[0.22em] text-slate-400">
+            <div className="flex min-h-10 items-start justify-between gap-2">
+              <p className="text-sm font-semibold text-slate-500">
                 {label}
               </p>
-              <Icon className={`h-5 w-5 ${tone}`} />
+              <Icon className={`h-5 w-5 shrink-0 ${tone}`} />
             </div>
-            <p className="mt-6 text-3xl font-black text-slate-900">{value}</p>
+            <p className="mt-6 text-2xl font-semibold text-slate-900">{value}</p>
           </div>
         ))}
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.7fr_1fr]">
-        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-5 flex items-center justify-between">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.24em] text-emerald-600">
+              <p className="text-sm font-semibold text-emerald-600">
                 Өнөөдөр
               </p>
-              <h2 className="mt-1 text-xl font-black text-slate-900">
+              <h2 className="mt-1 text-lg font-semibold text-slate-900">
                 Өнөөдрийн цаг авалтууд
               </h2>
             </div>
@@ -267,11 +267,11 @@ export default function DoctorDashboardPage() {
                 >
                   <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div>
-                      <p className="text-sm font-black text-slate-900">
+                      <p className="text-sm font-semibold text-slate-900">
                         {toTimeLabel(appointment.startTime)} –{" "}
                         {toTimeLabel(appointment.endTime)}
                       </p>
-                      <p className="mt-1 text-base font-bold text-slate-800">
+                      <p className="mt-1 text-sm font-bold text-slate-800">
                         {appointment.patient.fullName}
                       </p>
                       <p className="text-sm text-slate-600">
@@ -279,7 +279,7 @@ export default function DoctorDashboardPage() {
                       </p>
                     </div>
                     <span
-                      className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-bold ${
+                      className={`inline-flex items-center rounded-full border px-2.5 py-1 text-sm font-bold ${
                         statusClassMap[appointment.status] ??
                         "border-slate-200 bg-slate-100 text-slate-700"
                       }`}
@@ -287,7 +287,7 @@ export default function DoctorDashboardPage() {
                       {statusLabelMap[appointment.status] ?? appointment.status}
                     </span>
                   </div>
-                  <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                  <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-slate-500">
                     <span>{appointment.patient.phone}</span>
                     <span>•</span>
                     <span>{appointment.service.durationMin} мин</span>
@@ -304,12 +304,12 @@ export default function DoctorDashboardPage() {
           </div>
         </div>
 
-        <div className="space-y-5 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.24em] text-emerald-600">
+            <p className="text-sm font-semibold text-emerald-600">
               Түргэн үйлдлүүд
             </p>
-            <h2 className="mt-1 text-xl font-black text-slate-900">
+            <h2 className="mt-1 text-lg font-semibold text-slate-900">
               Анхаарах зүйлс
             </h2>
           </div>
@@ -336,9 +336,9 @@ export default function DoctorDashboardPage() {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
-        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-xl font-black text-slate-900">
+            <h2 className="text-lg font-semibold text-slate-900">
               Ирээдүйд болох цаг авалтууд
             </h2>
             <Link
@@ -361,10 +361,10 @@ export default function DoctorDashboardPage() {
                   className="flex flex-col gap-2 rounded-2xl border border-slate-200 p-3 md:flex-row md:items-center md:justify-between"
                 >
                   <div>
-                    <p className="text-sm font-black text-slate-900">
+                    <p className="text-sm font-semibold text-slate-900">
                       {formatDate(appointment.appointmentDate)}
                     </p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-sm text-slate-500">
                       {toTimeLabel(appointment.startTime)} •{" "}
                       {appointment.patient.fullName}
                     </p>
@@ -373,7 +373,7 @@ export default function DoctorDashboardPage() {
                     <span>{appointment.service.name}</span>
                     <span>{appointment.service.durationMin} мин</span>
                     <span
-                      className={`rounded-full border px-2 py-1 text-[11px] font-bold ${
+                      className={`rounded-full border px-2 py-1 text-sm font-bold ${
                         statusClassMap[appointment.status] ??
                         "border-slate-200 bg-slate-100 text-slate-700"
                       }`}
@@ -387,9 +387,9 @@ export default function DoctorDashboardPage() {
           </div>
         </div>
 
-        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-xl font-black text-slate-900">
+            <h2 className="text-lg font-semibold text-slate-900">
               Миний өвчтөнүүд
             </h2>
             <Link
@@ -414,13 +414,13 @@ export default function DoctorDashboardPage() {
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="font-bold text-slate-900">{patient.name}</p>
-                      <p className="text-xs text-slate-500">{patient.phone}</p>
+                      <p className="text-sm text-slate-500">{patient.phone}</p>
                     </div>
-                    <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">
+                    <span className="rounded-full bg-emerald-50 px-2 py-1 text-sm font-bold text-emerald-700">
                       {patient.totalAppointments} удаа ирсэн
                     </span>
                   </div>
-                  <div className="mt-2 text-xs text-slate-500">
+                  <div className="mt-2 text-sm text-slate-500">
                     Сүүлд ирсэн: {formatDate(patient.lastAppointment)}
                   </div>
                 </div>

@@ -1,4 +1,4 @@
-export type UserRole = "PATIENT" | "SUPER_ADMIN" | "ADMIN" | "DOCTOR";
+export type UserRole = "PATIENT" | "SUPER_ADMIN" | "ADMIN" | "RECEPTION" | "DOCTOR";
 
 export type UserRow = {
   id: string;
@@ -6,6 +6,7 @@ export type UserRow = {
   email: string | null;
   role: UserRole;
   isActive: boolean;
+  status: "ACTIVE" | "PENDING" | "REJECTED" | "SUSPENDED";
   doctorId: string | null;
   createdAt: string;
   updatedAt?: string;

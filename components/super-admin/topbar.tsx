@@ -1,6 +1,7 @@
 "use client";
 
-import { Bell, Menu, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import Link from "next/link";
+import { Activity, Menu, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { SuperAdminBreadcrumb } from "@/components/super-admin/breadcrumb";
 import { SuperAdminUserMenu } from "@/components/super-admin/user-menu";
 
@@ -16,8 +17,8 @@ export function SuperAdminTopbar({
   sidebarCollapsed: boolean;
 }) {
   return (
-    <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur-sm">
-      <div className="flex items-center justify-between gap-3 px-4 py-3 md:px-6">
+    <header className="sticky top-0 z-20 border-b border-slate-200 bg-white ">
+      <div className="flex items-center justify-between gap-3 min-h-20 px-4 py-3 md:px-8">
         <div className="flex min-w-0 items-center gap-3">
           <button
             type="button"
@@ -49,14 +50,7 @@ export function SuperAdminTopbar({
         </div>
 
         <div className="flex items-center gap-2 md:gap-3">
-          <button
-            type="button"
-            className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50"
-            aria-label="Notifications"
-          >
-            <Bell className="h-4 w-4" />
-            <span className="absolute right-2.5 top-2.5 h-2.5 w-2.5 rounded-full bg-amber-400 ring-2 ring-white" />
-          </button>
+          <Link href="/super-admin/logs" title="Үйлдлийн түүх" aria-label="Үйлдлийн түүх" className="hidden h-11 w-11 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 sm:flex"><Activity size={18} /></Link>
 
           <SuperAdminUserMenu user={user} />
         </div>

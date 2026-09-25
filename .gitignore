@@ -41,3 +41,9 @@ yarn-error.log*
 next-env.d.ts
 
 /app/generated/prisma
+
+# Safe configuration template
+!.env.example
+
+# Local UI screenshots (may contain clinic data)
+/artifacts/

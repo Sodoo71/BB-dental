@@ -132,7 +132,7 @@ export default function DoctorProfilePage() {
 
   if (loading) {
     return (
-      <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex items-center gap-3 text-slate-600">
           <div className="h-5 w-5 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
           <p className="text-sm font-medium">Профайл мэдээллийг уншиж байна…</p>
@@ -143,7 +143,7 @@ export default function DoctorProfilePage() {
 
   if (error || !profile) {
     return (
-      <div className="rounded-[28px] border border-red-200 bg-white p-6 shadow-sm">
+      <div className="rounded-2xl border border-red-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-bold text-slate-900">
           Профайл мэдээлэл олдсонгүй
         </h2>
@@ -155,13 +155,13 @@ export default function DoctorProfilePage() {
   }
 
   return (
-    <div className="space-y-6 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="space-y-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.24em] text-emerald-600">
             Хувийн мэдээлэл
           </p>
-          <h1 className="mt-1 text-2xl font-black text-slate-900">
+          <h1 className="mt-1 text-2xl font-semibold text-slate-900">
             Миний профайл
           </h1>
         </div>
@@ -175,7 +175,7 @@ export default function DoctorProfilePage() {
               Мэдээлэл засах
             </button>
           ) : (
-            <button
+            <button aria-label="Хаах"
               onClick={() => setIsEditing(false)}
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
@@ -196,7 +196,7 @@ export default function DoctorProfilePage() {
       {isEditing ? (
         <form
           onSubmit={handleSave}
-          className="space-y-4 rounded-3xl border border-slate-200 bg-slate-50 p-6"
+          className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-6"
         >
           <div className="grid gap-4 md:grid-cols-2">
             <div>
@@ -306,7 +306,7 @@ export default function DoctorProfilePage() {
           </div>
         </form>
       ) : (
-        <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
           <div className="mb-6 flex items-center gap-4">
             {profile.avatarUrl ? (
               <div className="h-20 w-20 overflow-hidden rounded-2xl border-2 border-emerald-500 shadow-md">
@@ -325,7 +325,7 @@ export default function DoctorProfilePage() {
               <p className="text-xs font-bold uppercase tracking-[0.24em] text-emerald-600">
                 {profile.role}
               </p>
-              <h2 className="mt-1 text-2xl font-black text-slate-900">
+              <h2 className="mt-1 text-2xl font-semibold text-slate-900">
                 {profile.name}
               </h2>
               <p className="text-sm text-slate-500">

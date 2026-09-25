@@ -1,80 +1,206 @@
 "use client";
 
-import { Activity, ArrowRight, Clock3 } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import {
+  Activity,
+  CalendarCheck2,
+  Clock3,
+  Filter,
+  Loader2,
+  RefreshCw,
+  Search,
+  ShieldAlert,
+  Stethoscope,
+  UserCheck,
+} from "lucide-react";
 import { PageHeader } from "@/components/super-admin/page-header";
 
-const entries = [
-  {
-    action: "Doctor schedule updated",
-    actor: "System Admin",
-    time: "Today, 09:42",
-  },
-  {
-    action: "New appointment confirmed",
-    actor: "Nurse Desk",
-    time: "Today, 08:15",
-  },
-  {
-    action: "Patient profile reviewed",
-    actor: "Support Team",
-    time: "Yesterday, 16:30",
-  },
-  {
-    action: "Admin access modified",
-    actor: "System Admin",
-    time: "Yesterday, 14:02",
-  },
-];
+type LogEntry = {
+  id: string;
+  action: string;
+  category: "APPOINTMENT" | "USER" | "DOCTOR" | "SYSTEM";
+  actor: string;
+  details: string;
+  time: string;
+  badge: string;
+  badgeColor: string;
+};
 
 export default function SuperAdminLogsPage() {
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<string>("ALL");
+  const [search, setSearch] = useState("");
+
+  const loadLogs = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/super-admin/logs");
+      const json = await res.json();
+      if (res.ok && json.data) {
+        setLogs(json.data);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadLogs();
+  }, []);
+
+  const filtered = logs.filter((log) => {
+    const matchesCat = filter === "ALL" || log.category === filter;
+    const q = search.trim().toLowerCase();
+    const matchesSearch =
+      !q ||
+      log.action.toLowerCase().includes(q) ||
+      log.actor.toLowerCase().includes(q) ||
+      log.details.toLowerCase().includes(q);
+    return matchesCat && matchesSearch;
+  });
+
+  const formatLogTime = (iso: string) => {
+    const d = new Date(iso);
+    return d.toLocaleString("mn-MN", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Activity Logs"
-        description="Track recent operational changes across the clinic platform."
+        title="Системийн үйл ажиллагааны лог"
+        description="Цаг захиалга, баталгаажуулалт, ажилтнуудын бүртгэл болон системийн өөрчлөлтүүдийг цаг тухайд нь хянах."
+        action={
+          <button
+            type="button"
+            onClick={loadLogs}
+            disabled={loading}
+            className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            <span>Шинэчлэх</span>
+          </button>
+        }
       />
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
-        <div className="mb-5 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white">
-            <Activity className="h-5 w-5" />
-          </div>
-          <div>
-            <div className="text-lg font-semibold text-slate-900">
-              Recent activity
+      {/* Filter and Search Bar */}
+      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-2">
+          {[
+            { id: "ALL", label: "Бүх үйлдлүүд" },
+            { id: "APPOINTMENT", label: "Үзлэгийн цаг" },
+            { id: "USER", label: "Хэрэглэгч" },
+            { id: "DOCTOR", label: "Эмч нар" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setFilter(tab.id)}
+              className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${
+                filter === tab.id
+                  ? "bg-slate-900 text-white shadow-sm"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="relative">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Хайх (үйлдэл, нэр, утас)..."
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-4 text-xs font-semibold outline-none focus:border-brand-500 focus:bg-white sm:w-64"
+          />
+        </div>
+      </div>
+
+      {/* Log Feed */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mb-5 flex items-center justify-between border-b border-slate-100 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-50 text-brand-600">
+              <Activity className="h-5 w-5" />
             </div>
-            <div className="text-sm text-slate-500">
-              Latest updates from the system
+            <div>
+              <h3 className="font-bold text-slate-900">
+                Сүүлийн үйлдлүүдийн жагсаалт
+              </h3>
+              <p className="text-xs text-slate-500">
+                Нийт {filtered.length} лог бүртгэл харагдаж байна
+              </p>
             </div>
           </div>
         </div>
 
-        <div className="space-y-4">
-          {entries.map((entry) => (
-            <div
-              key={entry.time}
-              className="flex gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4"
-            >
-              <div className="mt-1 flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-600 shadow-sm">
-                <Clock3 className="h-4 w-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="font-medium text-slate-800">
-                    {entry.action}
+        {loading ? (
+          <div className="flex h-48 items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-brand-600" />
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="py-12 text-center text-xs font-bold text-slate-400">
+            Одоогоор ямар нэгэн лог бичлэг олдсонгүй.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filtered.map((entry) => (
+              <div
+                key={entry.id}
+                className="flex min-w-0 flex-col items-start justify-between gap-3 rounded-2xl sm:flex-row sm:gap-4 border border-slate-100 bg-slate-50/70 p-4 transition hover:bg-slate-100/70"
+              >
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-slate-700 shadow-sm">
+                    {entry.category === "APPOINTMENT" && (
+                      <CalendarCheck2 className="h-4 w-4 text-brand-600" />
+                    )}
+                    {entry.category === "USER" && (
+                      <UserCheck className="h-4 w-4 text-emerald-600" />
+                    )}
+                    {entry.category === "DOCTOR" && (
+                      <Stethoscope className="h-4 w-4 text-purple-600" />
+                    )}
                   </div>
-                  <div className="inline-flex items-center gap-1 text-xs font-medium text-slate-500">
-                    {entry.time}
-                    <ArrowRight className="h-3.5 w-3.5" />
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-bold text-slate-900">
+                        {entry.action}
+                      </span>
+                      <span
+                        className={`max-w-full break-all rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase ${entry.badgeColor}`}
+                      >
+                        {entry.badge}
+                      </span>
+                    </div>
+                    <p className="mt-1 break-all text-xs text-slate-600 font-medium">
+                      {entry.details}
+                    </p>
+                    <p className="mt-1 break-all text-[11px] text-slate-500">
+                      Хийсэн:{" "}
+                      <span className="font-semibold text-slate-600">
+                        {entry.actor}
+                      </span>
+                    </p>
                   </div>
                 </div>
-                <div className="mt-1 text-sm text-slate-500">
-                  by {entry.actor}
+
+                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400 shrink-0">
+                  <Clock3 className="h-3.5 w-3.5" />
+                  <span>{formatLogTime(entry.time)}</span>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

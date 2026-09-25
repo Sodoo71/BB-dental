@@ -1,75 +1,32 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
-
-const validRoles = ["DOCTOR", "ADMIN", "SUPER_ADMIN"] as const;
-
+import { registerSchema } from "@/lib/validation/auth";
+import { apiError } from "@/lib/security/http";
+import { rateLimit } from "@/lib/security/rate-limit";
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as Record<string, unknown>;
-    const name = typeof body.name === "string" ? body.name.trim() : "";
-    const email =
-      typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-    const password = typeof body.password === "string" ? body.password : "";
-    const role = typeof body.role === "string" ? body.role : "DOCTOR";
-
-    if (!name || !email || !password) {
-      return NextResponse.json(
-        { error: "Нэр, и-мэйл, нууц үг шаардлагатай." },
-        { status: 400 },
-      );
-    }
-
-    if (!validRoles.includes(role as (typeof validRoles)[number])) {
-      return NextResponse.json({ error: "Роль буруу байна." }, { status: 400 });
-    }
-
-    if (password.length < 6) {
-      return NextResponse.json(
-        { error: "Нууц үг хамгийн багадаа 6 тэмдэгт байна." },
-        { status: 400 },
-      );
-    }
-
-    const existing = await prisma.user.findUnique({
-      where: { email },
+    const input = registerSchema.parse(await request.json());
+    await rateLimit("registration", "clinic", 30);
+    await rateLimit("registration-email", input.email, 3, 60);
+    const passwordHash = await hashPassword(input.password);
+    const user = await prisma.$transaction(async (tx) => {
+      const setting = await tx.systemSetting.findUnique({ where: { key: "registration_policy" } });
+      let autoApprove = false;
+      if (setting) {
+        try { autoApprove = JSON.parse(setting.value).autoApproveDoctors === true; } catch { /* fail closed */ }
+      }
+      const user = await tx.user.create({
+        data: { name: input.name, email: input.email, role: input.role, passwordHash, isActive: autoApprove, status: autoApprove ? "ACTIVE" : "PENDING" },
+        select: { id: true, name: true, email: true, role: true, status: true, isActive: true },
+      });
+      if (autoApprove && input.role === "DOCTOR") {
+        const doctor = await tx.doctor.create({ data: { name: user.name, email: user.email, specialty: "", experience: 0 } });
+        await tx.user.update({ where: { id: user.id }, data: { doctorId: doctor.id } });
+      }
+      await tx.auditLog.create({ data: { actorId: user.id, action: "USER_REGISTERED", entity: "User", entityId: user.id, metadata: { status: user.status, role: user.role } } });
+      return user;
     });
-
-    if (existing) {
-      return NextResponse.json(
-        { error: "И-мэйл аль хэдийн бүртгэгдсэн байна." },
-        { status: 409 },
-      );
-    }
-
-    const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        passwordHash: hashPassword(password),
-        role: role as (typeof validRoles)[number],
-        isActive: false,
-      },
-    });
-
-    return NextResponse.json(
-      {
-        success: true,
-        data: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          isActive: user.isActive,
-        },
-      },
-      { status: 201 },
-    );
-  } catch (error) {
-    console.error("POST /api/auth/register error:", error);
-    return NextResponse.json(
-      { error: "Бүртгэл үүсгэхэд алдаа гарлаа." },
-      { status: 500 },
-    );
-  }
+    return NextResponse.json({ success: true, data: user }, { status: 201 });
+  } catch (error) { return apiError(error); }
 }

@@ -5,14 +5,15 @@ import { usePathname } from "next/navigation";
 import { ChevronRight, Home } from "lucide-react";
 
 const labelMap: Record<string, string> = {
-  "super-admin": "Super Admin",
-  doctors: "Doctors",
-  admins: "Admins",
-  users: "Users",
-  appointments: "Appointments",
-  logs: "Logs",
-  settings: "Settings",
-  dashboard: "Dashboard",
+  "super-admin": "Удирдлага",
+  services: "Үйлчилгээ",
+  doctors: "Эмч нар",
+  admins: "Админууд",
+  users: "Ажилтнууд",
+  appointments: "Цаг захиалга",
+  logs: "Үйлдлийн түүх",
+  settings: "Тохиргоо",
+  dashboard: "Хянах самбар",
 };
 
 export function SuperAdminBreadcrumb() {
@@ -22,7 +23,7 @@ export function SuperAdminBreadcrumb() {
     .filter(Boolean)
     .filter((segment) => segment !== "super-admin");
 
-  const crumbs = [{ href: "/super-admin", label: "Super Admin" }].concat(
+  const crumbs = [{ href: "/super-admin", label: "Удирдлага" }].concat(
     segments.map((segment, index) => {
       const href = `/super-admin/${segments.slice(0, index + 1).join("/")}`;
       return {
@@ -39,9 +40,10 @@ export function SuperAdminBreadcrumb() {
   return (
     <nav
       aria-label="Breadcrumb"
-      className="flex items-center gap-2 text-sm text-slate-500"
+      className="flex min-w-0 items-center gap-2 overflow-hidden text-xs text-slate-500 sm:text-sm"
     >
       <Link
+        aria-label="Удирдлагын нүүр"
         href="/super-admin"
         className="inline-flex items-center gap-2 rounded-md px-1.5 py-1 transition hover:text-slate-700"
       >
@@ -53,7 +55,7 @@ export function SuperAdminBreadcrumb() {
           <div key={crumb.href} className="flex items-center gap-2">
             <ChevronRight className="h-4 w-4 text-slate-400" />
             {isLast ? (
-              <span className="font-medium text-slate-700">{crumb.label}</span>
+              <span className="truncate font-medium text-slate-700">{crumb.label}</span>
             ) : (
               <Link
                 href={crumb.href}

@@ -9,8 +9,16 @@ function readDoctorInput(input: DoctorInput) {
   const optionalString = (value: unknown) =>
     typeof value === "string" && value.trim() ? value.trim() : null;
 
+  const specialty =
+    typeof input.specialty === "string" && input.specialty.trim()
+      ? input.specialty.trim()
+      : typeof input.title === "string" && input.title.trim()
+        ? input.title.trim()
+        : "Шүдний их эмч";
+
   return {
     name,
+    specialty,
     title: optionalString(input.title),
     phone: optionalString(input.phone),
     email: optionalString(input.email),
@@ -20,7 +28,7 @@ function readDoctorInput(input: DoctorInput) {
 }
 
 export async function GET() {
-  const user = await requireRole("ADMIN", "SUPER_ADMIN");
+  const user = await requireRole("ADMIN", "SUPER_ADMIN", "RECEPTION");
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   try {

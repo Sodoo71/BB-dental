@@ -12,7 +12,7 @@ export default function Info({
 }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="text-cyan-400">{icon}</span>
+      <span className="text-brand-400">{icon}</span>
       <div>
         <span className="block text-xs text-slate-400">{title}</span>
         <b className="text-sm text-slate-100">{value}</b>

@@ -1,4 +1,4 @@
-export type AppRole = "PATIENT" | "SUPER_ADMIN" | "ADMIN" | "DOCTOR";
+export type AppRole = "PATIENT" | "SUPER_ADMIN" | "ADMIN" | "RECEPTION" | "DOCTOR";
 
 export const getDashboardRouteForRole = (role: string | null | undefined) => {
   switch (role) {
@@ -7,6 +7,8 @@ export const getDashboardRouteForRole = (role: string | null | undefined) => {
     case "DOCTOR":
       return "/doctor";
     case "ADMIN":
+      return "/super-admin";
+    case "RECEPTION":
       return "/admin";
     default:
       return "/login";
@@ -16,14 +18,16 @@ export const getDashboardRouteForRole = (role: string | null | undefined) => {
 export const getRoleLabel = (role: string | null | undefined) => {
   switch (role) {
     case "SUPER_ADMIN":
-      return "Super Admin";
+      return "Ерөнхий админ";
     case "ADMIN":
-      return "Admin";
+      return "Админ";
     case "DOCTOR":
-      return "Doctor";
+      return "Эмч";
+    case "RECEPTION":
+      return "Ресепшн";
     case "PATIENT":
-      return "Patient";
+      return "Үйлчлүүлэгч";
     default:
-      return "User";
+      return "Хэрэглэгч";
   }
 };

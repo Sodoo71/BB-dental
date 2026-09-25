@@ -1,9 +1,12 @@
 export type DoctorRow = {
   id: string;
   name: string;
+  specialty: string | null;
   title: string | null;
   phone: string | null;
   email: string | null;
+  avatarUrl: string | null;
+  telegramChatId: string | null;
   isActive: boolean;
   totalAppointments: number;
   completedAppointments: number;

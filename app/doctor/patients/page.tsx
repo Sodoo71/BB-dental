@@ -53,13 +53,13 @@ export default function DoctorPatientsPage() {
   }, []);
 
   return (
-    <div className="space-y-6 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="space-y-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.24em] text-emerald-600">
             Өвчтөнүүд
           </p>
-          <h1 className="mt-1 text-2xl font-black text-slate-900">
+          <h1 className="mt-1 text-2xl font-semibold text-slate-900">
             Миний өвчтөнүүд
           </h1>
         </div>
@@ -87,7 +87,7 @@ export default function DoctorPatientsPage() {
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
+          <div className="table-scroll" tabIndex={0} role="region" aria-label="Мэдээллийн хүснэгт"><table className="min-w-full text-left text-sm">
             <thead className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
               <tr>
                 <th className="p-3">Өвчтөн</th>
@@ -126,7 +126,7 @@ export default function DoctorPatientsPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </div>
       )}
     </div>

@@ -1,7 +1,8 @@
 "use client";
 import React, { useState } from "react";
 import { Menu, Phone, Sparkles, X } from "lucide-react";
-import Image from "next/image";
+import Link from "next/link";
+import { Brand } from "@/components/layout/Brand";
 
 export default function Navbar({
   scrollToBooking,
@@ -16,55 +17,49 @@ export default function Navbar({
   };
 
   return (
-    <nav className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/80 backdrop-blur-md">
+    <nav className="sticky top-0 z-40 border-b border-slate-200/80 bg-white ">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">
-        <div className="flex items-center">
-          <Image
-            src="/logo.jpg"
-            alt="BB Dental Clinic"
-            width={120}
-            height={40}
-            priority
-            className="h-10 w-auto object-contain rounded-2xl"
-          />
-        </div>
+        <Link href="/" aria-label="BB Dental нүүр хуудас"><Brand /></Link>
 
-        <div className="hidden items-center gap-8 font-bold text-slate-600 md:flex">
-          <a href="#services" className="transition hover:text-cyan-600">
+        <div className="hidden items-center gap-8 text-sm font-medium text-slate-600 lg:flex">
+          <a href="#services" className="transition hover:text-brand-600">
             Үйлчилгээ
           </a>
-          <a href="#doctors" className="transition hover:text-cyan-600">
+          <a href="#doctors" className="transition hover:text-brand-600">
             Эмч нар
           </a>
-          <a href="#booking" className="transition hover:text-cyan-600">
+          <a href="#booking" className="transition hover:text-brand-600">
             Цаг захиалга
           </a>
-          <a href="#contact" className="transition hover:text-cyan-600">
+          <a href="#contact" className="transition hover:text-brand-600">
             Холбоо барих
           </a>
         </div>
 
         <div className="flex items-center gap-3">
+          <Link href="/login" className="hidden min-h-11 items-center text-xs font-medium text-brand-700 lg:flex">Ажилтны нэвтрэх</Link>
           <a
             href="tel:95963531"
-            className="hidden items-center gap-2 rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-200 sm:flex"
+            className="hidden items-center gap-2 rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-200 xl:flex"
           >
-            <Phone className="h-4 w-4 text-cyan-600" />
+            <Phone className="h-4 w-4 text-brand-600" />
             9596-3531
           </a>
 
           <button
             onClick={scrollToBooking}
-            className="hidden rounded-xl bg-cyan-600 px-5 py-2.5 text-sm font-black text-white shadow-lg shadow-cyan-600/25 transition hover:bg-cyan-500 sm:inline-flex"
+            className="hidden rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-600/25 transition hover:bg-brand-500 sm:inline-flex"
           >
             Цаг авах
           </button>
 
           <button
             type="button"
-            aria-label="Toggle navigation menu"
+            aria-label="Үндсэн цэс"
+            aria-expanded={open}
+            aria-controls="public-navigation"
             onClick={() => setOpen((value) => !value)}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm md:hidden"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm lg:hidden"
           >
             {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
@@ -72,7 +67,7 @@ export default function Navbar({
       </div>
 
       {open && (
-        <div className="border-t border-slate-200 bg-white md:hidden">
+        <div id="public-navigation" className="border-t border-slate-200 bg-white lg:hidden">
           <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-4 text-sm font-bold text-slate-700">
             <a
               href="#services"
@@ -82,11 +77,11 @@ export default function Navbar({
               Үйлчилгээ
             </a>
             <a
-              href="#about"
+              href="#doctors"
               onClick={() => setOpen(false)}
               className="rounded-xl px-3 py-2 hover:bg-slate-100"
             >
-              Бидний тухай
+              Эмч нар
             </a>
             <a
               href="#booking"
@@ -104,7 +99,7 @@ export default function Navbar({
             </a>
             <button
               onClick={handleNavClick}
-              className="mt-2 rounded-xl bg-cyan-600 px-4 py-3 font-black text-white"
+              className="mt-2 rounded-xl bg-brand-600 px-4 py-3 font-semibold text-white"
             >
               Цаг авах
             </button>

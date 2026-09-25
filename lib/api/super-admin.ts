@@ -14,7 +14,7 @@ export type SuperAdminDashboard = {
 
 export async function getCurrentSuperAdminProfile() {
   const profile = await fetchJson("/api/auth/me");
-  if (profile?.data?.role !== "SUPER_ADMIN") {
+  if (!["SUPER_ADMIN", "ADMIN"].includes(profile?.data?.role)) {
     return null;
   }
 
@@ -43,7 +43,7 @@ export async function getSuperAdminDashboard(): Promise<SuperAdminDashboard> {
     doctors,
     users,
     services,
-    pendingUsers: users.filter((user) => !user.isActive),
+    pendingUsers: users.filter((user) => user.status === "PENDING"),
   };
 }
 

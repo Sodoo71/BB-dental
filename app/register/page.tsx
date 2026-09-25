@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+
 import {
   Eye,
   EyeOff,
@@ -11,10 +11,10 @@ import {
   Mail,
   UserRound,
 } from "lucide-react";
-import Image from "next/image";
+import { AuthShell } from "@/components/layout/AuthShell";
 
 export default function RegisterPage() {
-  const router = useRouter();
+  const [success, setSuccess] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -40,7 +40,7 @@ export default function RegisterPage() {
         throw new Error(data.error ?? "Бүртгэл үүсгэхэд алдаа гарлаа.");
       }
 
-      router.replace("/login");
+      setSuccess(data.data.status === "ACTIVE" ? "Бүртгэл үүслээ. Та нэвтэрч болно." : "Бүртгэл үүслээ. Админ баталгаажуулалт хүлээнэ үү.");
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Бүртгэл үүсгэхэд алдаа гарлаа.",
@@ -51,30 +51,23 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="grid min-h-screen place-items-center bg-gradient-to-br from-slate-950 via-blue-900 to-blue-600 p-4">
+    <AuthShell>
       <form
         onSubmit={submit}
-        className="w-full max-w-lg rounded-[28px] bg-white p-7 shadow-2xl sm:p-9"
+        className="w-full max-w-md"
       >
         <div className="mb-8 flex flex-col items-center text-center">
-          <Image
-            src="/logo.jpg"
-            alt="BB Dental Clinic"
-            width={120}
-            height={40}
-            priority
-            className="mx-auto h-12 w-auto rounded-2xl object-contain"
-          />
-          <h1 className="mt-3 text-3xl font-black text-slate-900">
+          <h1 className="page-title">
             Бүртгэл үүсгэх
           </h1>
           <p className="mt-2 text-sm text-slate-500">
-            Админ баталгаажуулалт хүлээнэ үү.
+            Ажилтны бүртгэл үүсгэх
           </p>
         </div>
 
+        {success && <p role="status" className="mb-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{success} <Link href="/login" className="underline">Нэвтрэх</Link></p>}
         {error && (
-          <p className="mb-4 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">
+          <p role="alert" className="mb-4 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">
             {error}
           </p>
         )}
@@ -89,7 +82,7 @@ export default function RegisterPage() {
                 type="text"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                className="w-full rounded-xl border border-slate-200 py-3 pl-11 pr-3 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-xl border border-slate-200 py-3 pl-11 pr-3 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                 placeholder="Батнасан"
               />
             </div>
@@ -101,10 +94,11 @@ export default function RegisterPage() {
               <Mail className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
               <input
                 required
-                type="email"
+                autoComplete="email"
+              type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                className="w-full rounded-xl border border-slate-200 py-3 pl-11 pr-3 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-xl border border-slate-200 py-3 pl-11 pr-3 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                 placeholder="name@example.com"
               />
             </div>
@@ -116,14 +110,18 @@ export default function RegisterPage() {
               <LockKeyhole className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
               <input
                 required
+                minLength={12}
+                maxLength={256}
+                autoComplete="new-password"
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                className="w-full rounded-xl border border-slate-200 py-3 pl-11 pr-11 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-xl border border-slate-200 py-3 pl-11 pr-11 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                 placeholder="••••••••"
               />
               <button
                 type="button"
+                aria-label={showPassword ? "Hide password" : "Show password"}
                 onClick={() => setShowPassword((current) => !current)}
                 className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
               >
@@ -141,18 +139,17 @@ export default function RegisterPage() {
             <select
               value={role}
               onChange={(event) => setRole(event.target.value)}
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
             >
               <option value="DOCTOR">DOCTOR</option>
-              <option value="ADMIN">ADMIN</option>
-              <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+              <option value="RECEPTION">RECEPTION</option>
             </select>
           </label>
         </div>
 
         <button
-          disabled={loading}
-          className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 font-black text-white hover:bg-blue-700 disabled:opacity-60"
+          disabled={loading || Boolean(success)}
+          className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 py-3 font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
         >
           {loading && <Loader2 className="h-5 w-5 animate-spin" />}
           Бүртгүүлэх
@@ -162,12 +159,12 @@ export default function RegisterPage() {
           Бүртгэлтэй юу?{" "}
           <Link
             href="/login"
-            className="font-bold text-blue-600 underline hover:text-blue-700"
+            className="font-bold text-brand-600 underline hover:text-brand-700"
           >
             Нэвтрэх
           </Link>
         </p>
       </form>
-    </main>
+    </AuthShell>
   );
 }

@@ -3,15 +3,15 @@ import Link from "next/link";
 export default function UnauthorizedPage() {
   return (
     <main className="grid min-h-screen place-items-center bg-slate-100 p-4">
-      <div className="w-full max-w-lg rounded-[28px] border border-slate-200 bg-white p-8 text-center shadow-xl">
+      <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-xl">
         <p className="text-xs font-bold uppercase tracking-[0.24em] text-red-600">
           403
         </p>
-        <h1 className="mt-3 text-3xl font-black text-slate-900">
-          Access denied
+        <h1 className="mt-3 text-3xl font-semibold text-slate-900">
+          Хандах эрхгүй байна
         </h1>
         <p className="mt-3 text-sm text-slate-600">
-          Таны эрх энэ хуудас руу орж болохгүй байна.
+          Энэ хуудсанд хандах эрх байхгүй байна. Өөрийн эрхээр нэвтэрнэ үү.
         </p>
         <div className="mt-6 flex justify-center gap-3">
           <Link

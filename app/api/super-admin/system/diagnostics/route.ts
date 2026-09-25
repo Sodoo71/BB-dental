@@ -115,7 +115,7 @@ export async function POST(request: Request) {
             include: { patient: true, service: true, notes: true },
           }),
           prisma.service.findMany(),
-          prisma.systemSetting.findMany(),
+          prisma.systemSetting.findMany({ where: { key: { in: ["clinic_info", "registration_policy", "security_config"] } } }),
         ]);
 
       return NextResponse.json({

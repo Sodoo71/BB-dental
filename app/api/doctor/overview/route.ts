@@ -90,12 +90,14 @@ export async function GET() {
   >();
 
   appointments.forEach((appointment) => {
-    const patient = appointment.patient;
-    const current = patientMap.get(patient.id) ?? {
-      id: patient.id,
-      patientId: patient.id,
-      name: patient.fullName,
-      phone: patient.phone,
+    const patientId = appointment.patient?.id || appointment.patientPhone;
+    const name = appointment.patient?.fullName || appointment.patientName;
+    const phone = appointment.patient?.phone || appointment.patientPhone;
+    const current = patientMap.get(patientId) ?? {
+      id: patientId,
+      patientId,
+      name,
+      phone,
       totalAppointments: 0,
       lastAppointment: null,
       nextAppointment: null,
@@ -115,7 +117,7 @@ export async function GET() {
     ) {
       current.nextAppointment = appointment.appointmentDate.toISOString();
     }
-    patientMap.set(patient.id, current);
+    patientMap.set(patientId, current);
   });
 
   const patients = Array.from(patientMap.values()).sort((a, b) => {
