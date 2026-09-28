@@ -1,15 +1,13 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Activity,
   CalendarCheck2,
   Clock3,
-  Filter,
   Loader2,
   RefreshCw,
   Search,
-  ShieldAlert,
   Stethoscope,
   UserCheck,
 } from "lucide-react";
@@ -27,40 +25,38 @@ type LogEntry = {
 };
 
 export default function SuperAdminLogsPage() {
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [error, setError] = useState("");
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("ALL");
   const [search, setSearch] = useState("");
 
-  const loadLogs = async () => {
+  const loadLogs = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/super-admin/logs");
+      const res = await fetch(`/api/super-admin/logs?page=${page}&category=${filter}&search=${encodeURIComponent(search)}`);
       const json = await res.json();
-      if (res.ok && json.data) {
+      if (!res.ok) throw new Error(json.error || "Лог ачаалж чадсангүй.");
+      setError("");
+      setTotal(json.pagination.total);
+      if (json.data) {
         setLogs(json.data);
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Лог ачаалж чадсангүй.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, filter, search]);
 
   useEffect(() => {
-    void loadLogs();
-  }, []);
+    const timer = setTimeout(() => { void loadLogs(); }, 250);
+    return () => clearTimeout(timer);
+  }, [loadLogs]);
 
-  const filtered = logs.filter((log) => {
-    const matchesCat = filter === "ALL" || log.category === filter;
-    const q = search.trim().toLowerCase();
-    const matchesSearch =
-      !q ||
-      log.action.toLowerCase().includes(q) ||
-      log.actor.toLowerCase().includes(q) ||
-      log.details.toLowerCase().includes(q);
-    return matchesCat && matchesSearch;
-  });
+  const filtered = logs;
 
   const formatLogTime = (iso: string) => {
     const d = new Date(iso);
@@ -98,10 +94,11 @@ export default function SuperAdminLogsPage() {
             { id: "APPOINTMENT", label: "Үзлэгийн цаг" },
             { id: "USER", label: "Хэрэглэгч" },
             { id: "DOCTOR", label: "Эмч нар" },
+            { id: "SYSTEM", label: "Систем" },
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setFilter(tab.id)}
+              onClick={() => { setPage(1); setFilter(tab.id); }}
               className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${
                 filter === tab.id
                   ? "bg-slate-900 text-white shadow-sm"
@@ -118,13 +115,15 @@ export default function SuperAdminLogsPage() {
           <input
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setPage(1); setSearch(e.target.value); }}
             placeholder="Хайх (үйлдэл, нэр, утас)..."
             className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-4 text-xs font-semibold outline-none focus:border-brand-500 focus:bg-white sm:w-64"
           />
         </div>
       </div>
 
+      {error && <p role="alert" className="text-red-600">{error}</p>}
+      <div className="flex items-center gap-4"><button disabled={page === 1 || loading} onClick={() => setPage(p => p - 1)}>Өмнөх</button><span>{page} / {Math.max(1, Math.ceil(total / 50))} · {total} лог</span><button disabled={page * 50 >= total || loading} onClick={() => setPage(p => p + 1)}>Дараах</button></div>
       {/* Log Feed */}
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="mb-5 flex items-center justify-between border-b border-slate-100 pb-4">

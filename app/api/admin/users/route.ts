@@ -62,21 +62,15 @@ export async function GET(request: Request) {
           }
         : {}),
     };
-    const [users, total] = await prisma.$transaction([
-      prisma.user.findMany({
-        where,
-        select: { ...publicUserSelect, doctor: { select: { title: true } } },
-        orderBy: [{ createdAt: "desc" }, { id: "asc" }],
-        skip: (page - 1) * 50,
-        take: 50,
-      }),
-      prisma.user.count({ where }),
+    const [users, doctors] = await prisma.$transaction([
+      prisma.user.findMany({ where, select: { ...publicUserSelect, doctor: { select: { title: true } } }, orderBy: [{ createdAt: "desc" }, { id: "asc" }] }),
+      prisma.doctor.findMany({ where: { user: null, ...(params.get("pending") === "true" ? { id: "" } : {}), ...(search ? { OR: [{ name: { contains: search, mode: "insensitive" } }, { email: { contains: search, mode: "insensitive" } }] } : {}) } }),
     ]);
-    return NextResponse.json({
-      success: true,
-      data: users.map((u) => ({ ...u, doctorTitle: u.doctor?.title ?? null })),
-      pagination: { page, pageSize: 50, total },
-    });
+    const staff = [
+      ...users.map(u => ({ ...u, hasAccount: true, doctorTitle: u.doctor?.title ?? null })),
+      ...doctors.map(d => ({ id: d.id, doctorId: d.id, name: d.name, email: d.email ?? "", phone: d.phone, avatarUrl: d.avatarUrl ?? d.imageUrl, telegramChatId: d.telegramChatId, role: "DOCTOR", status: d.isActive ? "ACTIVE" : "SUSPENDED", isActive: d.isActive, createdAt: d.createdAt, updatedAt: d.updatedAt, doctorTitle: d.title, hasAccount: false })),
+    ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id));
+    return NextResponse.json({ success: true, data: staff.slice((page - 1) * 50, page * 50), pagination: { page, pageSize: 50, total: staff.length } });
   } catch (error) {
     return apiError(error);
   }

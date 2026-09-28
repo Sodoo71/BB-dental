@@ -13,6 +13,7 @@ function addMinutes(startTime: string, durationMin: number) {
   const match = timePattern.exec(startTime);
   if (!match) return null;
   const totalMinutes = Number(match[1]) * 60 + Number(match[2]) + durationMin;
+  if (totalMinutes >= 24 * 60 || durationMin <= 0) return null;
   const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
   const minutes = totalMinutes % 60;
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
@@ -208,7 +209,7 @@ export async function POST(request: Request) {
     }
 
     const appointment = await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`${doctorId}:${date.toISOString().slice(0, 10)}`}))`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`${doctorId}:${date.toISOString().slice(0, 10)}`}))::text`;
 
       const match = patientId
         ? await tx.patient.findUnique({
@@ -258,7 +259,7 @@ export async function POST(request: Request) {
         throw new Error("Сонгосон цаг аль хэдийн захиалагдсан байна.");
       }
 
-      return tx.appointment.create({
+      const created = await tx.appointment.create({
         data: {
           patientName: patientRecord.fullName,
           patientPhone: patientRecord.phone,
@@ -278,6 +279,8 @@ export async function POST(request: Request) {
           chiefComplaint,
         },
       });
+      await tx.auditLog.create({ data: { actorId: user.id, action: "APPOINTMENT_CREATED", entity: "Appointment", entityId: created.id } });
+      return created;
     });
 
     if (doctorId && serviceId) {
@@ -290,9 +293,9 @@ export async function POST(request: Request) {
           where: { id: serviceId },
           select: { name: true },
         });
-        if (doc?.telegramChatId && srv) {
+        if (doc && srv) {
           await notifyDoctorOnTelegram({
-            chatId: doc.telegramChatId,
+            chatId: doc.telegramChatId || "",
             appointmentId: appointment.id,
             doctorName: doc.name,
             patientName: appointment.patientName,

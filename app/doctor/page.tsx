@@ -90,10 +90,10 @@ export default function DoctorDashboardPage() {
   const [data, setData] = useState<OverviewResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
-    setMounted(true);
+
     const load = async () => {
       try {
         const response = await fetch("/api/doctor/overview");
@@ -106,6 +106,7 @@ export default function DoctorDashboardPage() {
         }
 
         setData(payload.data);
+        setError(null);
       } catch (err) {
         setError(
           err instanceof Error
@@ -118,7 +119,7 @@ export default function DoctorDashboardPage() {
     };
 
     void load();
-  }, []);
+  }, [reload]);
 
   const workingHours = useMemo(() => {
     if (!data) return "0ц 0м";
@@ -131,7 +132,7 @@ export default function DoctorDashboardPage() {
     return (
       <div className="space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="h-8 w-48 animate-pulse rounded-xl bg-slate-200" />
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
           {Array.from({ length: 5 }).map((_, index) => (
             <div
               key={index}
@@ -151,7 +152,7 @@ export default function DoctorDashboardPage() {
         </h1>
         <p className="mt-2 text-slate-600">
           {error || "Эмчийн мэдээлэл олдсонгүй."}
-        </p>
+        </p><button className="button-secondary mt-4 px-4" onClick={() => { setLoading(true); setReload(v => v + 1); }}>Дахин ачаалах</button>
       </div>
     );
   }
@@ -170,7 +171,7 @@ export default function DoctorDashboardPage() {
               {greeting}, Др. {data.doctor.name}
             </h1>
             <p className="mt-2 text-sm text-slate-500">
-              {mounted &&
+              {
                 new Date().toLocaleDateString("mn-MN", {
                   weekday: "long",
                   year: "numeric",
@@ -186,7 +187,7 @@ export default function DoctorDashboardPage() {
         </div>
       </header>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-5">
         {[
           {
             label: "Өнөөдрийн цаг авалт",
@@ -236,7 +237,7 @@ export default function DoctorDashboardPage() {
 
       <section className="grid gap-6 xl:grid-cols-[1.7fr_1fr]">
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-5 flex items-center justify-between">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-emerald-600">
                 Өнөөдөр
@@ -337,7 +338,7 @@ export default function DoctorDashboardPage() {
 
       <section className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-semibold text-slate-900">
               Ирээдүйд болох цаг авалтууд
             </h2>
@@ -369,7 +370,7 @@ export default function DoctorDashboardPage() {
                       {appointment.patient.fullName}
                     </p>
                   </div>
-                  <div className="flex items-center gap-4 text-sm text-slate-600">
+                  <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600">
                     <span>{appointment.service.name}</span>
                     <span>{appointment.service.durationMin} мин</span>
                     <span
@@ -388,7 +389,7 @@ export default function DoctorDashboardPage() {
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-semibold text-slate-900">
               Миний өвчтөнүүд
             </h2>

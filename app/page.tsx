@@ -1,5 +1,6 @@
 "use client";
 
+import { ClinicInfoProvider } from "@/components/layout/ClinicInfoProvider";
 import React from "react";
 import Navbar from "./components/layout/Navbar";
 import Hero from "./components/home/Hero";
@@ -15,7 +16,7 @@ export default function Home() {
   };
 
   return (
-    <main>
+    <ClinicInfoProvider><main>
       <div className="min-h-screen bg-slate-50 text-slate-900 scroll-smooth">
         <Navbar scrollToBooking={scrollToBooking} />
         <Hero scrollToBooking={scrollToBooking} />
@@ -24,6 +25,6 @@ export default function Home() {
         <BookingSection />
         <Footer scrollToBooking={scrollToBooking} />
       </div>
-    </main>
+    </main></ClinicInfoProvider>
   );
 }

@@ -40,7 +40,7 @@ export async function PUT(request: Request) {
     const schedules = (await request.json()) as ScheduleInput[];
     if (!Array.isArray(schedules) || schedules.length !== 7) {
       return NextResponse.json(
-        { error: "7 days of availability are required." },
+        { error: "Долоо хоногийн 7 өдрийн хуваарь шаардлагатай." },
         { status: 400 },
       );
     }
@@ -57,7 +57,7 @@ export async function PUT(request: Request) {
         dayOfWeek > 6 ||
         seenDays.has(dayOfWeek)
       ) {
-        throw new Error("Invalid schedule data.");
+        throw new Error("Өдөр давхардсан эсвэл цагийн дараалал буруу байна.");
       }
       seenDays.add(dayOfWeek);
 
@@ -68,6 +68,7 @@ export async function PUT(request: Request) {
           startTime: "09:00",
           endTime: "17:00",
           isDayOff: true,
+          isActive: true,
         };
       }
 
@@ -85,7 +86,7 @@ export async function PUT(request: Request) {
         !timePattern.test(endTime) ||
         timeToMinutes(startTime) >= timeToMinutes(endTime)
       ) {
-        throw new Error("Invalid schedule data.");
+        throw new Error("Өдөр давхардсан эсвэл цагийн дараалал буруу байна.");
       }
 
       return {
@@ -94,11 +95,12 @@ export async function PUT(request: Request) {
         startTime,
         endTime,
         isDayOff: false,
+        isActive: true,
       };
     });
 
     await prisma.$transaction(
-      data.map((schedule) =>
+      [...data.map((schedule) =>
         prisma.doctorSchedule.upsert({
           where: {
             doctorId_dayOfWeek: {
@@ -109,7 +111,7 @@ export async function PUT(request: Request) {
           create: schedule,
           update: schedule,
         }),
-      ),
+      ), prisma.auditLog.create({ data: { actorId: user.id, action: "DOCTOR_SCHEDULE_UPDATED", entity: "Doctor", entityId: doctorId } })],
     );
 
     return NextResponse.json({ success: true });

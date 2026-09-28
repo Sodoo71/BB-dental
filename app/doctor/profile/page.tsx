@@ -12,6 +12,7 @@ import {
   UserRound,
   X,
 } from "lucide-react";
+import { ClinicImage } from "@/components/ui/ClinicImage";
 import { ImageUpload } from "@/components/ui/ImageUpload";
 import { showToast } from "@/components/ui/Toast";
 
@@ -32,6 +33,7 @@ export default function DoctorProfilePage() {
   const [error, setError] = useState<string | null>(null);
 
   const [isEditing, setIsEditing] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -45,37 +47,10 @@ export default function DoctorProfilePage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const meResponse = await fetch("/api/auth/me");
-        const me = await meResponse.json();
-
-        if (!meResponse.ok) {
-          throw new Error(me.error || "Профайл мэдээллийг ачаалж чадсангүй");
-        }
-
-        const doctorId = me.data?.doctorId;
-        const doctorsResponse = await fetch("/api/doctors");
-        const doctorsPayload = await doctorsResponse.json();
-
-        if (!doctorsResponse.ok) {
-          throw new Error(
-            doctorsPayload.error || "Эмч нарын жагсаалтыг ачаалж чадсангүй",
-          );
-        }
-
-        const doctor = (doctorsPayload.data || []).find(
-          (item: { id: string }) => item.id === doctorId,
-        );
-
-        const loadedProfile = {
-          id: doctor?.id || doctorId,
-          name: doctor?.name || me.data?.name || "Эмч",
-          title: doctor?.title || "",
-          phone: doctor?.phone || "",
-          email: doctor?.email || me.data?.email || "",
-          avatarUrl: doctor?.avatarUrl || doctor?.imageUrl || "",
-          telegramChatId: doctor?.telegramChatId || "",
-          role: me.data?.role || "DOCTOR",
-        };
+        const response = await fetch("/api/doctor/profile");
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || "Профайл ачаалж чадсангүй.");
+        const loadedProfile = { ...payload.data, role: "DOCTOR", avatarUrl: payload.data.avatarUrl || payload.data.imageUrl || "" };
 
         setProfile(loadedProfile);
         setFormData({
@@ -102,6 +77,7 @@ export default function DoctorProfilePage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving || uploading) return;
     setSaving(true);
     try {
       const response = await fetch("/api/doctor/profile", {
@@ -115,7 +91,7 @@ export default function DoctorProfilePage() {
         throw new Error(payload.error || "Мэдээлэл хадгалахад алдаа гарлаа.");
       }
 
-      setProfile((prev) => (prev ? { ...prev, ...formData } : null));
+      setProfile((prev) => (prev ? { ...prev, ...payload.data } : null));
       setIsEditing(false);
       showToast("Профайл мэдээлэл амжилттай шинэчлэгдлээ.", "success");
     } catch (err) {
@@ -156,7 +132,7 @@ export default function DoctorProfilePage() {
 
   return (
     <div className="space-y-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.24em] text-emerald-600">
             Хувийн мэдээлэл
@@ -165,10 +141,10 @@ export default function DoctorProfilePage() {
             Миний профайл
           </h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {!isEditing ? (
             <button
-              onClick={() => setIsEditing(true)}
+              onClick={() => { setFormData({ name: profile.name, title: profile.title || "", phone: profile.phone || "", email: profile.email || "", avatarUrl: profile.avatarUrl || "", telegramChatId: profile.telegramChatId || "" }); setIsEditing(true); }}
               className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
             >
               <Edit3 className="h-4 w-4" />
@@ -176,7 +152,7 @@ export default function DoctorProfilePage() {
             </button>
           ) : (
             <button aria-label="Хаах"
-              onClick={() => setIsEditing(false)}
+              disabled={saving || uploading} onClick={() => setIsEditing(false)}
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
               <X className="h-4 w-4" />
@@ -198,14 +174,15 @@ export default function DoctorProfilePage() {
           onSubmit={handleSave}
           className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-6"
         >
-          <div className="grid gap-4 md:grid-cols-2">
+          <fieldset disabled={saving} className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+              <label htmlFor="profile-name" className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
                 Овог нэр *
               </label>
               <input
                 type="text"
                 required
+                id="profile-name"
                 value={formData.name}
                 onChange={(e) =>
                   setFormData({ ...formData, name: e.target.value })
@@ -215,11 +192,12 @@ export default function DoctorProfilePage() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+              <label htmlFor="profile-title" className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
                 Мэргэшил / Цол
               </label>
               <input
                 type="text"
+                id="profile-title"
                 value={formData.title}
                 onChange={(e) =>
                   setFormData({ ...formData, title: e.target.value })
@@ -230,11 +208,12 @@ export default function DoctorProfilePage() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+              <label htmlFor="profile-phone" className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
                 Утасны дугаар
               </label>
               <input
                 type="text"
+                id="profile-phone"
                 value={formData.phone}
                 onChange={(e) =>
                   setFormData({ ...formData, phone: e.target.value })
@@ -244,11 +223,12 @@ export default function DoctorProfilePage() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+              <label htmlFor="profile-email" className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
                 И-мэйл хаяг
               </label>
               <input
                 type="email"
+                id="profile-email"
                 value={formData.email}
                 onChange={(e) =>
                   setFormData({ ...formData, email: e.target.value })
@@ -258,12 +238,13 @@ export default function DoctorProfilePage() {
             </div>
 
             <div className="md:col-span-2">
-              <label className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-                Telegram ID / Username
+              <label htmlFor="profile-telegramChatId" className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                Telegram Chat ID
               </label>
               <input
                 type="text"
-                placeholder="@username эсвэл Chat ID"
+                placeholder="Тоон Chat ID"
+                id="profile-telegramChatId"
                 value={formData.telegramChatId}
                 onChange={(e) =>
                   setFormData({ ...formData, telegramChatId: e.target.value })
@@ -271,33 +252,33 @@ export default function DoctorProfilePage() {
                 className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-emerald-500"
               />
               <p className="mt-1 text-xs text-slate-400">
-                Захиалгын мэдэгдэл хүлээн авах Телеграм Chat ID эсвэл Username.
+                Bot дээр /start дарсны дараа тоон Chat ID-гаа оруулна уу.
               </p>
             </div>
 
             {/* Profile Avatar Upload */}
             <div className="md:col-span-2">
-              <ImageUpload
-                label="Профайл зураг оруулах (Avatar Upload)"
+              <ImageUpload onUploadingChange={setUploading}
+                label="Профайл зураг"
                 value={formData.avatarUrl}
                 onChange={(url) =>
                   setFormData((prev) => ({ ...prev, avatarUrl: url }))
                 }
               />
             </div>
-          </div>
+          </fieldset>
 
           <div className="flex justify-end gap-2 border-t border-slate-200 pt-4">
             <button
               type="button"
-              onClick={() => setIsEditing(false)}
+              disabled={saving || uploading} onClick={() => setIsEditing(false)}
               className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-100"
             >
               Цуцлах
             </button>
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || uploading}
               className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-slate-800 disabled:opacity-50"
             >
               <Save className="h-4 w-4" />
@@ -310,7 +291,7 @@ export default function DoctorProfilePage() {
           <div className="mb-6 flex items-center gap-4">
             {profile.avatarUrl ? (
               <div className="h-20 w-20 overflow-hidden rounded-2xl border-2 border-emerald-500 shadow-md">
-                <img
+                <ClinicImage
                   src={profile.avatarUrl}
                   alt={profile.name}
                   className="h-full w-full object-cover"
@@ -340,7 +321,7 @@ export default function DoctorProfilePage() {
                 <Phone className="h-4 w-4 text-emerald-600" />
                 Утасны дугаар
               </div>
-              <p className="mt-3 text-base font-bold text-slate-900">
+              <p className="mt-3 break-all text-base font-bold text-slate-900">
                 {profile.phone || "Бүртгэгдээгүй"}
               </p>
             </div>
@@ -350,7 +331,7 @@ export default function DoctorProfilePage() {
                 <Mail className="h-4 w-4 text-emerald-600" />
                 И-мэйл хаяг
               </div>
-              <p className="mt-3 text-base font-bold text-slate-900">
+              <p className="mt-3 break-all text-base font-bold text-slate-900">
                 {profile.email || "Бүртгэгдээгүй"}
               </p>
             </div>
@@ -360,7 +341,7 @@ export default function DoctorProfilePage() {
                 <MessageSquare className="h-4 w-4 text-emerald-600" />
                 Telegram ID
               </div>
-              <p className="mt-3 text-base font-bold text-slate-900">
+              <p className="mt-3 break-all text-base font-bold text-slate-900">
                 {profile.telegramChatId || "Бүртгэгдээгүй"}
               </p>
             </div>

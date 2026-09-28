@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { syncDoctor } from "@/lib/auth/users";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 import { registerSchema } from "@/lib/validation/auth";
@@ -21,8 +22,7 @@ export async function POST(request: Request) {
         select: { id: true, name: true, email: true, role: true, status: true, isActive: true },
       });
       if (autoApprove && input.role === "DOCTOR") {
-        const doctor = await tx.doctor.create({ data: { name: user.name, email: user.email, specialty: "", experience: 0 } });
-        await tx.user.update({ where: { id: user.id }, data: { doctorId: doctor.id } });
+        await syncDoctor(tx, user.id);
       }
       await tx.auditLog.create({ data: { actorId: user.id, action: "USER_REGISTERED", entity: "User", entityId: user.id, metadata: { status: user.status, role: user.role } } });
       return user;

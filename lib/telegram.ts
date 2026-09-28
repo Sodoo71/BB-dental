@@ -1,3 +1,10 @@
+import { prisma } from "@/lib/prisma";
+
+async function notificationConfig() {
+  const row = await prisma.systemSetting.findUnique({ where: { key: "telegram_config" } });
+  try { return JSON.parse(row?.value ?? "{}") as { enabled?: boolean; channelId?: string }; } catch { return {}; }
+}
+
 type DoctorNotification = {
   chatId: string;
   appointmentId?: string;
@@ -21,6 +28,7 @@ export async function sendTelegramRaw(
     const res = await fetch(
       `https://api.telegram.org/bot${token}/${endpoint}`,
       {
+        signal: AbortSignal.timeout(10000),
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -34,7 +42,9 @@ export async function sendTelegramRaw(
 }
 
 export async function notifyDoctorOnTelegram(notification: DoctorNotification) {
-  if (!process.env.TELEGRAM_BOT_TOKEN || !notification.chatId) return false;
+  if (!process.env.TELEGRAM_BOT_TOKEN) return false;
+  const config = await notificationConfig();
+  if (config.enabled === false) return false;
 
   const date = new Intl.DateTimeFormat("mn-MN", {
     timeZone: "Asia/Ulaanbaatar",
@@ -79,14 +89,16 @@ export async function notifyDoctorOnTelegram(notification: DoctorNotification) {
       }
     : undefined;
 
-  const result = await sendTelegramRaw("sendMessage", {
+  const result = notification.chatId ? await sendTelegramRaw("sendMessage", {
     chat_id: notification.chatId,
     text,
     parse_mode: "Markdown",
     reply_markup,
-  });
+  }) : null;
 
-  return result?.ok === true;
+  const channelId = config.channelId || process.env.TELEGRAM_CHAT_ID || process.env.ADMIN_CHAT_ID;
+  const channelResult = channelId && channelId !== notification.chatId ? await sendTelegramRaw("sendMessage", { chat_id: channelId, text, parse_mode: "Markdown" }) : null;
+  return result?.ok === true || channelResult?.ok === true;
 }
 
 export async function notifyAppointmentReminder(params: {
@@ -98,6 +110,7 @@ export async function notifyAppointmentReminder(params: {
   appointmentDate: Date;
   startTime: string;
 }) {
+  if ((await notificationConfig()).enabled === false) return false;
   const date = new Intl.DateTimeFormat("mn-MN", {
     timeZone: "Asia/Ulaanbaatar",
     month: "numeric",

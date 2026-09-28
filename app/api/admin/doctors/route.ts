@@ -1,31 +1,8 @@
+import { doctorProfileSchema } from "@/lib/validation/doctor";
+import { apiError } from "@/lib/security/http";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
-
-type DoctorInput = Record<string, unknown>;
-
-function readDoctorInput(input: DoctorInput) {
-  const name = typeof input.name === "string" ? input.name.trim() : "";
-  const optionalString = (value: unknown) =>
-    typeof value === "string" && value.trim() ? value.trim() : null;
-
-  const specialty =
-    typeof input.specialty === "string" && input.specialty.trim()
-      ? input.specialty.trim()
-      : typeof input.title === "string" && input.title.trim()
-        ? input.title.trim()
-        : "Шүдний их эмч";
-
-  return {
-    name,
-    specialty,
-    title: optionalString(input.title),
-    phone: optionalString(input.phone),
-    email: optionalString(input.email),
-    avatarUrl: optionalString(input.avatarUrl),
-    telegramChatId: optionalString(input.telegramChatId),
-  };
-}
 
 export async function GET() {
   const user = await requireRole("ADMIN", "SUPER_ADMIN", "RECEPTION");
@@ -51,20 +28,20 @@ export async function POST(request: Request) {
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   try {
-    const input = readDoctorInput((await request.json()) as DoctorInput);
+    const input = doctorProfileSchema.parse(await request.json());
     if (!input.name) {
       return NextResponse.json(
         { error: "Эмчийн нэр заавал байна." },
         { status: 400 },
       );
     }
-    const doctor = await prisma.doctor.create({ data: input });
+    const doctor = await prisma.$transaction(async tx => {
+      const created = await tx.doctor.create({ data: { ...input, specialty: input.specialty || "Шүдний их эмч", imageUrl: input.avatarUrl } });
+      await tx.auditLog.create({ data: { actorId: user.id, action: "DOCTOR_CREATED", entity: "Doctor", entityId: created.id } });
+      return created;
+    });
     return NextResponse.json({ success: true, data: doctor }, { status: 201 });
   } catch (error) {
-    console.error("POST /api/admin/doctors error:", error);
-    return NextResponse.json(
-      { error: "Эмч нэмэхэд алдаа гарлаа." },
-      { status: 500 },
-    );
+    return apiError(error);
   }
 }

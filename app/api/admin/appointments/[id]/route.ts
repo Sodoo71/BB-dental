@@ -33,11 +33,15 @@ export async function PATCH(
       );
     }
 
-    const updated = await prisma.appointment.update({
+    const updated = await prisma.$transaction(async tx => {
+    const updated = await tx.appointment.update({
       where: { id },
       data: { status: status as AppointmentStatus },
     });
 
+    await tx.auditLog.create({ data: { actorId: user.id, action: "APPOINTMENT_UPDATED", entity: "Appointment", entityId: id, metadata: { status: String(status) } } });
+    return updated;
+    });
     return NextResponse.json({ success: true, data: updated });
   } catch (error: unknown) {
     console.error("PATCH Error:", error);
@@ -72,9 +76,10 @@ export async function DELETE(
       );
     }
 
-    await prisma.appointment.delete({
-      where: { id },
-    });
+    await prisma.$transaction([
+      prisma.appointment.delete({ where: { id } }),
+      prisma.auditLog.create({ data: { actorId: user.id, action: "APPOINTMENT_DELETED", entity: "Appointment", entityId: id } }),
+    ]);
 
     return NextResponse.json({
       success: true,

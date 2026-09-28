@@ -6,6 +6,7 @@ import { Loader2, Trash2, UploadCloud } from "lucide-react";
 type ImageUploadProps = {
   value?: string | null;
   onChange: (url: string) => void;
+  onUploadingChange?: (uploading: boolean) => void;
   label?: string;
   className?: string;
 };
@@ -71,6 +72,7 @@ async function optimizeImageForUpload(file: File): Promise<File | Blob> {
 export function ImageUpload({
   value,
   onChange,
+  onUploadingChange,
   label = "Зураг оруулах",
   className = "",
 }: ImageUploadProps) {
@@ -93,6 +95,7 @@ export function ImageUpload({
 
     setError(null);
     setUploading(true);
+    onUploadingChange?.(true);
 
     try {
       const optimizedFile = await optimizeImageForUpload(file);
@@ -127,6 +130,7 @@ export function ImageUpload({
       setError(err instanceof Error ? err.message : "Хуулахад алдаа гарлаа.");
     } finally {
       setUploading(false);
+      onUploadingChange?.(false);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }

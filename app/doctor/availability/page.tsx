@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Copy, Save, Sparkles, Zap } from "lucide-react";
+import { ArrowLeft, Copy, Save, Zap } from "lucide-react";
 import { showToast } from "@/components/ui/Toast";
 
 const weekdayLabels = [
@@ -32,6 +32,7 @@ type ScheduleRow = {
 export default function DoctorAvailabilityPage() {
   const [schedule, setSchedule] = useState<ScheduleRow[]>(defaultWeek);
   const [loading, setLoading] = useState(true);
+  const [savedSchedule, setSavedSchedule] = useState<ScheduleRow[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,6 +65,7 @@ export default function DoctorAvailabilityPage() {
           };
         });
         setSchedule(normalized);
+        setSavedSchedule(normalized);
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Мэдээлэл татахад алдаа гарлаа.",
@@ -119,13 +121,16 @@ export default function DoctorAvailabilityPage() {
           ...row,
           startTime: monday.startTime,
           endTime: monday.endTime,
-          isDayOff: false,
+          isDayOff: monday.isDayOff,
         };
       }),
     );
   };
 
   const saveSchedule = async () => {
+    if (saving || loading || error) return;
+    const invalid = schedule.find(day => !day.isDayOff && (!day.startTime || !day.endTime || day.startTime >= day.endTime));
+    if (invalid) { showToast(`${weekdayLabels[invalid.dayOfWeek]}: дуусах цаг эхлэх цагаас хойш байна.`, "error"); return; }
     setSaving(true);
     try {
       const response = await fetch("/api/doctor/availability", {
@@ -136,6 +141,7 @@ export default function DoctorAvailabilityPage() {
       const payload = await response.json();
       if (!response.ok)
         throw new Error(payload.error || "Цагийн хуваарийг хадгалж чадсангүй");
+      setSavedSchedule(schedule);
       showToast("Таны ажиллах цагийн хуваарь амжилттай шинэчлэгдлээ.", "success");
     } catch (error) {
       showToast(
@@ -186,12 +192,13 @@ export default function DoctorAvailabilityPage() {
         </Link>
       </div>
 
+      <p aria-live="polite" className="text-sm text-slate-500">{JSON.stringify(schedule) === JSON.stringify(savedSchedule) ? "Хуваарь хадгалагдсан." : "Хадгалаагүй өөрчлөлт байна."} · Улаанбаатарын цагаар</p>
       {/* QUICK PRESETS BANNER */}
       <div className="rounded-2xl border border-emerald-100 bg-gradient-to-r from-emerald-50/90 to-brand-50/70 p-4">
         <div className="mb-2 flex items-center gap-2">
           <Zap className="h-4 w-4 text-emerald-600" />
           <span className="text-xs font-semibold uppercase tracking-wider text-emerald-950">
-            Хурдан тохируулах загварууд (1-Click Presets)
+            Хурдан тохируулах
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -229,7 +236,7 @@ export default function DoctorAvailabilityPage() {
 
       {/* Grid of 7 days */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {schedule.map((day) => (
+        {[...schedule].sort((a, b) => ((a.dayOfWeek + 6) % 7) - ((b.dayOfWeek + 6) % 7)).map((day) => (
           <div
             key={day.dayOfWeek}
             className={`rounded-2xl border p-4 transition ${
@@ -254,12 +261,8 @@ export default function DoctorAvailabilityPage() {
                           ? {
                               ...row,
                               isDayOff,
-                              startTime: isDayOff
-                                ? "09:00"
-                                : row.startTime || "09:00",
-                              endTime: isDayOff
-                                ? "18:00"
-                                : row.endTime || "18:00",
+                              startTime: row.startTime || "09:00",
+                              endTime: row.endTime || "18:00",
                             }
                           : row,
                       ),
@@ -320,7 +323,7 @@ export default function DoctorAvailabilityPage() {
       <div className="flex justify-end pt-2">
         <button
           onClick={saveSchedule}
-          disabled={saving}
+          disabled={saving || Boolean(error) || JSON.stringify(schedule) === JSON.stringify(savedSchedule)}
           className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-6 py-3 text-xs font-semibold text-white shadow-md hover:bg-slate-800 disabled:opacity-60"
         >
           <Save className="h-4 w-4" />

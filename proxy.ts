@@ -7,9 +7,6 @@ const protectedRoutes = ["/doctor", "/admin", "/super-admin"];
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   // Telegram webhook and cron authenticate separately; browser mutation routes require Origin.
-  if (process.env.NODE_ENV === "production" && !process.env.APP_URL && pathname.startsWith("/api/")) {
-    return NextResponse.json({ error: "Application origin is not configured." }, { status: 503 });
-  }
   const machineRoute = pathname === "/api/telegram/webhook";
   if (pathname.startsWith("/api/") && !machineRoute && !isSameOriginMutation(request.method, request.headers.get("origin"), process.env.APP_URL || request.url, request.headers.get("sec-fetch-site"))) {
     return NextResponse.json({ error: "Cross-origin request denied." }, { status: 403 });

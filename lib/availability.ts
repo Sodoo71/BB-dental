@@ -1,3 +1,4 @@
+import { clinicDateKey, clinicMinutes } from "@/lib/doctor-workspace";
 import { prisma } from "@/lib/prisma";
 
 const timePattern = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -44,12 +45,10 @@ export function isPastSlot(
   now = new Date(),
 ): boolean {
   const appointmentDate = toUTCDateOnly(date);
-  const nowUTC = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-  );
+  const nowUTC = new Date(`${clinicDateKey(now)}T00:00:00Z`);
   if (appointmentDate.getTime() < nowUTC.getTime()) return true;
   if (appointmentDate.getTime() > nowUTC.getTime()) return false;
-  return toMinutes(time) <= now.getUTCHours() * 60 + now.getUTCMinutes();
+  return toMinutes(time) <= clinicMinutes(now);
 }
 
 export function withinRange(
@@ -78,7 +77,7 @@ export async function getDoctorDaySchedule(doctorId: string, date: Date) {
 
   let startTime = weekly?.startTime ?? null;
   let endTime = weekly?.endTime ?? null;
-  let isDayOff = Boolean(weekly?.isDayOff);
+  let isDayOff = Boolean(weekly?.isDayOff || weekly?.isActive === false);
 
   const exceptions = await prisma.doctorAvailabilityException.findMany({
     where: {

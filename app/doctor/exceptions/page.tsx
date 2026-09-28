@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { clinicDateKey } from "@/lib/doctor-workspace";
 import Link from "next/link";
-import { ArrowLeft, CalendarOff, Clock, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { showToast } from "@/components/ui/Toast";
 
 type ExceptionItem = {
@@ -21,12 +22,14 @@ const typeLabelMap: Record<string, { label: string; color: string }> = {
 };
 
 export default function DoctorExceptionsPage() {
+  const [error, setError] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [items, setItems] = useState<ExceptionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   const [form, setForm] = useState({
-    date: new Date().toISOString().slice(0, 10),
+    date: clinicDateKey(),
     type: "DAY_OFF" as "DAY_OFF" | "BLOCKED_RANGE" | "SCHEDULE_OVERRIDE",
     startTime: "09:00",
     endTime: "13:00",
@@ -42,19 +45,23 @@ export default function DoctorExceptionsPage() {
           payload.error || "Чөлөөний хүсэлтийн жагсаалтыг ачаалж чадсангүй",
         );
       setItems(payload.data || []);
+      setError("");
     } catch (error) {
-      console.error(error);
+      setError(error instanceof Error ? error.message : "Чөлөөний мэдээлэл ачаалж чадсангүй.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    void load();
+    const timer = setTimeout(() => { void load(); }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
+    if (form.type !== "DAY_OFF" && (!form.startTime || !form.endTime || form.startTime >= form.endTime)) { showToast("Эхлэх, дуусах цагаа шалгана уу.", "error"); return; }
     setSubmitting(true);
     try {
       const response = await fetch("/api/doctor/exceptions", {
@@ -70,7 +77,7 @@ export default function DoctorExceptionsPage() {
         throw new Error(payload.error || "Чөлөөний хүсэлт үүсгэж чадсангүй");
 
       setForm({
-        date: new Date().toISOString().slice(0, 10),
+        date: clinicDateKey(),
         type: "DAY_OFF",
         startTime: "09:00",
         endTime: "13:00",
@@ -91,8 +98,10 @@ export default function DoctorExceptionsPage() {
   };
 
   const remove = async (id: string) => {
+    if (deletingId) return;
     if (!confirm("Та энэ чөлөөг устгахдаа итгэлтэй байна уу?")) return;
 
+    setDeletingId(id);
     try {
       const response = await fetch(
         `/api/doctor/exceptions?id=${encodeURIComponent(id)}`,
@@ -107,7 +116,7 @@ export default function DoctorExceptionsPage() {
       showToast("Чөлөө амжилттай устгагдлаа.", "success");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Устгахад алдаа гарлаа.", "error");
-    }
+    } finally { setDeletingId(null); }
   };
 
   return (
@@ -158,9 +167,9 @@ export default function DoctorExceptionsPage() {
               }
               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold outline-none focus:border-emerald-500"
             >
-              <option value="DAY_OFF">Бүтэн өдөр амрах (Day Off)</option>
-              <option value="BLOCKED_RANGE">Зарим цагийг хаах (Blocked Hours)</option>
-              <option value="SCHEDULE_OVERRIDE">Ажлын цаг өөрчлөх (Override)</option>
+              <option value="DAY_OFF">Бүтэн өдөр амрах</option>
+              <option value="BLOCKED_RANGE">Зарим цагийг хаах</option>
+              <option value="SCHEDULE_OVERRIDE">Ажлын цаг өөрчлөх</option>
             </select>
           </label>
 
@@ -237,7 +246,7 @@ export default function DoctorExceptionsPage() {
           Бүртгэлтэй чөлөө ба онцгой хуваариуд
         </h2>
 
-        {loading ? (
+        {error ? <div role="alert" className="text-sm text-red-600">{error}<button onClick={() => void load()} className="button-secondary ml-3 px-3">Дахин ачаалах</button></div> : loading ? (
           <div className="flex items-center gap-3 p-6 text-sm text-slate-500">
             <div className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
             Ачаалж байна…
@@ -262,7 +271,7 @@ export default function DoctorExceptionsPage() {
                   <div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-semibold text-slate-900">
-                        {item.date}
+                        {item.date.slice(0, 10)}
                       </span>
                       <span
                         className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${typeInfo.color}`}
@@ -287,7 +296,7 @@ export default function DoctorExceptionsPage() {
                   <div className="flex justify-end border-t border-slate-200/60 pt-2">
                     <button
                       type="button"
-                      onClick={() => remove(item.id)}
+                      disabled={Boolean(deletingId)} onClick={() => remove(item.id)}
                       className="inline-flex items-center gap-1 text-xs font-bold text-red-600 hover:text-red-700"
                     >
                       <Trash2 className="h-3.5 w-3.5" />

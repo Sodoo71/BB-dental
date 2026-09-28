@@ -126,7 +126,7 @@ export async function POST(req: Request) {
     });
 
     const appointment = await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`${doctorId}:${date.toISOString().slice(0, 10)}`}))`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`${doctorId}:${date.toISOString().slice(0, 10)}`}))::text`;
 
       const existing = await tx.appointment.findFirst({
         where: {
@@ -175,7 +175,7 @@ export async function POST(req: Request) {
         },
       });
 
-      return tx.appointment.create({
+      const created = await tx.appointment.create({
         data: {
           patientName: normalizedName,
           patientPhone: normalizedPhone,
@@ -192,6 +192,8 @@ export async function POST(req: Request) {
               : null,
         },
       });
+      await tx.auditLog.create({ data: { action: "APPOINTMENT_CREATED", entity: "Appointment", entityId: created.id } });
+      return created;
     });
 
     const patient = await prisma.patient.findUnique({
@@ -200,10 +202,10 @@ export async function POST(req: Request) {
     });
 
     let notificationSent = false;
-    if (patient && doctor.telegramChatId) {
+    if (patient) {
       try {
         notificationSent = await notifyDoctorOnTelegram({
-          chatId: doctor.telegramChatId,
+          chatId: doctor.telegramChatId || "",
           appointmentId: appointment.id,
           doctorName: doctor.name,
           patientName: patient.fullName,

@@ -41,8 +41,8 @@ export async function GET() {
     allAppointmentsForStats,
     doctorsList,
   ] = await Promise.all([
-    prisma.user.count(),
-    prisma.user.count({ where: { isActive: false } }),
+    prisma.user.count().then(async count => count + await prisma.doctor.count({ where: { user: null } })),
+    prisma.user.count({ where: { status: "PENDING" } }),
     prisma.user.count({
       where: { role: { in: ["ADMIN", "SUPER_ADMIN"] } },
     }),

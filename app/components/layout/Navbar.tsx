@@ -1,4 +1,5 @@
 "use client";
+import { useClinicInfo } from "@/components/layout/ClinicInfoProvider";
 import React, { useState } from "react";
 import { Menu, Phone, Sparkles, X } from "lucide-react";
 import Link from "next/link";
@@ -9,6 +10,7 @@ export default function Navbar({
 }: {
   scrollToBooking: () => void;
 }) {
+  const info = useClinicInfo();
   const [open, setOpen] = useState(false);
 
   const handleNavClick = () => {
@@ -39,11 +41,11 @@ export default function Navbar({
         <div className="flex items-center gap-3">
           <Link href="/login" className="hidden min-h-11 items-center text-xs font-medium text-brand-700 lg:flex">Ажилтны нэвтрэх</Link>
           <a
-            href="tel:95963531"
+            href={`tel:${info.phone}`}
             className="hidden items-center gap-2 rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-200 xl:flex"
           >
             <Phone className="h-4 w-4 text-brand-600" />
-            9596-3531
+            {info.phone}
           </a>
 
           <button

@@ -9,7 +9,7 @@ export async function GET(request: Request) {
 
     const services = await prisma.service.findMany({
       where: includeInactive ? undefined : { isActive: true },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }, { id: "asc" }],
     });
 
     return NextResponse.json({ success: true, data: services });
@@ -33,11 +33,14 @@ export async function POST(request: Request) {
     const name = typeof body.name === "string" ? body.name.trim() : "";
     const description =
       typeof body.description === "string" ? body.description.trim() : null;
+    const policy = await prisma.systemSetting.findUnique({ where: { key: "registration_policy" } });
+    let defaultDuration = "30";
+    try { const value = JSON.parse(policy?.value ?? "{}").defaultDuration; if (["15", "30", "45", "60"].includes(value)) defaultDuration = value; } catch {}
     const durationMin =
       typeof body.durationMin === "string" ||
       typeof body.durationMin === "number"
         ? String(body.durationMin).trim()
-        : "";
+        : defaultDuration;
     const price =
       typeof body.price === "string" || typeof body.price === "number"
         ? String(body.price).trim()
@@ -45,6 +48,8 @@ export async function POST(request: Request) {
     const imageUrl =
       typeof body.imageUrl === "string" ? body.imageUrl.trim() : null;
     const isActive = body.isActive !== false;
+    const sortOrder = Number(body.sortOrder ?? 0);
+    if (!Number.isInteger(sortOrder) || sortOrder < 0 || sortOrder > 100000) return NextResponse.json({ error: "Эрэмбэ 0–100000 бүхэл тоо байна." }, { status: 400 });
 
     if (!name || !durationMin || !price) {
       return NextResponse.json(
@@ -54,7 +59,7 @@ export async function POST(request: Request) {
     }
 
     const parsedDuration = Number(durationMin);
-    if (!Number.isFinite(parsedDuration) || parsedDuration <= 0) {
+    if (!Number.isInteger(parsedDuration) || parsedDuration < 5 || parsedDuration > 480) {
       return NextResponse.json(
         { error: "Үйлчилгээний хугацаа буруу байна." },
         { status: 400 },
@@ -77,6 +82,7 @@ export async function POST(request: Request) {
     const service = await prisma.service.create({
       data: {
         name,
+        sortOrder,
         slug,
         category,
         description: description || null,
@@ -153,9 +159,13 @@ export async function PUT(request: Request) {
     const isActive =
       typeof body.isActive === "boolean" ? body.isActive : undefined;
 
+    const sortOrder = body.sortOrder === undefined ? undefined : Number(body.sortOrder);
+    if (sortOrder !== undefined && (!Number.isInteger(sortOrder) || sortOrder < 0 || sortOrder > 100000)) return NextResponse.json({ error: "Эрэмбэ 0–100000 бүхэл тоо байна." }, { status: 400 });
+    if (durationMin !== undefined && (!Number.isInteger(durationMin) || durationMin < 5 || durationMin > 480)) return NextResponse.json({ error: "Хугацаа 5–480 минут байна." }, { status: 400 });
     const updated = await prisma.service.update({
       where: { id: serviceId },
       data: {
+        ...(sortOrder !== undefined ? { sortOrder } : {}),
         ...(name !== undefined ? { name } : {}),
         ...(description !== undefined
           ? { description: description || null }

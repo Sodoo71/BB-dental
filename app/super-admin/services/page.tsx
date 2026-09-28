@@ -2,17 +2,13 @@
 import { DialogFrame } from "@/components/ui/DialogFrame";
 
 import React, { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import {
   Edit2,
-  Image as ImageIcon,
-  Layers,
   Loader2,
   Plus,
   Search,
   Sparkles,
   Trash2,
-  UsersRound,
   X,
 } from "lucide-react";
 import { PageHeader } from "@/components/super-admin/page-header";
@@ -24,6 +20,7 @@ type ServiceItem = {
   name: string;
   category?: string | null;
   description?: string | null;
+  sortOrder?: number;
   durationMin: string | number;
   price?: string | number | null;
   imageUrl?: string | null;
@@ -32,6 +29,7 @@ type ServiceItem = {
 };
 
 export default function SuperAdminServicesPage() {
+  const [defaultDuration, setDefaultDuration] = useState("30");
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -47,6 +45,7 @@ export default function SuperAdminServicesPage() {
     name: "",
     category: "GENERAL",
     description: "",
+    sortOrder: "0",
     durationMin: "30",
     price: "50000",
     imageUrl: "",
@@ -67,7 +66,10 @@ export default function SuperAdminServicesPage() {
   };
 
   useEffect(() => {
-    void loadServices();
+    const controller = new AbortController();
+    fetch("/api/services?all=true", { signal: controller.signal }).then(async r => { if (!r.ok) throw new Error(); setServices((await r.json()).data ?? []); }).catch(() => {}).finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    fetch("/api/super-admin/settings").then(r => r.json()).then(p => { if (p.data?.registration_policy?.defaultDuration) setDefaultDuration(p.data.registration_policy.defaultDuration); }).catch(() => {});
+    return () => controller.abort();
   }, []);
 
   const handleOpenAdd = () => {
@@ -76,7 +78,8 @@ export default function SuperAdminServicesPage() {
       name: "",
       category: "GENERAL",
       description: "",
-      durationMin: "30",
+      sortOrder: "0",
+      durationMin: defaultDuration,
       price: "",
       imageUrl: "",
       isActive: true,
@@ -90,6 +93,7 @@ export default function SuperAdminServicesPage() {
       name: service.name,
       category: service.category || "GENERAL",
       description: service.description || "",
+      sortOrder: String(service.sortOrder ?? 0),
       durationMin: String(service.durationMin),
       price: String(service.price || ""),
       imageUrl: service.imageUrl || "",
@@ -402,6 +406,10 @@ export default function SuperAdminServicesPage() {
                 </select>
               </label>
 
+              <label className="block space-y-1 font-bold text-slate-700">
+                <span>Харагдах эрэмбэ (бага тоо эхэнд)</span>
+                <input type="number" min="0" max="100000" required value={formData.sortOrder} onChange={e => setFormData(p => ({ ...p, sortOrder: e.target.value }))} className="w-full rounded-xl border p-2.5" />
+              </label>
               <div className="grid grid-cols-2 gap-3">
                 <label className="block space-y-1 font-bold text-slate-700">
                   <span>Үргэлжлэх хугацаа (минут) *</span>

@@ -1,5 +1,7 @@
 "use client";
 
+import { useClinicInfo } from "@/components/layout/ClinicInfoProvider";
+import { Brand } from "@/components/layout/Brand";
 import React from "react";
 import { Sparkles, Clock, Phone, MapPin } from "lucide-react";
 
@@ -8,6 +10,7 @@ export default function Footer({
 }: {
   scrollToBooking: () => void;
 }) {
+  const info = useClinicInfo();
   return (
     <footer
       id="contact"
@@ -17,10 +20,7 @@ export default function Footer({
         <div className="grid gap-10 lg:grid-cols-4">
           {/* Brand */}
           <div>
-            <div className="flex items-center gap-2 text-white">
-              <Sparkles className="h-6 w-6 text-gold" />
-              <span className="text-xl font-semibold">BB DENTAL</span>
-            </div>
+            <Brand dark />
 
             <p className="mt-4 text-sm leading-relaxed">
               Танд болон таны гэр бүлд чанартай, сэтгэл ханамжтай шүдний тусламж
@@ -32,17 +32,7 @@ export default function Footer({
           <div>
             <h4 className="font-bold text-white">Цагийн хуваарь</h4>
 
-            <ul className="mt-4 space-y-3 text-sm">
-              <li className="flex items-center gap-2">
-                <Clock className="h-4 w-4 shrink-0 text-gold" />
-                <span>Даваа - Баасан | 09:00-19:00</span>
-              </li>
-
-              <li className="flex items-center gap-2">
-                <Clock className="h-4 w-4 shrink-0 text-gold" />
-                <span>Бямба - Ням | 10:00-18:00</span>
-              </li>
-            </ul>
+            <p className="mt-4 text-sm whitespace-pre-line">{info.workingHoursNote}</p>
           </div>
 
           {/* Contact */}
@@ -52,32 +42,25 @@ export default function Footer({
             <ul className="mt-4 space-y-4 text-sm">
               <li>
                 <a
-                  href="tel:+97695963531"
+                  href={`tel:${info.phone}`}
                   className="flex items-center gap-2 transition-colors hover:text-white"
                 >
                   <Phone className="h-4 w-4 shrink-0 text-gold" />
-                  <span>+976 9596-3531</span>
+                  <span>{info.phone}</span>
                 </a>
               </li>
 
+              <li><a href={`mailto:${info.email}`}>{info.email}</a></li>
               <li>
                 <a
-                  href="https://maps.app.goo.gl/McqVo5a7imhDMger9?g_st=ipcq1q"
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(info.address)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-start gap-2 transition-colors hover:text-white"
                 >
                   <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-gold" />
 
-                  <span>
-                    БГД, 12-р хороо, 3, 4-р хороолол,
-                
-                    Бичлийн аркны автобусны буудал дээр,
-                    
-                    Азифармтай эмийн сангийн 3 давхарт,
-                    
-                    BB Dental Clinic
-                  </span>
+                  <span>{info.address}</span>
                 </a>
               </li>
             </ul>
@@ -98,7 +81,7 @@ export default function Footer({
 
         {/* Copyright */}
         <div className="mt-12 border-t border-slate-900 pt-8 text-center text-xs text-slate-600">
-          © {new Date().getFullYear()} BB Dental Clinic. Бүх эрх хуулиар
+          © {new Date().getFullYear()} {info.clinicName}. Бүх эрх хуулиар
           хамгаалагдсан.
         </div>
       </div>

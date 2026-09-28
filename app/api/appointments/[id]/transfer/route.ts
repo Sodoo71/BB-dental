@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { ensureAppointmentSlotIsAvailable } from "@/lib/availability";
+import { apiError, HttpError } from "@/lib/security/http";
 import { requireSessionUser } from "@/lib/auth";
 
 export async function POST(
@@ -47,27 +49,22 @@ export async function POST(
 
     const noteText = `Шилжүүлэг: ${prevDoctorName} -> ${targetDoctor.name}.${reason ? ` Шалтгаан: ${reason}` : ""}`;
 
-    const [updatedAppointment] = await prisma.$transaction([
-      prisma.appointment.update({
-        where: { id },
-        data: {
-          doctorId: targetDoctorId,
-        },
-        include: {
-          doctor: true,
-          patient: true,
-          service: true,
-          notes: { orderBy: { createdAt: "desc" } },
-        },
-      }),
-      prisma.appointmentNote.create({
-        data: {
-          appointmentId: id,
-          note: noteText,
-          author: authorName,
-        },
-      }),
-    ]);
+    const updatedAppointment = await prisma.$transaction(async tx => {
+      for (const doctorId of [appointment.doctorId, targetDoctorId].filter((id): id is string => Boolean(id)).sort()) {
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`${doctorId}:${appointment.appointmentDate.toISOString().slice(0, 10)}`}))::text`;
+      }
+      const current = await tx.appointment.findFirst({ where: { id, doctorId: appointment.doctorId, status: { in: ["PENDING", "CONFIRMED"] } } });
+      if (!current) throw new HttpError(409, "Энэ захиалга өөрчлөгдсөн эсвэл дууссан байна. Жагсаалтаа шинэчилнэ үү.");
+      try { await ensureAppointmentSlotIsAvailable({ doctorId: targetDoctorId, serviceId: current.serviceId, appointmentDate: current.appointmentDate, startTime: current.startTime }); }
+      catch { throw new HttpError(409, "Сонгосон эмч энэ цагт ажиллахгүй эсвэл өөр захиалгатай байна."); }
+      const collision = await tx.appointment.findFirst({ where: { doctorId: targetDoctorId, appointmentDate: current.appointmentDate, status: { in: ["PENDING", "CONFIRMED", "COMPLETED", "NO_SHOW"] }, startTime: { lt: current.endTime }, endTime: { gt: current.startTime } } });
+      if (collision) throw new HttpError(409, "Сонгосон эмчийн цаг давхцаж байна.");
+      const result = await tx.appointment.updateMany({ where: { id, doctorId: current.doctorId, status: current.status }, data: { doctorId: targetDoctorId } });
+      if (!result.count) throw new HttpError(409, "Захиалга өөрчлөгдсөн байна. Дахин ачаална уу.");
+      await tx.appointmentNote.create({ data: { appointmentId: id, note: noteText, author: authorName } });
+      await tx.auditLog.create({ data: { actorId: user.id, action: "APPOINTMENT_TRANSFERRED", entity: "Appointment", entityId: id, metadata: { from: current.doctorId, to: targetDoctorId } } });
+      return tx.appointment.findUniqueOrThrow({ where: { id }, include: { doctor: true, patient: true, service: true, notes: { orderBy: { createdAt: "desc" } } } });
+    }, { timeout: 15000 });
 
     return NextResponse.json({
       success: true,
@@ -75,10 +72,6 @@ export async function POST(
       message: `Өвчтөний цагийг ${targetDoctor.name} эмч рүү амжилттай шилжүүллээ.`,
     });
   } catch (error) {
-    console.error("POST /api/appointments/[id]/transfer error:", error);
-    return NextResponse.json(
-      { error: "Өвчтөн шилжүүлэхэд алдаа гарлаа." },
-      { status: 500 },
-    );
+    return apiError(error);
   }
 }

@@ -97,3 +97,11 @@
 @layer components {
   .dialog-frame button[aria-label="Хаах"] { display: inline-flex; min-width: 44px; min-height: 44px; align-items: center; justify-content: center; border-radius: 8px; }
 }
+
+/* Doctor portal: touch targets and readable controls on small screens. */
+.doctor-content :is(input:not([type=checkbox]), select, textarea) { min-width: 0; }
+@media (max-width: 639px) {
+  .doctor-content :is(button, a.button-primary, a.button-secondary) { min-height: 44px; }
+  .doctor-content :is(input:not([type=checkbox]), select, textarea) { font-size: 16px; max-width: 100%; }
+  .doctor-content :is(p, h1, h2, h3) { overflow-wrap: anywhere; }
+}

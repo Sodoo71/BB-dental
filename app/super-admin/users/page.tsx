@@ -25,6 +25,7 @@ import { showToast } from "@/components/ui/Toast";
 import { ImageUpload } from "@/components/ui/ImageUpload";
 
 type UserRow = {
+  hasAccount?: boolean;
   id: string;
   name: string;
   email: string;
@@ -418,6 +419,7 @@ export default function SuperAdminUsersPage() {
                           : "—"}
                       </td>
                       <td className="p-4 text-right">
+                        {u.hasAccount === false ? <Link className="text-brand-700 text-xs underline" href={`/super-admin/doctors/${u.doctorId}`}>Эмчийн бүртгэл засах · Нэвтрэх дансгүй</Link> : (
                         <div className="flex items-center justify-end gap-1.5">
                           {u.status === "PENDING" && <button type="button" title="Бүртгэлээс татгалзах" disabled={processingId === u.id} onClick={() => handleReject(u.id)} className="min-h-11 rounded-xl px-3 text-red-700">Татгалзах</button>}
                           {!u.isActive && (
@@ -449,6 +451,7 @@ export default function SuperAdminUsersPage() {
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
+                        )}
                       </td>
                     </tr>
                   ))

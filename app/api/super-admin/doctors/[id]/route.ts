@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { updateDoctorProfile } from "@/lib/auth/users";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
 
@@ -222,10 +223,7 @@ export async function PATCH(
       );
     }
 
-    const doctor = await prisma.doctor.update({
-      where: { id },
-      data: input,
-    });
+    const doctor = await updateDoctorProfile(user, id, input);
 
     return NextResponse.json({ success: true, data: doctor });
   } catch (error) {

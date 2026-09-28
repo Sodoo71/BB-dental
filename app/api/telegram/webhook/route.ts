@@ -9,7 +9,10 @@ import {
 export async function POST(request: Request) {
   try {
     const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
-    if (!secret || request.headers.get("x-telegram-bot-api-secret-token") !== secret) {
+    if (
+      !secret ||
+      request.headers.get("x-telegram-bot-api-secret-token") !== secret
+    ) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const update = await request.json().catch(() => null);
@@ -43,13 +46,28 @@ export async function POST(request: Request) {
           return NextResponse.json({ ok: true });
         }
 
-        const linkedUser = await prisma.user.findFirst({ where: { doctorId: appointment.doctorId, isActive: true, status: "ACTIVE", role: { in: ["DOCTOR", "ADMIN", "SUPER_ADMIN"] } } });
-        if (!appointment.doctorId || !linkedUser || String(cb.from?.id) !== appointment.doctor?.telegramChatId || String(fromChatId) !== appointment.doctor?.telegramChatId) {
+        const linkedUser = await prisma.user.findFirst({
+          where: {
+            doctorId: appointment.doctorId,
+            isActive: true,
+            status: "ACTIVE",
+            role: { in: ["DOCTOR", "ADMIN", "SUPER_ADMIN"] },
+          },
+        });
+        if (
+          !appointment.doctorId ||
+          !linkedUser ||
+          String(cb.from?.id) !== appointment.doctor?.telegramChatId ||
+          String(fromChatId) !== appointment.doctor?.telegramChatId
+        ) {
           return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
         const newStatus = isConfirm ? "CONFIRMED" : "CANCELLED";
         const changed = await prisma.appointment.updateMany({
-          where: { id: appointmentId, status: { in: ["PENDING", "CONFIRMED"] } },
+          where: {
+            id: appointmentId,
+            status: { in: ["PENDING", "CONFIRMED"] },
+          },
           data: { status: newStatus },
         });
         if (!changed.count) return NextResponse.json({ ok: true });
@@ -77,7 +95,8 @@ export async function POST(request: Request) {
       const msg = update.message;
       const chatId = String(msg.chat.id);
       const text = String(msg.text || "").trim();
-      if (msg.chat.type !== "private" || String(msg.from?.id) !== chatId) return NextResponse.json({ ok: true });
+      if (msg.chat.type !== "private" || String(msg.from?.id) !== chatId)
+        return NextResponse.json({ ok: true });
 
       // Account binding must be performed by an authenticated ERP administrator.
       if (text.startsWith("/start doc_")) {
@@ -97,7 +116,17 @@ export async function POST(request: Request) {
       // /today - check today's appointments for this doctor
       if (text === "/today") {
         const doctor = await prisma.doctor.findFirst({
-          where: { telegramChatId: chatId, isActive: true, user: { is: { isActive: true, status: "ACTIVE", role: { in: ["DOCTOR", "ADMIN", "SUPER_ADMIN"] } } } },
+          where: {
+            telegramChatId: chatId,
+            isActive: true,
+            user: {
+              is: {
+                isActive: true,
+                status: "ACTIVE",
+                role: { in: ["DOCTOR", "ADMIN", "SUPER_ADMIN"] },
+              },
+            },
+          },
         });
 
         if (!doctor) {
@@ -151,7 +180,17 @@ export async function POST(request: Request) {
       // /schedule - doctor weekly schedule
       if (text === "/schedule") {
         const doctor = await prisma.doctor.findFirst({
-          where: { telegramChatId: chatId, isActive: true, user: { is: { isActive: true, status: "ACTIVE", role: { in: ["DOCTOR", "ADMIN", "SUPER_ADMIN"] } } } },
+          where: {
+            telegramChatId: chatId,
+            isActive: true,
+            user: {
+              is: {
+                isActive: true,
+                status: "ACTIVE",
+                role: { in: ["DOCTOR", "ADMIN", "SUPER_ADMIN"] },
+              },
+            },
+          },
           include: { schedules: { orderBy: { dayOfWeek: "asc" } } },
         });
 

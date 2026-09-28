@@ -1,30 +1,18 @@
 "use client";
 
+import { ImageUpload } from "@/components/ui/ImageUpload";
 import React, { useEffect, useState } from "react";
 import {
   Activity,
-  AlertTriangle,
-  Bell,
   Building2,
   CheckCircle2,
-  Clock,
-  Database,
   Download,
-  FileCheck,
-  HardDrive,
-  HelpCircle,
   Loader2,
-  Lock,
-  Mail,
-  Phone,
   RefreshCw,
   Save,
   Send,
-  ShieldAlert,
   ShieldCheck,
-  Sparkles,
   Trash2,
-  Zap,
 } from "lucide-react";
 import { PageHeader } from "@/components/super-admin/page-header";
 import { showToast } from "@/components/ui/Toast";
@@ -34,6 +22,7 @@ export default function SuperAdminSettingsPage() {
 
   // Section 1: Clinic Info
   const [clinicInfo, setClinicInfo] = useState({
+    logoUrl: "",
     clinicName: "BB Dental Clinic",
     phone: "+976 9596-3531",
     email: "sodoosodbileg71@gmail.com",
@@ -49,6 +38,7 @@ export default function SuperAdminSettingsPage() {
     channelId: "",
     enabled: true,
   });
+  const [messageText, setMessageText] = useState("");
   const [testChatId, setTestChatId] = useState("");
   const [savingTelegram, setSavingTelegram] = useState(false);
   const [testingTelegram, setTestingTelegram] = useState(false);
@@ -79,14 +69,15 @@ export default function SuperAdminSettingsPage() {
       try {
         const res = await fetch("/api/super-admin/settings");
         const data = await res.json();
-        if (res.ok && data.data) {
+        if (!res.ok) throw new Error(data.error);
+        if (data.data) {
           if (data.data.clinic_info) setClinicInfo(data.data.clinic_info);
           if (data.data.telegram_config)
             setTelegramConfig(data.data.telegram_config);
           if (data.data.registration_policy)
             setRegistrationPolicy(data.data.registration_policy);
         }
-      } catch (err) {
+      } catch {
         showToast("Тохиргоо ачаалахад алдаа гарлаа.", "error");
       } finally {
         setLoading(false);
@@ -152,8 +143,8 @@ export default function SuperAdminSettingsPage() {
 
   // Test Telegram Bot Message
   const handleTestTelegram = async () => {
-    if (!testChatId.trim()) {
-      showToast("Шалгах Telegram Chat ID эсвэл Username оруулна уу.", "error");
+    if (!testChatId.trim() || !messageText.trim()) {
+      showToast("Telegram Chat ID болон илгээх текстээ оруулна уу.", "error");
       return;
     }
     setTestingTelegram(true);
@@ -163,14 +154,15 @@ export default function SuperAdminSettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chatId: testChatId.trim(),
+          text: messageText,
         }),
       });
       const data = await res.json();
       if (!res.ok)
-        throw new Error(data.error || "Тест мэдэгдэл илгээж чадсангүй.");
+        throw new Error(data.error || "Мессеж илгээж чадсангүй.");
 
       showToast(
-        data.message || "Тест мэдэгдэл Telegram руу амжилттай илгээгдлээ!",
+        data.message || "Мессеж Telegram руу амжилттай илгээгдлээ!",
         "success",
       );
     } catch (err) {
@@ -218,6 +210,7 @@ export default function SuperAdminSettingsPage() {
         body: JSON.stringify({ action: "ping" }),
       });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
       if (res.ok) {
         setPingData(data);
         showToast(
@@ -308,6 +301,7 @@ export default function SuperAdminSettingsPage() {
         {/* CARD 1: CLINIC INFO */}
         <div className="flex min-w-0 flex-col justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <form onSubmit={handleSaveClinic} className="space-y-4">
+            <ImageUpload label="Эмнэлгийн лого" value={clinicInfo.logoUrl} onChange={(logoUrl) => setClinicInfo(p => ({ ...p, logoUrl }))} />
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
@@ -441,7 +435,7 @@ export default function SuperAdminSettingsPage() {
                   <input
                     value={testChatId}
                     onChange={(e) => setTestChatId(e.target.value)}
-                    placeholder="Таны Telegram Chat ID эсвэл @username..."
+                    placeholder="Хүлээн авагчийн тоон Chat ID..."
                     className="flex-1 rounded-xl border border-brand-200 bg-white px-3 py-2 text-xs outline-none"
                   />
                   <button
@@ -455,9 +449,10 @@ export default function SuperAdminSettingsPage() {
                     ) : (
                       <Send className="h-3.5 w-3.5" />
                     )}
-                    <span>Тест илгээх</span>
+                    <span>Мессеж илгээх</span>
                   </button>
                 </div>
+                <textarea aria-label="Илгээх текст" placeholder="Илгээх текстээ бичнэ үү" maxLength={4096} value={messageText} onChange={e => setMessageText(e.target.value)} className="w-full rounded-xl border p-3 text-sm" />
                 <p className="text-[11px] text-brand-700">
                   Мэдэгдэл очихгүй бол Телеграм дээрээ bot руугаа орж{" "}
                   <strong>/start</strong> дарсан эсэхээ шалгаарай.
@@ -526,7 +521,7 @@ export default function SuperAdminSettingsPage() {
               </label>
 
               <label className="block space-y-1 font-bold text-slate-700">
-                <span>Үзлэгийн үндсэн дундаж хугацаа</span>
+                <span>Шинэ үйлчилгээний үндсэн хугацаа</span>
                 <select
                   value={registrationPolicy.defaultDuration}
                   onChange={(e) =>
@@ -560,15 +555,6 @@ export default function SuperAdminSettingsPage() {
               </button>
             </div>
           </form>
-        </div>
-
-        {/* CARD 4: SECURITY & ACCESS CONTROL */}
-        <div className="flex min-w-0 flex-col justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="space-y-4">
-            <h3 className="font-bold text-slate-900">Аюулгүй байдал</h3>
-            <p className="text-sm text-slate-600">Нэвтрэх хугацаа 12 цаг. Нэг и-мэйлээр 15 минутад 8 удаа нэвтрэх оролдлого хийх боломжтой. Шинэ нууц үг 12-оос доошгүй тэмдэгттэй байна. Системээс гарах, нууц үг болон ажилтны эрх өөрчлөхөд өмнөх нэвтрэлт хүчингүй болно.</p>
-            <p className="text-sm text-slate-500">Засварын горим болон онлайн захиалгыг идэвхжүүлэх/хаах тохиргоо одоогоор хөгжүүлэгдээгүй.</p>
-          </div>
         </div>
 
         {/* CARD 5: SELF-SERVICE SYSTEM HEALTH & DIAGNOSTICS */}
@@ -611,7 +597,7 @@ export default function SuperAdminSettingsPage() {
                 <span className="text-base font-semibold text-emerald-400">
                   {pingData
                     ? `${pingData.latencyMs} ms (Маш хурдан)`
-                    : "Шалгаж байна..."}
+                    : "Шалгаагүй"}
                 </span>
               </div>
 
@@ -620,8 +606,7 @@ export default function SuperAdminSettingsPage() {
                   Төлөв & Холболт
                 </span>
                 <span className="text-base font-semibold text-brand-400 flex items-center gap-1">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Идэвхтэй
-                  (Secure)
+                  <CheckCircle2 className="h-4 w-4" /> {pingData?.status === "HEALTHY" ? "Хэвийн" : "Шалгаагүй"}
                 </span>
               </div>
             </div>

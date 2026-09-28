@@ -175,7 +175,7 @@ export default function ReceptionDashboard() {
   }, [selectedDoctorId]);
 
   const fetchServices = useCallback(async () => {
-    const response = await fetch("/api/services?all=true");
+    const response = await fetch("/api/services");
     const data = await response.json();
     if (!response.ok) return;
     const serviceList = data.data ?? [];

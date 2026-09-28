@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { appointmentPatient, clinicDateKey } from "@/lib/doctor-workspace";
+import { getDoctorDaySchedule } from "@/lib/availability";
 import { requireRole } from "@/lib/auth";
 
 function toMinutes(time: string | null | undefined) {
@@ -15,36 +17,24 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = new Date(`${clinicDateKey()}T00:00:00Z`);
 
   const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
   const nextWeek = new Date(today);
-  nextWeek.setDate(nextWeek.getDate() + 7);
+  nextWeek.setUTCDate(nextWeek.getUTCDate() + 7);
 
   const [doctor, schedules, appointments] = await Promise.all([
     prisma.doctor.findUnique({
       where: { id: user.doctorId },
       select: { id: true, name: true, title: true, phone: true, email: true },
     }),
-    prisma.doctorSchedule.findMany({
-      where: { doctorId: user.doctorId },
-      select: {
-        dayOfWeek: true,
-        startTime: true,
-        endTime: true,
-        isDayOff: true,
-      },
-    }),
+    getDoctorDaySchedule(user.doctorId, today),
     prisma.appointment.findMany({
       where: {
         doctorId: user.doctorId,
-        appointmentDate: {
-          gte: new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000),
-          lt: nextWeek,
-        },
+
       },
       include: { patient: true, service: true },
       orderBy: [{ appointmentDate: "asc" }, { startTime: "asc" }],
@@ -65,16 +55,12 @@ export async function GET() {
 
   const upcomingAppointments = appointments.filter((appointment) => {
     const date = new Date(appointment.appointmentDate);
-    return date >= tomorrow && date < nextWeek;
+    return date >= tomorrow && date < nextWeek && ["PENDING", "CONFIRMED"].includes(appointment.status);
   });
 
-  const workingMinutes = schedules
-    .filter((item) => !item.isDayOff)
-    .reduce(
-      (sum, item) =>
-        sum + Math.max(0, toMinutes(item.endTime) - toMinutes(item.startTime)),
-      0,
-    );
+  const start = toMinutes(schedules.startTime);
+  const end = toMinutes(schedules.endTime);
+  const workingMinutes = schedules.isDayOff ? 0 : Array.from({ length: Math.max(0, end - start) }, (_, i) => start + i).filter(minute => !schedules.blockedRanges.some(range => minute >= toMinutes(range.startTime) && minute < toMinutes(range.endTime))).length;
 
   const patientMap = new Map<
     string,
@@ -103,17 +89,17 @@ export async function GET() {
       nextAppointment: null,
     };
 
-    current.totalAppointments += 1;
+    if (appointment.status === "COMPLETED") current.totalAppointments += 1;
     const appointmentTime = new Date(appointment.appointmentDate).getTime();
     if (
-      !current.lastAppointment ||
-      appointmentTime > new Date(current.lastAppointment).getTime()
+      appointment.status === "COMPLETED" && (!current.lastAppointment ||
+      appointmentTime > new Date(current.lastAppointment).getTime())
     ) {
       current.lastAppointment = appointment.appointmentDate.toISOString();
     }
     if (
-      !current.nextAppointment ||
-      appointmentTime < new Date(current.nextAppointment).getTime()
+      ["PENDING", "CONFIRMED"].includes(appointment.status) && appointmentTime >= today.getTime() && (!current.nextAppointment ||
+      appointmentTime < new Date(current.nextAppointment).getTime())
     ) {
       current.nextAppointment = appointment.appointmentDate.toISOString();
     }
@@ -140,8 +126,8 @@ export async function GET() {
           .length,
         workingMinutes,
       },
-      todayAppointments: todayAppointments,
-      upcomingAppointments: upcomingAppointments,
+      todayAppointments: todayAppointments.map(appointmentPatient),
+      upcomingAppointments: upcomingAppointments.map(appointmentPatient),
       patients,
     },
   });
