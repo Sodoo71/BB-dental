@@ -10,6 +10,7 @@ import {
   Clock3,
   Stethoscope,
 } from "lucide-react";
+import { clinicDateKey, clinicMinutes } from "@/lib/doctor-workspace";
 
 type Appointment = {
   id: string;
@@ -83,6 +84,7 @@ const formatDate = (dateString: string | null) => {
   return date.toLocaleDateString("mn-MN", {
     month: "short",
     day: "numeric",
+    timeZone: "UTC",
   });
 };
 
@@ -93,7 +95,6 @@ export default function DoctorDashboardPage() {
   const [reload, setReload] = useState(0);
 
   useEffect(() => {
-
     const load = async () => {
       try {
         const response = await fetch("/api/doctor/overview");
@@ -152,35 +153,45 @@ export default function DoctorDashboardPage() {
         </h1>
         <p className="mt-2 text-slate-600">
           {error || "Эмчийн мэдээлэл олдсонгүй."}
-        </p><button className="button-secondary mt-4 px-4" onClick={() => { setLoading(true); setReload(v => v + 1); }}>Дахин ачаалах</button>
+        </p>
+        <button
+          className="button-secondary mt-4 px-4"
+          onClick={() => {
+            setLoading(true);
+            setReload((v) => v + 1);
+          }}
+        >
+          Дахин ачаалах
+        </button>
       </div>
     );
   }
 
-  const greeting = new Date().getHours() < 12 ? "Өглөөний мэнд" : "Өдрийн мэнд";
+  const greeting = clinicMinutes() < 12 * 60 ? "Өглөөний мэнд" : "Өдрийн мэнд";
+  const today = new Date(`${clinicDateKey()}T00:00:00Z`);
 
   return (
     <div className="space-y-6">
       <header className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-sm font-semibold text-emerald-600">
+            <p className="text-sm font-semibold text-brand-600">
               Эмчийн ажиллах хэсэг
             </p>
-            <h1 className="mt-2 text-2xl font-semibold text-slate-900">
+            <h1 className="mt-2 font-sans text-2xl font-semibold text-brand-900">
               {greeting}, Др. {data.doctor.name}
             </h1>
             <p className="mt-2 text-sm text-slate-500">
-              {
-                new Date().toLocaleDateString("mn-MN", {
-                  weekday: "long",
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
+              {today.toLocaleDateString("mn-MN", {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+                timeZone: "UTC",
+              })}
             </p>
           </div>
-          <div className="flex items-center gap-2 rounded-2xl bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700">
+          <div className="flex items-center gap-2 rounded-2xl bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-700">
             <CalendarDays className="h-4 w-4" />
             Өнөөдрийн хуваарь бэлэн
           </div>
@@ -225,12 +236,12 @@ export default function DoctorDashboardPage() {
             className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
           >
             <div className="flex min-h-10 items-start justify-between gap-2">
-              <p className="text-sm font-semibold text-slate-500">
-                {label}
-              </p>
+              <p className="text-sm font-semibold text-slate-500">{label}</p>
               <Icon className={`h-5 w-5 shrink-0 ${tone}`} />
             </div>
-            <p className="mt-6 text-2xl font-semibold text-slate-900">{value}</p>
+            <p className="mt-6 text-2xl font-semibold text-slate-900">
+              {value}
+            </p>
           </div>
         ))}
       </section>
@@ -239,16 +250,14 @@ export default function DoctorDashboardPage() {
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-emerald-600">
-                Өнөөдөр
-              </p>
-              <h2 className="mt-1 text-lg font-semibold text-slate-900">
+              <p className="text-sm font-semibold text-brand-600">Өнөөдөр</p>
+              <h2 className="mt-1 font-sans text-lg font-semibold text-brand-900">
                 Өнөөдрийн цаг авалтууд
               </h2>
             </div>
             <Link
               href="/doctor/appointments"
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 text-sm font-semibold text-brand-700 hover:bg-brand-50"
             >
               Бүгдийг харах
               <ArrowRight className="h-4 w-4" />
@@ -307,10 +316,10 @@ export default function DoctorDashboardPage() {
 
         <div className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div>
-            <p className="text-sm font-semibold text-emerald-600">
+            <p className="text-sm font-semibold text-brand-600">
               Түргэн үйлдлүүд
             </p>
-            <h2 className="mt-1 text-lg font-semibold text-slate-900">
+            <h2 className="mt-1 font-sans text-lg font-semibold text-brand-900">
               Анхаарах зүйлс
             </h2>
           </div>
@@ -326,7 +335,7 @@ export default function DoctorDashboardPage() {
               <Link
                 key={label}
                 href={href}
-                className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-bold text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50"
+                className="flex min-h-12 items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-bold text-brand-700 transition hover:border-brand-200 hover:bg-brand-50"
               >
                 <span>{label}</span>
                 <ArrowRight className="h-4 w-4" />
@@ -344,7 +353,7 @@ export default function DoctorDashboardPage() {
             </h2>
             <Link
               href="/doctor/appointments"
-              className="text-sm font-semibold text-emerald-700"
+              className="text-sm font-semibold text-brand-700"
             >
               Бүх цаг авалтыг харах
             </Link>
@@ -395,7 +404,7 @@ export default function DoctorDashboardPage() {
             </h2>
             <Link
               href="/doctor/patients"
-              className="text-sm font-semibold text-emerald-700"
+              className="text-sm font-semibold text-brand-700"
             >
               Бүгдийг харах
             </Link>
@@ -417,7 +426,7 @@ export default function DoctorDashboardPage() {
                       <p className="font-bold text-slate-900">{patient.name}</p>
                       <p className="text-sm text-slate-500">{patient.phone}</p>
                     </div>
-                    <span className="rounded-full bg-emerald-50 px-2 py-1 text-sm font-bold text-emerald-700">
+                    <span className="rounded-full bg-brand-50 px-2 py-1 text-sm font-bold text-brand-700">
                       {patient.totalAppointments} удаа ирсэн
                     </span>
                   </div>

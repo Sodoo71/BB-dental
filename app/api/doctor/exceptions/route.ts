@@ -18,7 +18,13 @@ export async function GET() {
     orderBy: { date: "asc" },
   });
 
-  return NextResponse.json({ success: true, data: items });
+  return NextResponse.json({
+    success: true,
+    data: items.map((item) => ({
+      ...item,
+      status: item.isActive ? "APPROVED" : "PENDING",
+    })),
+  });
 }
 
 export async function POST(request: Request) {
@@ -26,6 +32,7 @@ export async function POST(request: Request) {
   if (!user || !user.doctorId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
+  const doctorId = user.doctorId;
 
   try {
     const body = (await request.json()) as Record<string, unknown>;
@@ -56,19 +63,41 @@ export async function POST(request: Request) {
       );
     }
 
-    if (dateValue < clinicDateKey()) throw new HttpError(400, "Өнгөрсөн өдөрт чөлөө бүртгэх боломжгүй.");
-    if (type !== "DAY_OFF" && (!timePattern.test(startTime) || !timePattern.test(endTime) || startTime >= endTime)) throw new HttpError(400, "Эхлэх, дуусах цагаа шалгана уу.");
-    const item = await prisma.$transaction(async tx => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`${user.doctorId}:${dateValue}`}))::text`;
-      const appointments = await tx.appointment.findMany({ where: { doctorId: user.doctorId, appointmentDate: date, status: { in: ["PENDING", "CONFIRMED"] } }, select: { startTime: true, endTime: true } });
-      const conflict = appointments.some(a => type === "DAY_OFF" || (type === "BLOCKED_RANGE" ? a.startTime < endTime && a.endTime > startTime : a.startTime < startTime || a.endTime > endTime));
-      if (conflict) throw new HttpError(409, "Энэ хугацаанд захиалгатай байна. Эхлээд захиалгыг шилжүүлэх эсвэл цуцална уу.");
-      const result = await tx.doctorAvailabilityException.create({ data: { doctorId: user.doctorId!, date, type: availabilityType, startTime: type === "DAY_OFF" ? null : startTime, endTime: type === "DAY_OFF" ? null : endTime, reason: reason || null } });
-      await tx.auditLog.create({ data: { actorId: user.id, action: "DOCTOR_EXCEPTION_CREATED", entity: "Doctor", entityId: user.doctorId! } });
-      return result;
+    if (dateValue < clinicDateKey())
+      throw new HttpError(400, "Өнгөрсөн өдөрт чөлөө бүртгэх боломжгүй.");
+    if (
+      type !== "DAY_OFF" &&
+      (!timePattern.test(startTime) ||
+        !timePattern.test(endTime) ||
+        startTime >= endTime)
+    )
+      throw new HttpError(400, "Эхлэх, дуусах цагаа шалгана уу.");
+    const item = await prisma.$transaction(async (tx) => {
+      const request = await tx.doctorAvailabilityException.create({
+        data: {
+          doctorId,
+          date,
+          type: availabilityType,
+          startTime: type === "DAY_OFF" ? null : startTime,
+          endTime: type === "DAY_OFF" ? null : endTime,
+          reason: reason || null,
+          isActive: false,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId: user.id,
+          action: "DOCTOR_LEAVE_REQUESTED",
+          entity: "DoctorAvailabilityException",
+          entityId: request.id,
+        },
+      });
+      return request;
     });
     return NextResponse.json({ success: true, data: item }, { status: 201 });
-  } catch (error) { return apiError(error); }
+  } catch (error) {
+    return apiError(error);
+  }
 }
 
 export async function DELETE(request: Request) {
@@ -76,6 +105,7 @@ export async function DELETE(request: Request) {
   if (!user || !user.doctorId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
+  const doctorId = user.doctorId;
 
   try {
     const { searchParams } = new URL(request.url);
@@ -87,19 +117,35 @@ export async function DELETE(request: Request) {
       );
     }
 
-    await prisma.doctorAvailabilityException.deleteMany({
-      where: { id, doctorId: user.doctorId },
+    await prisma.$transaction(async (tx) => {
+      const pending = await tx.doctorAvailabilityException.findFirst({
+        where: { id, doctorId, isActive: false },
+      });
+      if (!pending) {
+        throw new HttpError(
+          409,
+          "Зөвхөн хүлээгдэж буй хүсэлтийг цуцалж болно.",
+        );
+      }
+      await tx.doctorAvailabilityException.delete({ where: { id } });
+      await tx.auditLog.create({
+        data: {
+          actorId: user.id,
+          action: "DOCTOR_LEAVE_CANCELLED",
+          entity: "DoctorAvailabilityException",
+          entityId: id,
+          metadata: {
+            date: pending.date.toISOString(),
+            type: pending.type,
+            startTime: pending.startTime,
+            endTime: pending.endTime,
+            reason: pending.reason,
+          },
+        },
+      });
     });
     return NextResponse.json({ success: true });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Unable to delete the exception.",
-      },
-      { status: 500 },
-    );
+    return apiError(error);
   }
 }

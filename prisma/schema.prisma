@@ -8,21 +8,21 @@ datasource db {
 }
 
 model User {
-  id             String   @id @default(uuid())
-  email          String   @unique
+  id             String        @id @default(uuid())
+  email          String        @unique
   name           String
   phone          String?
   avatarUrl      String?
   telegramChatId String?
   passwordHash   String
-  role           UserRole @default(DOCTOR)
-  isActive       Boolean  @default(true)
+  role           UserRole      @default(DOCTOR)
+  isActive       Boolean       @default(true)
   status         AccountStatus @default(ACTIVE)
   sessions       Session[]
-  doctorId       String?  @unique
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  doctor         Doctor?  @relation(fields: [doctorId], references: [id])
+  doctorId       String?       @unique
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  doctor         Doctor?       @relation(fields: [doctorId], references: [id])
 
   @@index([role])
 }
@@ -222,7 +222,6 @@ enum DoctorAvailabilityType {
   BLOCKED_RANGE
   SCHEDULE_OVERRIDE
 }
-
 
 enum AccountStatus {
   PENDING

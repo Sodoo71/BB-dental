@@ -56,6 +56,7 @@ type DoctorAnalytics = {
     type: string;
     reason: string | null;
     isActive: boolean;
+    status?: "PENDING" | "APPROVED" | "CANCELLED";
   }>;
   recentAppointments: Array<{
     id: string;
@@ -70,6 +71,20 @@ type DoctorAnalytics = {
 };
 
 const labels = ["Ням", "Даваа", "Мягмар", "Лхагва", "Пүрэв", "Баасан", "Бямба"];
+const appointmentStatusLabels: Record<string, string> = {
+  PENDING: "Хүлээгдэж буй",
+  CONFIRMED: "Баталгаажсан",
+  COMPLETED: "Дууссан",
+  CANCELLED: "Цуцлагдсан",
+  NO_SHOW: "Ирээгүй",
+};
+const appointmentStatusClasses: Record<string, string> = {
+  PENDING: "bg-amber-50 text-amber-800",
+  CONFIRMED: "bg-emerald-50 text-emerald-800",
+  COMPLETED: "bg-brand-50 text-brand-700",
+  CANCELLED: "bg-red-50 text-red-700",
+  NO_SHOW: "bg-slate-100 text-slate-700",
+};
 
 const emptyDoctorForm = {
   name: "",
@@ -180,7 +195,7 @@ export default function DoctorAnalyticsPage() {
 
   if (!data && !error) {
     return (
-      <main className="min-h-screen bg-slate-100 p-6 text-slate-900">
+      <main className="min-h-screen bg-background p-4 text-foreground sm:p-6">
         <div className="mx-auto max-w-7xl">
           <div className="rounded-2xl bg-white p-6 shadow-sm">
             Аналитик мэдээллийг ачаалж байна…
@@ -192,9 +207,9 @@ export default function DoctorAnalyticsPage() {
 
   if (error || !data) {
     return (
-      <main className="min-h-screen bg-slate-100 p-6">
+      <main className="min-h-screen bg-background p-4 sm:p-6">
         <div className="mx-auto max-w-2xl rounded-2xl bg-white p-8 shadow-sm">
-          <h1 className="text-2xl font-semibold text-slate-900">
+          <h1 className="font-sans text-2xl font-semibold text-brand-900">
             Аналитик боломжгүй байна
           </h1>
           <p className="mt-3 text-slate-600">
@@ -202,7 +217,7 @@ export default function DoctorAnalyticsPage() {
           </p>
           <Link
             href="/super-admin"
-            className="mt-5 inline-flex rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white"
+            className="button-primary mt-5 min-h-11 px-4"
           >
             Хяналтын самбар руу буцах
           </Link>
@@ -214,34 +229,38 @@ export default function DoctorAnalyticsPage() {
   const { doctor, stats, schedule, exceptions, recentAppointments } = data;
 
   return (
-    <main className="min-h-screen bg-slate-100 p-4 text-slate-900 md:p-8">
+    <main className="min-h-screen bg-background p-4 text-foreground sm:p-6 lg:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
-        <header className="rounded-2xl bg-slate-950 p-6 text-white shadow-lg shadow-slate-200">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center gap-4">
+        <header className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
               <Link
                 href="/super-admin"
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-700 px-3 py-2 text-sm font-medium text-slate-200"
+                className="inline-flex min-h-11 w-fit shrink-0 items-center gap-2 rounded-xl border border-slate-200 px-3 text-sm font-semibold text-brand-700 hover:bg-brand-50"
               >
                 <ArrowLeft className="h-4 w-4" /> Хяналтын самбар
               </Link>
               <div>
-                <p className="text-xs font-bold tracking-[0.24em] text-emerald-400">
+                <p className="text-xs font-bold tracking-[0.18em] text-brand-600">
                   ЭМЧИЙН АНАЛИТИК
                 </p>
-                <h1 className="mt-1 text-3xl font-semibold">{doctor.name}</h1>
+                <h1 className="mt-1 break-words font-sans text-2xl font-semibold text-brand-900 sm:text-3xl">
+                  {doctor.name}
+                </h1>
               </div>
             </div>
-            <div className="rounded-2xl border border-slate-700 bg-slate-900/60 px-4 py-3 text-sm">
-              <p className="text-slate-300">Төлөв</p>
-              <p className="font-bold text-emerald-300">
+            <div className="rounded-xl border border-brand-100 bg-brand-50 px-4 py-3 text-sm sm:min-w-32">
+              <p className="text-brand-600">Төлөв</p>
+              <p
+                className={`font-bold ${doctor.isActive ? "text-emerald-700" : "text-slate-600"}`}
+              >
                 {doctor.isActive ? "Идэвхтэй" : "Идэвхгүй"}
               </p>
             </div>
           </div>
         </header>
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           {[
             {
               label: "Нийт цаг авалт",
@@ -262,15 +281,15 @@ export default function DoctorAnalyticsPage() {
           ].map((item) => (
             <div
               key={item.label}
-              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+              className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
             >
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-slate-500">
                   {item.label}
                 </p>
-                <item.icon className="h-5 w-5 text-emerald-600" />
+                <item.icon className="h-5 w-5 text-brand-600" />
               </div>
-              <p className="mt-5 text-3xl font-semibold text-slate-900">
+              <p className="mt-5 text-2xl font-semibold text-brand-900 sm:text-3xl">
                 {item.value}
               </p>
             </div>
@@ -278,16 +297,16 @@ export default function DoctorAnalyticsPage() {
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[1.1fr_.9fr]">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-slate-900">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="font-sans text-lg font-semibold text-brand-900">
                 Эмчийн профайл
               </h2>
               {!isEditing && (
                 <button
                   type="button"
                   onClick={() => setIsEditing(true)}
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:border-slate-500 hover:bg-slate-50"
+                  className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-brand-700 transition hover:bg-brand-50 sm:w-auto"
                 >
                   Профайл засах
                 </button>
@@ -307,7 +326,7 @@ export default function DoctorAnalyticsPage() {
                           name: event.target.value,
                         }))
                       }
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 outline-none transition focus:border-emerald-500 focus:bg-white"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 outline-none transition focus:border-brand-500 focus:bg-white"
                     />
                   </label>
                   <label className="space-y-2 text-sm font-medium text-slate-600">
@@ -320,7 +339,7 @@ export default function DoctorAnalyticsPage() {
                           title: event.target.value,
                         }))
                       }
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 outline-none transition focus:border-emerald-500 focus:bg-white"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 outline-none transition focus:border-brand-500 focus:bg-white"
                     />
                   </label>
                   <label className="space-y-2 text-sm font-medium text-slate-600">
@@ -333,7 +352,7 @@ export default function DoctorAnalyticsPage() {
                           phone: event.target.value,
                         }))
                       }
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 outline-none transition focus:border-emerald-500 focus:bg-white"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 outline-none transition focus:border-brand-500 focus:bg-white"
                     />
                   </label>
                   <label className="space-y-2 text-sm font-medium text-slate-600">
@@ -347,7 +366,7 @@ export default function DoctorAnalyticsPage() {
                           email: event.target.value,
                         }))
                       }
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 outline-none transition focus:border-emerald-500 focus:bg-white"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 outline-none transition focus:border-brand-500 focus:bg-white"
                     />
                   </label>
                   <div className="sm:col-span-2">
@@ -372,7 +391,7 @@ export default function DoctorAnalyticsPage() {
                           telegramChatId: event.target.value,
                         }))
                       }
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 outline-none transition focus:border-emerald-500 focus:bg-white"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 outline-none transition focus:border-brand-500 focus:bg-white"
                     />
                   </label>
                 </div>
@@ -391,12 +410,12 @@ export default function DoctorAnalyticsPage() {
                   Идэвхтэй эмч
                 </label>
 
-                <div className="flex flex-wrap items-center gap-3 pt-2">
+                <div className="grid grid-cols-1 gap-2 pt-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
                   <button
                     type="button"
                     onClick={handleSave}
                     disabled={saving || !form.name.trim()}
-                    className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-300"
+                    className="button-primary min-h-12 w-full px-4 disabled:opacity-60 sm:w-auto"
                   >
                     {saving ? "Хадгалж байна..." : "Өөрчлөлтийг хадгалах"}
                   </button>
@@ -414,7 +433,7 @@ export default function DoctorAnalyticsPage() {
                         isActive: doctor.isActive,
                       });
                     }}
-                    className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-bold text-slate-700"
+                    className="button-secondary min-h-12 w-full px-4 sm:w-auto"
                   >
                     Цуцлах
                   </button>
@@ -464,18 +483,20 @@ export default function DoctorAnalyticsPage() {
             )}
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-slate-900">Төлөвийн тойм</h2>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+            <h2 className="font-sans text-lg font-semibold text-brand-900">
+              Төлөвийн тойм
+            </h2>
             <div className="mt-5 space-y-4">
               {Object.entries(data.statusBreakdown).map(([key, value]) => (
                 <div key={key}>
                   <div className="mb-1 flex items-center justify-between text-sm text-slate-600">
-                    <span>{key}</span>
-                    <span className="font-bold text-slate-900">{value}</span>
+                    <span>{appointmentStatusLabels[key] ?? key}</span>
+                    <span className="font-bold text-brand-900">{value}</span>
                   </div>
                   <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
                     <div
-                      className="h-full rounded-full bg-emerald-500"
+                      className="h-full rounded-full bg-brand-500"
                       style={{
                         width: `${Math.max((value / maxStatusValue) * 100, 6)}%`,
                       }}
@@ -488,14 +509,18 @@ export default function DoctorAnalyticsPage() {
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-slate-900">Ажлын нэгтгэл</h2>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+            <h2 className="font-sans text-lg font-semibold text-brand-900">
+              Ажлын нэгтгэл
+            </h2>
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <div className="rounded-2xl bg-slate-50 p-4">
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
                   Ажиллах өдрүүд
                 </p>
-                <p className="mt-2 text-2xl font-semibold">{stats.workingDays}</p>
+                <p className="mt-2 text-2xl font-semibold">
+                  {stats.workingDays}
+                </p>
               </div>
               <div className="rounded-2xl bg-slate-50 p-4">
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
@@ -517,13 +542,15 @@ export default function DoctorAnalyticsPage() {
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
                   Амралтын өдрүүд
                 </p>
-                <p className="mt-2 text-2xl font-semibold">{stats.dayOffDays}</p>
+                <p className="mt-2 text-2xl font-semibold">
+                  {stats.dayOffDays}
+                </p>
               </div>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-slate-900">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+            <h2 className="font-sans text-lg font-semibold text-brand-900">
               Долоо хоногийн хуваарь
             </h2>
             <div className="mt-5 space-y-2">
@@ -551,8 +578,8 @@ export default function DoctorAnalyticsPage() {
         </section>
 
         <section className="grid gap-6 lg:grid-cols-[1fr_1fr]">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-slate-900">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+            <h2 className="font-sans text-lg font-semibold text-brand-900">
               Сүүлийн цаг авалтууд
             </h2>
             <div className="mt-4 space-y-3">
@@ -570,8 +597,11 @@ export default function DoctorAnalyticsPage() {
                       <p className="font-semibold text-slate-800">
                         {appointment.patientName}
                       </p>
-                      <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-700">
-                        {appointment.status}
+                      <span
+                        className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${appointmentStatusClasses[appointment.status] ?? "bg-slate-100 text-slate-700"}`}
+                      >
+                        {appointmentStatusLabels[appointment.status] ??
+                          appointment.status}
                       </span>
                     </div>
                     <p className="mt-1 text-sm text-slate-500">
@@ -606,8 +636,16 @@ export default function DoctorAnalyticsPage() {
                       <p className="font-semibold text-slate-800">
                         {exception.type}
                       </p>
-                      <span className="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-amber-700">
-                        {exception.isActive ? "Идэвхтэй" : "Идэвхгүй"}
+                      <span
+                        className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${exception.status === "PENDING" ? "bg-amber-50 text-amber-800" : exception.status === "CANCELLED" || !exception.isActive ? "bg-slate-100 text-slate-600" : "bg-emerald-50 text-emerald-800"}`}
+                      >
+                        {exception.status === "PENDING"
+                          ? "Хүлээгдэж буй"
+                          : exception.status === "CANCELLED"
+                            ? "Цуцалсан"
+                            : exception.isActive
+                              ? "Баталсан"
+                              : "Идэвхгүй"}
                       </span>
                     </div>
                     <p className="mt-1 text-sm text-slate-500">

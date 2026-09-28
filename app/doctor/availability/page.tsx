@@ -129,8 +129,18 @@ export default function DoctorAvailabilityPage() {
 
   const saveSchedule = async () => {
     if (saving || loading || error) return;
-    const invalid = schedule.find(day => !day.isDayOff && (!day.startTime || !day.endTime || day.startTime >= day.endTime));
-    if (invalid) { showToast(`${weekdayLabels[invalid.dayOfWeek]}: дуусах цаг эхлэх цагаас хойш байна.`, "error"); return; }
+    const invalid = schedule.find(
+      (day) =>
+        !day.isDayOff &&
+        (!day.startTime || !day.endTime || day.startTime >= day.endTime),
+    );
+    if (invalid) {
+      showToast(
+        `${weekdayLabels[invalid.dayOfWeek]}: дуусах цаг эхлэх цагаас хойш байна.`,
+        "error",
+      );
+      return;
+    }
     setSaving(true);
     try {
       const response = await fetch("/api/doctor/availability", {
@@ -142,7 +152,10 @@ export default function DoctorAvailabilityPage() {
       if (!response.ok)
         throw new Error(payload.error || "Цагийн хуваарийг хадгалж чадсангүй");
       setSavedSchedule(schedule);
-      showToast("Таны ажиллах цагийн хуваарь амжилттай шинэчлэгдлээ.", "success");
+      showToast(
+        "Таны ажиллах цагийн хуваарь амжилттай шинэчлэгдлээ.",
+        "success",
+      );
     } catch (error) {
       showToast(
         error instanceof Error
@@ -192,7 +205,12 @@ export default function DoctorAvailabilityPage() {
         </Link>
       </div>
 
-      <p aria-live="polite" className="text-sm text-slate-500">{JSON.stringify(schedule) === JSON.stringify(savedSchedule) ? "Хуваарь хадгалагдсан." : "Хадгалаагүй өөрчлөлт байна."} · Улаанбаатарын цагаар</p>
+      <p aria-live="polite" className="text-sm text-slate-500">
+        {JSON.stringify(schedule) === JSON.stringify(savedSchedule)
+          ? "Хуваарь хадгалагдсан."
+          : "Хадгалаагүй өөрчлөлт байна."}{" "}
+        · Улаанбаатарын цагаар
+      </p>
       {/* QUICK PRESETS BANNER */}
       <div className="rounded-2xl border border-emerald-100 bg-gradient-to-r from-emerald-50/90 to-brand-50/70 p-4">
         <div className="mb-2 flex items-center gap-2">
@@ -205,28 +223,28 @@ export default function DoctorAvailabilityPage() {
           <button
             type="button"
             onClick={applyStandardWeek}
-            className="rounded-xl border border-emerald-200 bg-white px-3 py-1.5 text-xs font-bold text-emerald-900 shadow-2xs hover:bg-emerald-100"
+            className="min-h-11 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm font-bold text-emerald-900 shadow-2xs hover:bg-emerald-100"
           >
             ⚡ Дав - Баа (09:00 - 18:00, Бям-Ням Амралт)
           </button>
           <button
             type="button"
             onClick={applyEveryday}
-            className="rounded-xl border border-emerald-200 bg-white px-3 py-1.5 text-xs font-bold text-emerald-900 shadow-2xs hover:bg-emerald-100"
+            className="min-h-11 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm font-bold text-emerald-900 shadow-2xs hover:bg-emerald-100"
           >
             ⚡ Бүх 7 өдөр (09:00 - 18:00)
           </button>
           <button
             type="button"
             onClick={applyHalfDay}
-            className="rounded-xl border border-emerald-200 bg-white px-3 py-1.5 text-xs font-bold text-emerald-900 shadow-2xs hover:bg-emerald-100"
+            className="min-h-11 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm font-bold text-emerald-900 shadow-2xs hover:bg-emerald-100"
           >
             ⚡ Хагас цаг (09:00 - 14:00)
           </button>
           <button
             type="button"
             onClick={copyMondayToAll}
-            className="flex items-center gap-1 rounded-xl border border-brand-200 bg-white px-3 py-1.5 text-xs font-bold text-brand-900 shadow-2xs hover:bg-brand-100"
+            className="flex min-h-11 items-center gap-1 rounded-xl border border-brand-200 bg-white px-3 py-2 text-sm font-bold text-brand-900 shadow-2xs hover:bg-brand-100"
           >
             <Copy className="h-3.5 w-3.5" />
             Даваа гарагийн цагийг бүх ажлын өдөрт хуулах
@@ -236,95 +254,105 @@ export default function DoctorAvailabilityPage() {
 
       {/* Grid of 7 days */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {[...schedule].sort((a, b) => ((a.dayOfWeek + 6) % 7) - ((b.dayOfWeek + 6) % 7)).map((day) => (
-          <div
-            key={day.dayOfWeek}
-            className={`rounded-2xl border p-4 transition ${
-              day.isDayOff
-                ? "border-slate-200 bg-slate-50"
-                : "border-emerald-200 bg-emerald-50/60"
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-slate-900">
-                {weekdayLabels[day.dayOfWeek]}
-              </span>
-              <label className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-slate-600">
-                <input
-                  type="checkbox"
-                  checked={day.isDayOff}
-                  onChange={(event) => {
-                    const isDayOff = event.target.checked;
-                    setSchedule((current) =>
-                      current.map((row) =>
-                        row.dayOfWeek === day.dayOfWeek
-                          ? {
-                              ...row,
-                              isDayOff,
-                              startTime: row.startTime || "09:00",
-                              endTime: row.endTime || "18:00",
-                            }
-                          : row,
-                      ),
-                    );
-                  }}
-                  className="h-3.5 w-3.5 rounded text-emerald-600"
-                />
-                Амрах өдөр
-              </label>
-            </div>
+        {[...schedule]
+          .sort((a, b) => ((a.dayOfWeek + 6) % 7) - ((b.dayOfWeek + 6) % 7))
+          .map((day) => (
+            <div
+              key={day.dayOfWeek}
+              className={`rounded-2xl border p-4 transition ${
+                day.isDayOff
+                  ? "border-slate-200 bg-slate-50"
+                  : "border-emerald-200 bg-emerald-50/60"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-slate-900">
+                  {weekdayLabels[day.dayOfWeek]}
+                </span>
+                <label className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={day.isDayOff}
+                    onChange={(event) => {
+                      const isDayOff = event.target.checked;
+                      setSchedule((current) =>
+                        current.map((row) =>
+                          row.dayOfWeek === day.dayOfWeek
+                            ? {
+                                ...row,
+                                isDayOff,
+                                startTime: row.startTime || "09:00",
+                                endTime: row.endTime || "18:00",
+                              }
+                            : row,
+                        ),
+                      );
+                    }}
+                    className="h-5 w-5 rounded text-emerald-600"
+                  />
+                  Амрах өдөр
+                </label>
+              </div>
 
-            {day.isDayOff ? (
-              <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white/70 py-2.5 text-center text-xs font-bold uppercase tracking-wider text-slate-400">
-                Амралтын өдөр
-              </div>
-            ) : (
-              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                <label className="rounded-xl border border-white bg-white p-2">
-                  <span className="text-[10px] text-slate-400 block font-bold">Эхлэх</span>
-                  <input
-                    type="time"
-                    value={day.startTime}
-                    onChange={(event) =>
-                      setSchedule((current) =>
-                        current.map((row) =>
-                          row.dayOfWeek === day.dayOfWeek
-                            ? { ...row, startTime: event.target.value }
-                            : row,
-                        ),
-                      )
-                    }
-                    className="w-full bg-transparent font-bold text-slate-800 outline-none"
-                  />
-                </label>
-                <label className="rounded-xl border border-white bg-white p-2">
-                  <span className="text-[10px] text-slate-400 block font-bold">Дуусах</span>
-                  <input
-                    type="time"
-                    value={day.endTime}
-                    onChange={(event) =>
-                      setSchedule((current) =>
-                        current.map((row) =>
-                          row.dayOfWeek === day.dayOfWeek
-                            ? { ...row, endTime: event.target.value }
-                            : row,
-                        ),
-                      )
-                    }
-                    className="w-full bg-transparent font-bold text-slate-800 outline-none"
-                  />
-                </label>
-              </div>
-            )}
-          </div>
-        ))}
+              {day.isDayOff ? (
+                <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white/70 py-2.5 text-center text-xs font-bold uppercase tracking-wider text-slate-400">
+                  Амралтын өдөр
+                </div>
+              ) : (
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                  <label className="rounded-xl border border-white bg-white p-2">
+                    <span className="text-[10px] text-slate-400 block font-bold">
+                      Эхлэх
+                    </span>
+                    <input
+                      type="time"
+                      value={day.startTime}
+                      onChange={(event) =>
+                        setSchedule((current) =>
+                          current.map((row) =>
+                            row.dayOfWeek === day.dayOfWeek
+                              ? { ...row, startTime: event.target.value }
+                              : row,
+                          ),
+                        )
+                      }
+                      className="min-h-10 w-full bg-transparent font-bold text-slate-800 outline-none"
+                    />
+                  </label>
+                  <label className="rounded-xl border border-white bg-white p-2">
+                    <span className="text-[10px] text-slate-400 block font-bold">
+                      Дуусах
+                    </span>
+                    <input
+                      type="time"
+                      value={day.endTime}
+                      onChange={(event) =>
+                        setSchedule((current) =>
+                          current.map((row) =>
+                            row.dayOfWeek === day.dayOfWeek
+                              ? { ...row, endTime: event.target.value }
+                              : row,
+                          ),
+                        )
+                      }
+                      className="min-h-10 w-full bg-transparent font-bold text-slate-800 outline-none"
+                    />
+                  </label>
+                </div>
+              )}
+            </div>
+          ))}
       </div>
 
       <div className="flex justify-end pt-2">
         <button
           onClick={saveSchedule}
-          disabled={saving || Boolean(error) || JSON.stringify(schedule) === JSON.stringify(savedSchedule)}
-          className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-6 py-3 text-xs font-semibold text-white shadow-md hover:bg-slate-800 disabled:opacity-60"
+          disabled={
+            saving ||
+            Boolean(error) ||
+            JSON.stringify(schedule) === JSON.stringify(savedSchedule)
+          }
+          className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-6 text-sm font-semibold text-white shadow-md hover:bg-slate-800 disabled:opacity-60 sm:w-auto"
         >
           <Save className="h-4 w-4" />
           {saving ? "Хадгалж байна…" : "Хуваарь хадгалах"}

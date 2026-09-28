@@ -279,7 +279,14 @@ export async function POST(request: Request) {
           chiefComplaint,
         },
       });
-      await tx.auditLog.create({ data: { actorId: user.id, action: "APPOINTMENT_CREATED", entity: "Appointment", entityId: created.id } });
+      await tx.auditLog.create({
+        data: {
+          actorId: user.id,
+          action: "APPOINTMENT_CREATED",
+          entity: "Appointment",
+          entityId: created.id,
+        },
+      });
       return created;
     });
 

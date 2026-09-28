@@ -38,6 +38,7 @@ import {
   Zap,
 } from "lucide-react";
 import { AdminSidebar } from "@/components/admin/sidebar";
+import { DoctorLeaveRequests } from "@/components/admin/DoctorLeaveRequests";
 import { showToast } from "@/components/ui/Toast";
 
 interface AppointmentNote {
@@ -588,7 +589,10 @@ export default function ReceptionDashboard() {
         />
 
         {/* Main Content Area */}
-        <main id="reception-main" className="staff-content min-w-0 flex-1 space-y-6">
+        <main
+          id="reception-main"
+          className="staff-content min-w-0 flex-1 space-y-6"
+        >
           {/* Top header bar */}
           <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
@@ -606,30 +610,34 @@ export default function ReceptionDashboard() {
                     "Өдөр тутмын үзлэгийн цагууд"}
                   {activeTab === "QUICK_BOOK" && "Шуурхай цаг бүртгэх"}
                   {activeTab === "PATIENTS" && "Үйлчлүүлэгчдийн лавлах"}
+                  {activeTab === "DOCTOR_LEAVES" && "Эмчийн чөлөөний хүсэлт"}
                 </h1>
                 <p className="text-sm text-slate-500">
-                  Үйлчлүүлэгчдийг хүлээн авах, цаг бүртгэх, эмчид шилжүүлэх ба
-                  дотоод тэмдэглэл
+                  {activeTab === "DOCTOR_LEAVES"
+                    ? "Чөлөөний хүсэлтийг шалгаж батлах эсвэл цуцлах"
+                    : "Үйлчлүүлэгчдийг хүлээн авах, цаг бүртгэх, эмчид шилжүүлэх ба дотоод тэмдэглэл"}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => {
-                  setLoading(true);
-                  void fetchAppointments();
-                  void fetchDoctors();
-                  void fetchServices();
-                }}
-                className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-100"
-              >
-                <RefreshCw
-                  className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
-                />
-                Шинэчлэх
-              </button>
-            </div>
+            {activeTab !== "DOCTOR_LEAVES" && (
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    setLoading(true);
+                    void fetchAppointments();
+                    void fetchDoctors();
+                    void fetchServices();
+                  }}
+                  className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-100"
+                >
+                  <RefreshCw
+                    className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+                  />
+                  Шинэчлэх
+                </button>
+              </div>
+            )}
           </div>
 
           {/* TAB 1: APPOINTMENTS */}
@@ -676,7 +684,9 @@ export default function ReceptionDashboard() {
                     <p className="min-h-10 text-sm font-semibold text-slate-500">
                       {card.label}
                     </p>
-                    <div className={`mt-1.5 text-2xl font-semibold ${card.color}`}>
+                    <div
+                      className={`mt-1.5 text-2xl font-semibold ${card.color}`}
+                    >
                       {card.value}
                     </div>
                   </div>
@@ -752,14 +762,27 @@ export default function ReceptionDashboard() {
                   </div>
                 </div>
 
-                <div className="table-scroll" tabIndex={0} role="region" aria-label="Цаг захиалгын хүснэгт">
+                <div
+                  className="table-scroll"
+                  tabIndex={0}
+                  role="region"
+                  aria-label="Цаг захиалгын хүснэгт"
+                >
                   <table className="w-full min-w-[1000px] table-fixed text-left text-sm">
                     <thead className="border-b border-slate-200 bg-slate-50 text-sm font-semibold text-slate-500">
                       <tr>
-                        <th className="w-[200px] px-3 py-3 text-sm">Үйлчлүүлэгч</th>
-                        <th className="w-[130px] px-3 py-3 text-sm">Огноо & Цаг</th>
-                        <th className="w-[190px] px-3 py-3 text-sm">Үйлчилгээ</th>
-                        <th className="w-[180px] px-3 py-3 text-sm">Хариуцсан эмч</th>
+                        <th className="w-[200px] px-3 py-3 text-sm">
+                          Үйлчлүүлэгч
+                        </th>
+                        <th className="w-[130px] px-3 py-3 text-sm">
+                          Огноо & Цаг
+                        </th>
+                        <th className="w-[190px] px-3 py-3 text-sm">
+                          Үйлчилгээ
+                        </th>
+                        <th className="w-[180px] px-3 py-3 text-sm">
+                          Хариуцсан эмч
+                        </th>
                         <th className="w-[180px] px-3 py-3 text-sm">Төлөв</th>
                         <th className="w-[120px] px-3 py-3 text-right text-sm">
                           Үйлдлүүд
@@ -823,12 +846,78 @@ export default function ReceptionDashboard() {
                                   label={`Захиалгын үйлдлүүд: ${app.patient?.fullName || "Үйлчлүүлэгч"}`}
                                   disabled={updatingId === app.id}
                                   actions={[
-                                    { label: "Эмч рүү шилжүүлэх", icon: <ArrowRightLeft className="h-4 w-4 text-purple-600" />, onSelect: () => handleOpenTransfer(app) },
-                                    { label: "Дотоод тэмдэглэл", icon: <MessageSquare className="h-4 w-4 text-brand-600" />, onSelect: () => { void handleOpenNotes(app); } },
-                                    ...(app.status === "PENDING" ? [{ label: "Баталгаажуулах", icon: <Check className="h-4 w-4 text-emerald-600" />, onSelect: () => { void handleStatusChange(app.id, "CONFIRMED"); } }] : []),
-                                    ...(app.status === "CONFIRMED" ? [{ label: "Үзлэг дууссан", icon: <Clock className="h-4 w-4 text-brand-600" />, onSelect: () => { void handleStatusChange(app.id, "COMPLETED"); } }] : []),
-                                    ...(app.status !== "CANCELLED" ? [{ label: "Цуцлах", icon: <X className="h-4 w-4 text-amber-600" />, onSelect: () => { void handleStatusChange(app.id, "CANCELLED"); } }] : []),
-                                    { label: "Устгах", icon: <Trash2 className="h-4 w-4" />, destructive: true, onSelect: () => { void handleDelete(app.id); } },
+                                    {
+                                      label: "Эмч рүү шилжүүлэх",
+                                      icon: (
+                                        <ArrowRightLeft className="h-4 w-4 text-purple-600" />
+                                      ),
+                                      onSelect: () => handleOpenTransfer(app),
+                                    },
+                                    {
+                                      label: "Дотоод тэмдэглэл",
+                                      icon: (
+                                        <MessageSquare className="h-4 w-4 text-brand-600" />
+                                      ),
+                                      onSelect: () => {
+                                        void handleOpenNotes(app);
+                                      },
+                                    },
+                                    ...(app.status === "PENDING"
+                                      ? [
+                                          {
+                                            label: "Баталгаажуулах",
+                                            icon: (
+                                              <Check className="h-4 w-4 text-emerald-600" />
+                                            ),
+                                            onSelect: () => {
+                                              void handleStatusChange(
+                                                app.id,
+                                                "CONFIRMED",
+                                              );
+                                            },
+                                          },
+                                        ]
+                                      : []),
+                                    ...(app.status === "CONFIRMED"
+                                      ? [
+                                          {
+                                            label: "Үзлэг дууссан",
+                                            icon: (
+                                              <Clock className="h-4 w-4 text-brand-600" />
+                                            ),
+                                            onSelect: () => {
+                                              void handleStatusChange(
+                                                app.id,
+                                                "COMPLETED",
+                                              );
+                                            },
+                                          },
+                                        ]
+                                      : []),
+                                    ...(app.status !== "CANCELLED"
+                                      ? [
+                                          {
+                                            label: "Цуцлах",
+                                            icon: (
+                                              <X className="h-4 w-4 text-amber-600" />
+                                            ),
+                                            onSelect: () => {
+                                              void handleStatusChange(
+                                                app.id,
+                                                "CANCELLED",
+                                              );
+                                            },
+                                          },
+                                        ]
+                                      : []),
+                                    {
+                                      label: "Устгах",
+                                      icon: <Trash2 className="h-4 w-4" />,
+                                      destructive: true,
+                                      onSelect: () => {
+                                        void handleDelete(app.id);
+                                      },
+                                    },
                                   ]}
                                 />
                               </div>
@@ -1125,12 +1214,22 @@ export default function ReceptionDashboard() {
               </div>
             </div>
           )}
+
+          {activeTab === "DOCTOR_LEAVES" &&
+            currentUser &&
+            ["ADMIN", "SUPER_ADMIN"].includes(currentUser.role) && (
+              <DoctorLeaveRequests />
+            )}
         </main>
       </div>
 
       {/* Transfer Appointment Modal */}
       {transferModalOpen && transferringApp && (
-        <DialogFrame onClose={() => setTransferModalOpen(false)} label="Эмч рүү шилжүүлэх" size="max-w-md">
+        <DialogFrame
+          onClose={() => setTransferModalOpen(false)}
+          label="Эмч рүү шилжүүлэх"
+          size="max-w-md"
+        >
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-lg space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
@@ -1143,7 +1242,8 @@ export default function ReceptionDashboard() {
                     "Үйлчлүүлэгч"}
                 </h3>
               </div>
-              <button aria-label="Хаах"
+              <button
+                aria-label="Хаах"
                 type="button"
                 onClick={() => setTransferModalOpen(false)}
                 className="text-slate-400 hover:text-slate-600"
@@ -1218,7 +1318,11 @@ export default function ReceptionDashboard() {
 
       {/* Internal Notes Modal */}
       {notesModalOpen && activeAppForNotes && (
-        <DialogFrame onClose={() => setNotesModalOpen(false)} label="Дотоод тэмдэглэл" size="max-w-lg">
+        <DialogFrame
+          onClose={() => setNotesModalOpen(false)}
+          label="Дотоод тэмдэглэл"
+          size="max-w-lg"
+        >
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-lg space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
@@ -1235,7 +1339,8 @@ export default function ReceptionDashboard() {
                     ""}
                 </h3>
               </div>
-              <button aria-label="Хаах"
+              <button
+                aria-label="Хаах"
                 type="button"
                 onClick={() => setNotesModalOpen(false)}
                 className="text-slate-400 hover:text-slate-600"

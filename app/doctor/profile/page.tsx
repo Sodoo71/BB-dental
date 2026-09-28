@@ -49,8 +49,13 @@ export default function DoctorProfilePage() {
       try {
         const response = await fetch("/api/doctor/profile");
         const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || "Профайл ачаалж чадсангүй.");
-        const loadedProfile = { ...payload.data, role: "DOCTOR", avatarUrl: payload.data.avatarUrl || payload.data.imageUrl || "" };
+        if (!response.ok)
+          throw new Error(payload.error || "Профайл ачаалж чадсангүй.");
+        const loadedProfile = {
+          ...payload.data,
+          role: "DOCTOR",
+          avatarUrl: payload.data.avatarUrl || payload.data.imageUrl || "",
+        };
 
         setProfile(loadedProfile);
         setFormData({
@@ -144,15 +149,27 @@ export default function DoctorProfilePage() {
         <div className="flex flex-wrap items-center gap-2">
           {!isEditing ? (
             <button
-              onClick={() => { setFormData({ name: profile.name, title: profile.title || "", phone: profile.phone || "", email: profile.email || "", avatarUrl: profile.avatarUrl || "", telegramChatId: profile.telegramChatId || "" }); setIsEditing(true); }}
-              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
+              onClick={() => {
+                setFormData({
+                  name: profile.name,
+                  title: profile.title || "",
+                  phone: profile.phone || "",
+                  email: profile.email || "",
+                  avatarUrl: profile.avatarUrl || "",
+                  telegramChatId: profile.telegramChatId || "",
+                });
+                setIsEditing(true);
+              }}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
             >
               <Edit3 className="h-4 w-4" />
               Мэдээлэл засах
             </button>
           ) : (
-            <button aria-label="Хаах"
-              disabled={saving || uploading} onClick={() => setIsEditing(false)}
+            <button
+              aria-label="Хаах"
+              disabled={saving || uploading}
+              onClick={() => setIsEditing(false)}
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
               <X className="h-4 w-4" />
@@ -161,7 +178,7 @@ export default function DoctorProfilePage() {
           )}
           <Link
             href="/doctor"
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
           >
             <ArrowLeft className="h-4 w-4" />
             Хянах самбар
@@ -172,11 +189,14 @@ export default function DoctorProfilePage() {
       {isEditing ? (
         <form
           onSubmit={handleSave}
-          className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-6"
+          className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-6"
         >
           <fieldset disabled={saving} className="grid gap-4 md:grid-cols-2">
             <div>
-              <label htmlFor="profile-name" className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+              <label
+                htmlFor="profile-name"
+                className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-500"
+              >
                 Овог нэр *
               </label>
               <input
@@ -192,7 +212,10 @@ export default function DoctorProfilePage() {
             </div>
 
             <div>
-              <label htmlFor="profile-title" className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+              <label
+                htmlFor="profile-title"
+                className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-500"
+              >
                 Мэргэшил / Цол
               </label>
               <input
@@ -208,7 +231,10 @@ export default function DoctorProfilePage() {
             </div>
 
             <div>
-              <label htmlFor="profile-phone" className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+              <label
+                htmlFor="profile-phone"
+                className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-500"
+              >
                 Утасны дугаар
               </label>
               <input
@@ -223,7 +249,10 @@ export default function DoctorProfilePage() {
             </div>
 
             <div>
-              <label htmlFor="profile-email" className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+              <label
+                htmlFor="profile-email"
+                className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-500"
+              >
                 И-мэйл хаяг
               </label>
               <input
@@ -238,7 +267,10 @@ export default function DoctorProfilePage() {
             </div>
 
             <div className="md:col-span-2">
-              <label htmlFor="profile-telegramChatId" className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+              <label
+                htmlFor="profile-telegramChatId"
+                className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-500"
+              >
                 Telegram Chat ID
               </label>
               <input
@@ -258,7 +290,8 @@ export default function DoctorProfilePage() {
 
             {/* Profile Avatar Upload */}
             <div className="md:col-span-2">
-              <ImageUpload onUploadingChange={setUploading}
+              <ImageUpload
+                onUploadingChange={setUploading}
                 label="Профайл зураг"
                 value={formData.avatarUrl}
                 onChange={(url) =>
@@ -268,18 +301,19 @@ export default function DoctorProfilePage() {
             </div>
           </fieldset>
 
-          <div className="flex justify-end gap-2 border-t border-slate-200 pt-4">
+          <div className="grid grid-cols-2 gap-2 border-t border-slate-200 pt-4 sm:flex sm:justify-end">
             <button
               type="button"
-              disabled={saving || uploading} onClick={() => setIsEditing(false)}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-100"
+              disabled={saving || uploading}
+              onClick={() => setIsEditing(false)}
+              className="min-h-12 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 hover:bg-slate-100"
             >
               Цуцлах
             </button>
             <button
               type="submit"
               disabled={saving || uploading}
-              className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-slate-800 disabled:opacity-50"
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-bold text-white transition hover:bg-slate-800 disabled:opacity-50 sm:px-5"
             >
               <Save className="h-4 w-4" />
               {saving ? "Хадгалж байна…" : "Хадгалах"}
@@ -287,7 +321,7 @@ export default function DoctorProfilePage() {
           </div>
         </form>
       ) : (
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-6">
           <div className="mb-6 flex items-center gap-4">
             {profile.avatarUrl ? (
               <div className="h-20 w-20 overflow-hidden rounded-2xl border-2 border-emerald-500 shadow-md">

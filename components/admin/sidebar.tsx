@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   CalendarRange,
+  CalendarCheck2,
   LayoutDashboard,
   LogOut,
   PlusCircle,
@@ -45,6 +46,9 @@ export function AdminSidebar({
     { id: "APPOINTMENTS", label: "Үзлэгийн цагууд", icon: CalendarRange },
     { id: "QUICK_BOOK", label: "Шуурхай цаг бүртгэх", icon: PlusCircle },
     { id: "PATIENTS", label: "Үйлчлүүлэгчийн лавлах", icon: Users },
+    ...(user.role === "ADMIN" || user.role === "SUPER_ADMIN"
+      ? [{ id: "DOCTOR_LEAVES", label: "Эмчийн чөлөө", icon: CalendarCheck2 }]
+      : []),
   ];
 
   const handleSelect = (id: string) => {
@@ -157,10 +161,18 @@ export function AdminSidebar({
 
   return (
     <>
-      <Drawer open={Boolean(mobileOpen)} onClose={() => onCloseMobile?.()} label="Ресепшний цэс">{content}</Drawer>
+      <Drawer
+        open={Boolean(mobileOpen)}
+        onClose={() => onCloseMobile?.()}
+        label="Ресепшний цэс"
+      >
+        {content}
+      </Drawer>
 
       {/* Desktop static aside */}
-      <div className="sticky top-6 hidden h-[calc(100dvh-3rem)] shrink-0 xl:block">{content}</div>
+      <div className="sticky top-6 hidden h-[calc(100dvh-3rem)] shrink-0 xl:block">
+        {content}
+      </div>
     </>
   );
 }

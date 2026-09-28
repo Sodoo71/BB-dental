@@ -197,7 +197,10 @@ export async function GET(
       },
       statusBreakdown,
       schedule: doctor.schedules,
-      exceptions: doctor.availabilityExceptions,
+      exceptions: doctor.availabilityExceptions.map((exception) => ({
+        ...exception,
+        status: exception.isActive ? "APPROVED" : "PENDING",
+      })),
       recentAppointments,
     },
   });
