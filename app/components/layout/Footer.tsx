@@ -3,7 +3,8 @@
 import { useClinicInfo } from "@/components/layout/ClinicInfoProvider";
 import { Brand } from "@/components/layout/Brand";
 import React from "react";
-import { Sparkles, Clock, Phone, MapPin } from "lucide-react";
+import Link from "next/link";
+import { Phone, MapPin } from "lucide-react";
 
 export default function Footer({
   scrollToBooking,
@@ -45,7 +46,7 @@ export default function Footer({
                   href={`tel:${info.phone}`}
                   className="flex items-center gap-2 transition-colors hover:text-white"
                 >
-                  <Phone className="h-4 w-4 shrink-0 text-gold" />
+                  <Phone className="h-4 w-4 shrink-0 text-accent" />
                   <span>{info.phone}</span>
                 </a>
               </li>
@@ -58,7 +59,7 @@ export default function Footer({
                   rel="noopener noreferrer"
                   className="flex items-start gap-2 transition-colors hover:text-white"
                 >
-                  <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-gold" />
+                  <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
 
                   <span>{info.address}</span>
                 </a>
@@ -80,9 +81,17 @@ export default function Footer({
         </div>
 
         {/* Copyright */}
-        <div className="mt-12 border-t border-slate-900 pt-8 text-center text-xs text-slate-600">
+        <div className="mt-12 border-t border-white/15 pt-8 text-center text-xs text-brand-100">
           © {new Date().getFullYear()} {info.clinicName}. Бүх эрх хуулиар
           хамгаалагдсан.
+          <div className="mt-2 lg:hidden">
+            <Link
+              href="/login"
+              className="inline-flex min-h-11 items-center px-3 text-[11px] text-brand-200 transition hover:text-white focus-visible:text-white"
+            >
+              Ажилтны нэвтрэх
+            </Link>
+          </div>
         </div>
       </div>
     </footer>

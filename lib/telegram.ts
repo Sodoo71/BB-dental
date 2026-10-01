@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 
-async function notificationConfig() {
+export async function notificationConfig() {
   const row = await prisma.systemSetting.findUnique({ where: { key: "telegram_config" } });
   try { return JSON.parse(row?.value ?? "{}") as { enabled?: boolean; channelId?: string }; } catch { return {}; }
 }
@@ -34,9 +34,13 @@ export async function sendTelegramRaw(
         body: JSON.stringify(body),
       },
     );
-    return await res.json();
+    const result = await res.json();
+    if (!res.ok || result?.ok !== true) {
+      console.error(`Telegram API rejected [${endpoint}]`, { status: res.status, code: result?.error_code });
+    }
+    return result;
   } catch (err) {
-    console.error(`Telegram API error [${endpoint}]:`, err);
+    console.error(`Telegram API error [${endpoint}]`, err instanceof Error ? err.name : "NetworkError");
     return null;
   }
 }
@@ -55,16 +59,16 @@ export async function notifyDoctorOnTelegram(notification: DoctorNotification) {
   }).format(notification.appointmentDate);
 
   const text = [
-    "🦷 *ШИНЭ ЦАГИЙН ЗАХИАЛГА*",
+    "🦷 ШИНЭ ЦАГИЙН ЗАХИАЛГА",
     "",
-    `👨‍⚕️ *Эмч:* ${notification.doctorName}`,
-    `👤 *Үйлчлүүлэгч:* ${notification.patientName}`,
-    `📞 *Утас:* \`${notification.patientPhone}\``,
-    `🩺 *Үйлчилгээ:* ${notification.serviceName}`,
-    `📅 *Өдөр:* ${date}`,
-    `⏰ *Цаг:* ${notification.startTime}`,
+    `👨‍⚕️ Эмч: ${notification.doctorName}`,
+    `👤 Үйлчлүүлэгч: ${notification.patientName}`,
+    `📞 Утас: ${notification.patientPhone}`,
+    `🩺 Үйлчилгээ: ${notification.serviceName}`,
+    `📅 Өдөр: ${date}`,
+    `⏰ Цаг: ${notification.startTime}`,
     notification.chiefComplaint
-      ? `📝 *Зовиур:* ${notification.chiefComplaint}`
+      ? `📝 Зовиур: ${notification.chiefComplaint}`
       : null,
     "",
     "Доорх товчоор шууд баталгаажуулах эсвэл цуцлах боломжтой:",
@@ -89,16 +93,18 @@ export async function notifyDoctorOnTelegram(notification: DoctorNotification) {
       }
     : undefined;
 
-  const result = notification.chatId ? await sendTelegramRaw("sendMessage", {
-    chat_id: notification.chatId,
-    text,
-    parse_mode: "Markdown",
+  const result = notification.chatId.trim() ? await sendTelegramRaw("sendMessage", {
+    chat_id: notification.chatId.trim(),
+    text: text.slice(0, 4000),
     reply_markup,
   }) : null;
 
   const channelId = config.channelId || process.env.TELEGRAM_CHAT_ID || process.env.ADMIN_CHAT_ID;
-  const channelResult = channelId && channelId !== notification.chatId ? await sendTelegramRaw("sendMessage", { chat_id: channelId, text, parse_mode: "Markdown" }) : null;
-  return result?.ok === true || channelResult?.ok === true;
+  if (channelId && channelId !== notification.chatId.trim()) {
+    await sendTelegramRaw("sendMessage", { chat_id: channelId, text: text.slice(0, 4000) });
+  }
+  // A channel copy does not prove delivery to the assigned doctor.
+  return result?.ok === true;
 }
 
 export async function notifyAppointmentReminder(params: {
@@ -118,7 +124,7 @@ export async function notifyAppointmentReminder(params: {
   }).format(params.appointmentDate);
 
   const text = [
-    "⏰ *ҮЗЛЭГИЙН ЦАГИЙН САНУУЛГА*",
+    "⏰ ҮЗЛЭГИЙН ЦАГИЙН САНУУЛГА",
     "",
     `👨‍⚕️ Эмч: ${params.doctorName}`,
     `👤 Үйлчлүүлэгч: ${params.patientName} (${params.patientPhone})`,
@@ -129,7 +135,6 @@ export async function notifyAppointmentReminder(params: {
   const result = await sendTelegramRaw("sendMessage", {
     chat_id: params.chatId,
     text,
-    parse_mode: "Markdown",
   });
 
   return result?.ok === true;
@@ -150,11 +155,12 @@ export async function editMessageText(
   chatId: string | number,
   messageId: number,
   text: string,
+  appointmentId?: string,
 ) {
   return sendTelegramRaw("editMessageText", {
     chat_id: chatId,
     message_id: messageId,
-    text,
-    parse_mode: "Markdown",
+    text: text.slice(0, 4096),
+    reply_markup: { inline_keyboard: appointmentId ? [[{ text: "❌ Цуцлах", callback_data: `cancel:${appointmentId}` }]] : [] },
   });
 }

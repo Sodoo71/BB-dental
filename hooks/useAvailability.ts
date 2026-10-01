@@ -1,55 +1,27 @@
 "use client";
-import { startTransition, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
-export default function useAvailability(
-  doctorId: string,
-  serviceId: string,
-  date: string,
-) {
-  const [slots, setSlots] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
-  const abortRef = useRef<AbortController | null>(null);
+export default function useAvailability(doctorId: string, serviceId: string, date: string, refresh = 0) {
+  const key = JSON.stringify([doctorId, serviceId, date, refresh]);
+  const ready = Boolean(doctorId && serviceId && date);
+  const [response, setResponse] = useState<{ key: string; slots: string[]; error: string | null } | null>(null);
 
   useEffect(() => {
-    startTransition(() => setSlots([]));
     if (!doctorId || !serviceId || !date) return;
+    const controller = new AbortController();
+    void fetch(`/api/availability?${new URLSearchParams({ doctorId, serviceId, date })}`, { signal: controller.signal })
+      .then(async (r) => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || "Боломжит цагийг ачаалж чадсангүй.");
+        const slots = Array.isArray(data.data) ? data.data : Array.isArray(data.slots) ? data.slots : [];
+        if (!controller.signal.aborted) setResponse({ key, slots, error: null });
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setResponse({ key, slots: [], error: error instanceof Error ? error.message : "Боломжит цагийг ачаалж чадсангүй." });
+      });
+    return () => controller.abort();
+  }, [date, doctorId, serviceId, key]);
 
-    let live = true;
-    abortRef.current?.abort();
-    const ac = new AbortController();
-    abortRef.current = ac;
-
-    const timeout = setTimeout(() => {
-      setLoading(true);
-      void fetch(
-        `/api/availability?${new URLSearchParams({ doctorId, serviceId, date })}`,
-        { signal: ac.signal },
-      )
-        .then(async (r) => {
-          const d = await r.json();
-          if (!r.ok) throw new Error(d.error || "Failed to load slots");
-          const payload = Array.isArray(d.data)
-            ? d.data
-            : Array.isArray(d.slots)
-              ? d.slots
-              : [];
-          if (live) startTransition(() => setSlots(payload));
-        })
-        .catch((err) => {
-          if (err.name === "AbortError") return;
-          if (live) startTransition(() => setSlots([]));
-        })
-        .finally(() => {
-          if (live) setLoading(false);
-        });
-    }, 0);
-
-    return () => {
-      live = false;
-      clearTimeout(timeout);
-      ac.abort();
-    };
-  }, [date, doctorId, serviceId]);
-
-  return { slots, loading } as const;
+  const current = ready && response?.key === key ? response : null;
+  return { slots: current?.slots ?? [], loading: ready && !current, error: current?.error ?? null } as const;
 }

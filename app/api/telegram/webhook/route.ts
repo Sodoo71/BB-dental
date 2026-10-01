@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { getTelegramWebhookSecret } from "@/lib/telegram-webhook";
+import { canActOnTelegramAppointment, parseTelegramAction, telegramStatusTransition } from "@/lib/telegram-callback";
+import { clinicDateKey } from "@/lib/doctor-workspace";
 import { prisma } from "@/lib/prisma";
 import {
   answerCallbackQuery,
@@ -8,7 +11,8 @@ import {
 
 export async function POST(request: Request) {
   try {
-    const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
+    if (!request.headers.get("x-telegram-bot-api-secret-token")) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const secret = await getTelegramWebhookSecret();
     if (
       !secret ||
       request.headers.get("x-telegram-bot-api-secret-token") !== secret
@@ -29,65 +33,39 @@ export async function POST(request: Request) {
       const messageId = cb.message?.message_id;
       const originalText = cb.message?.text || "";
 
-      if (data.startsWith("confirm:") || data.startsWith("cancel:")) {
-        const isConfirm = data.startsWith("confirm:");
-        const appointmentId = data.split(":")[1];
-
-        const appointment = await prisma.appointment.findUnique({
-          where: { id: appointmentId },
-          include: {
-            doctor: true,
-            service: true,
-          },
-        });
-
-        if (!appointment) {
-          await answerCallbackQuery(callbackId, "Захиалга олдсонгүй.");
-          return NextResponse.json({ ok: true });
-        }
-
-        const linkedUser = await prisma.user.findFirst({
-          where: {
-            doctorId: appointment.doctorId,
-            isActive: true,
-            status: "ACTIVE",
-            role: { in: ["DOCTOR", "ADMIN", "SUPER_ADMIN"] },
-          },
-        });
-        if (
-          !appointment.doctorId ||
-          !linkedUser ||
-          String(cb.from?.id) !== appointment.doctor?.telegramChatId ||
-          String(fromChatId) !== appointment.doctor?.telegramChatId
-        ) {
-          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        }
-        const newStatus = isConfirm ? "CONFIRMED" : "CANCELLED";
-        const changed = await prisma.appointment.updateMany({
-          where: {
-            id: appointmentId,
-            status: { in: ["PENDING", "CONFIRMED"] },
-          },
-          data: { status: newStatus },
-        });
-        if (!changed.count) return NextResponse.json({ ok: true });
-
-        const statusBadge = isConfirm
-          ? "✅ *ЭМЧЭЭС БАТАЛГААЖСАН*"
-          : "❌ *ЦУЦЛАГДСАН*";
-
-        await answerCallbackQuery(
-          callbackId,
-          isConfirm ? "Цаг амжилттай баталгаажлаа!" : "Цаг цуцлагдлаа.",
-        );
-
-        if (fromChatId && messageId) {
-          const updatedMessage = `${originalText}\n\n━━━━━━━━━━━━━━━\n${statusBadge}\n_Төлөв: ${new Date().toLocaleTimeString("mn-MN")}_`;
-          await editMessageText(fromChatId, messageId, updatedMessage);
-        }
-
+      const action = parseTelegramAction(data);
+      if (!action || typeof callbackId !== "string" || !messageId) {
+        if (typeof callbackId === "string") await answerCallbackQuery(callbackId, "Энэ товч хүчингүй байна.");
         return NextResponse.json({ ok: true });
       }
+      const outcome = await prisma.$transaction(async (tx) => {
+        const appointment = await tx.appointment.findUnique({ where: { id: action.appointmentId }, include: { doctor: { include: { user: true } } } });
+        if (!appointment) return { message: "Захиалга олдсонгүй.", status: null };
+        const account = appointment.doctor?.user;
+        if (!canActOnTelegramAppointment({
+          senderId: cb.from?.id, chatId: fromChatId, chatType: cb.message?.chat?.type,
+          telegramChatId: appointment.doctor?.telegramChatId,
+          doctorActive: appointment.doctor?.isActive === true,
+          accountActive: Boolean(account?.isActive && account.status === "ACTIVE" && ["DOCTOR", "ADMIN", "SUPER_ADMIN"].includes(account.role)),
+        })) return { message: "Зөвхөн энэ захиалгын эмч өөрийн холбосон Telegram-аас өөрчлөх боломжтой.", status: null };
+        if (!telegramStatusTransition(appointment.status, action.status)) {
+          return { message: "Захиалга аль хэдийн шинэчлэгдсэн байна.", status: appointment.status };
+        }
+        const changed = await tx.appointment.updateMany({
+          where: { id: appointment.id, doctorId: appointment.doctorId, status: appointment.status },
+          data: { status: action.status },
+        });
+        if (!changed.count) return { message: "Захиалга өөрчлөгдсөн байна. Дахин шалгана уу.", status: null };
+        await tx.auditLog.create({ data: { actorId: account!.id, action: "APPOINTMENT_UPDATED", entity: "Appointment", entityId: appointment.id, metadata: { previousStatus: appointment.status, status: action.status, source: "TELEGRAM" } } });
+        return { message: action.status === "CONFIRMED" ? "Цаг амжилттай баталгаажлаа!" : "Цаг цуцлагдлаа.", status: action.status };
+      });
+      await answerCallbackQuery(callbackId, outcome.message);
+      if (outcome.status) {
+        const labels: Record<string, string> = { CONFIRMED: "✅ БАТАЛГААЖСАН", CANCELLED: "❌ ЦУЦЛАГДСАН", COMPLETED: "✅ ҮЗЛЭГ ДУУССАН", NO_SHOW: "ИРЭЭГҮЙ", PENDING: "ХҮЛЭЭГДЭЖ БУЙ" };
+        const baseText = originalText.split("\n\n━━━━━━━━━━━━━━━")[0].slice(0, 3900);
+        await editMessageText(fromChatId, messageId, `${baseText}\n\n━━━━━━━━━━━━━━━\n${labels[outcome.status]}`, outcome.status === "CONFIRMED" ? action.appointmentId : undefined);
+      }
+      return NextResponse.json({ ok: true });
     }
 
     // 2. HANDLE TELEGRAM MESSAGES (/start, /today, /schedule)
@@ -98,17 +76,11 @@ export async function POST(request: Request) {
       if (msg.chat.type !== "private" || String(msg.from?.id) !== chatId)
         return NextResponse.json({ ok: true });
 
-      // Account binding must be performed by an authenticated ERP administrator.
-      if (text.startsWith("/start doc_")) {
-        return NextResponse.json({ ok: true });
-      }
-
-      // /start with no arguments
-      if (text === "/start") {
+      // /start only explains the authenticated profile flow; it never binds an account.
+      if (text === "/start" || text.startsWith("/start ")) {
         await sendTelegramRaw("sendMessage", {
           chat_id: chatId,
-          text: `🦷 *BB Dental Clinic Bot*\n\nТаны Telegram Chat ID: \`${chatId}\`\n\nЭмч та өөрийн эмчийн профайл дахь "Telegram холбох" линкээр орон бүртгэлээ автоматаар баталгаажуулна уу.`,
-          parse_mode: "Markdown",
+          text: `🦷 BB Dental Clinic Bot\n\nТаны Telegram Chat ID: ${chatId}\n\nЭнэ тоон ID-г сайтын Миний профайл → Telegram Chat ID талбарт оруулаад хадгалаарай. Дараа нь Туршилтын мэдэгдэл илгээх товчоор шалгана уу.`,
         });
         return NextResponse.json({ ok: true });
       }
@@ -137,10 +109,8 @@ export async function POST(request: Request) {
           return NextResponse.json({ ok: true });
         }
 
-        const now = new Date();
-        const todayStart = new Date(
-          Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-        );
+        const today = clinicDateKey();
+        const todayStart = new Date(`${today}T00:00:00.000Z`);
         const todayEnd = new Date(todayStart);
         todayEnd.setUTCDate(todayEnd.getUTCDate() + 1);
 
@@ -156,9 +126,8 @@ export async function POST(request: Request) {
         if (apps.length === 0) {
           await sendTelegramRaw("sendMessage", {
             chat_id: chatId,
-            text: `📅 *Өнөөдөр (${now.toISOString().slice(0, 10)})*: Танд товлогдсон цагийн захиалга байхгүй байна.`,
-            parse_mode: "Markdown",
-          });
+            text: `📅 *Өнөөдөр (${today})*: Танд товлогдсон цагийн захиалга байхгүй байна.`,
+            });
           return NextResponse.json({ ok: true });
         }
 
@@ -172,7 +141,6 @@ export async function POST(request: Request) {
         await sendTelegramRaw("sendMessage", {
           chat_id: chatId,
           text: `📅 *Өнөөдрийн үзлэгийн цагууд (${doctor.name})*:\n\n${list}`,
-          parse_mode: "Markdown",
         });
         return NextResponse.json({ ok: true });
       }
@@ -221,7 +189,6 @@ export async function POST(request: Request) {
         await sendTelegramRaw("sendMessage", {
           chat_id: chatId,
           text: `🗓 *Таны долоо хоногийн цагийн хуваарь*:\n\n${lines.join("\n")}`,
-          parse_mode: "Markdown",
         });
         return NextResponse.json({ ok: true });
       }
@@ -229,7 +196,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("Telegram webhook handler error:", error);
-    return NextResponse.json({ ok: true });
+    console.error("Telegram webhook handler error:", error instanceof Error ? error.name : "UnknownError");
+    return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 });
   }
 }

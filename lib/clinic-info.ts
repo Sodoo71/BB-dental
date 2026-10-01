@@ -1,6 +1,6 @@
 export const defaultClinicInfo = {
   clinicName: "BB Dental Clinic",
-  logoUrl: "",
+  logoUrl: "/images/bb-dental-logo.jpg",
   phone: "+976 9596-3531",
   email: "sodoosodbileg71@gmail.com",
   address: "БГД, 12-р хороо, 3, 4-р хороолол, Бичлийн аркны автобусны буудал дээр, Азифармтай эмийн сангийн 3 давхарт, BB Dental Clinic",

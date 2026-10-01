@@ -26,7 +26,7 @@ export function SuperAdminSidebar({ user, collapsed, mobileOpen, onCloseMobile }
       </div>)}
     </nav>
     <div className="space-y-4 border-t border-white/10 p-4">
-      {!compact && <div className="flex items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/20 text-sm text-gold">{(user.name || "BB").slice(0, 2)}</span><div className="min-w-0"><p className="truncate text-sm font-medium">{user.name}</p><p className="text-xs text-brand-200">{getRoleLabel(user.role)}</p></div></div>}
+      {!compact && <div className="flex items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/20 text-sm text-accent">{(user.name || "BB").slice(0, 2)}</span><div className="min-w-0"><p className="truncate text-sm font-medium">{user.name}</p><p className="text-xs text-brand-200">{getRoleLabel(user.role)}</p></div></div>}
       <LogoutButton label={compact ? "Гарах" : "Системээс гарах"} />
     </div>
   </aside>;

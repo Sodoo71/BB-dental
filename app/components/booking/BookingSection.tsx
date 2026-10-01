@@ -1,682 +1,156 @@
 "use client";
-import { DialogFrame } from "@/components/ui/DialogFrame";
-import React, { useEffect, useMemo, useState } from "react";
-import Select from "@/app/components/ui/Select";
-import Info from "../ui/Info";
+
+import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref, type FormEvent } from "react";
+import { ArrowRight, Check, CheckCircle2, ChevronLeft, ChevronRight, Loader2, Search } from "lucide-react";
 import Field from "../ui/Field";
-import {
-  UserRound,
-  Stethoscope,
-  CalendarDays,
-  Clock3,
-  Loader2,
-  ChevronLeft,
-  ChevronRight,
-  Sparkles,
-  Zap,
-} from "lucide-react";
-import useDoctors from "../../../hooks/useDoctors";
-import useServices from "../../../hooks/useServices";
-import useAvailability from "../../../hooks/useAvailability";
-import useBooking from "../../../hooks/useBooking";
-import { iso, getCalendarCells, isPastDate } from "../../../lib/date";
-import type { Doctor, Service } from "../../../types/booking";
+import useDoctors from "@/hooks/useDoctors";
+import useServices from "@/hooks/useServices";
+import useAvailability from "@/hooks/useAvailability";
+import useBooking from "@/hooks/useBooking";
+import { iso, getCalendarCells, isPastDate } from "@/lib/date";
 
-type SuggestionItem = {
-  date: string;
-  formattedDate: string;
-  dayOfWeek: string;
-  slot: string;
-  doctorId: string;
-  doctorName: string;
-  serviceId: string;
-  serviceName: string;
-};
+export type BookingHandle = { select: (selection: { serviceId?: string; doctorId?: string }) => void };
+type Suggestion = { date: string; formattedDate: string; slot: string; doctorId: string; doctorName: string; serviceId: string };
+const categories: Record<string, string> = { GENERAL: "Ерөнхий үзлэг", PREVENTION: "Урьдчилан сэргийлэлт", TREATMENT: "Эмчилгээ", COSMETIC: "Гоо сайхан", SURGERY: "Мэс ажилбар" };
+const money = (price: string | number | null) => price === null ? "Үнэ тодорхойгүй" : `${Number(price).toLocaleString()}₮`;
+const pageSize = 6;
 
-const categoryLabels: Record<string, string> = {
-  GENERAL: "Ерөнхий үзлэг",
-  PREVENTION: "Урьдчилан сэргийлэлт",
-  TREATMENT: "Эмчилгээ",
-  COSMETIC: "Гоо сайхан",
-  SURGERY: "Мэс ажилбар",
-};
-
-export default function BookingSection() {
+export default function BookingSection({ ref }: { ref?: Ref<BookingHandle> }) {
   const today = useMemo(() => new Date(), []);
-  const { doctors, loading } = useDoctors();
-  const { services } = useServices();
-  const {
-    open,
-    setOpen,
-    sending,
-    setSending,
-    result,
-    setResult,
-    form,
-    setForm,
-    notify,
-  } = useBooking();
-
-  const [doctorId, setDoctorId] = useState("");
+  const { doctors, loading: doctorsLoading } = useDoctors();
+  const { services, loading: servicesLoading } = useServices();
+  const { sending, setSending, form, setForm, resetForm } = useBooking();
   const [serviceId, setServiceId] = useState("");
-  const [step, setStep] = useState(1);
-  const [category, setCategory] = useState("ALL");
+  const [doctorId, setDoctorId] = useState("");
   const [date, setDate] = useState("");
-  const [month, setMonth] = useState(
-    new Date(today.getFullYear(), today.getMonth(), 1),
-  );
+  const [month, setMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
+  const [step, setStep] = useState(1);
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("");
+  const [page, setPage] = useState(0);
+  const [refresh, setRefresh] = useState(0);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+  const submitting = useRef(false);
+  const panel = useRef<HTMLDivElement>(null);
+  const { slots, loading: slotsLoading, error: slotsError } = useAvailability(doctorId, serviceId, date, refresh);
+  const [suggestionResponse, setSuggestionResponse] = useState<{ key: string; items: Suggestion[] } | null>(null);
+  const suggestionKey = JSON.stringify([serviceId, doctorId, refresh]);
+  const suggestions = suggestionResponse?.key === suggestionKey ? suggestionResponse.items : [];
+  const service = services.find((item) => item.id === serviceId);
+  const doctor = doctors.find((item) => item.id === doctorId);
+  const filtered = services.filter((item) => (!category || (item.category || "GENERAL") === category) && item.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
+  const pageCount = Math.ceil(filtered.length / pageSize);
+  const validTime = Boolean(service && doctor && date && form.startTime && !slotsLoading && slots.includes(form.startTime));
 
-  const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
-  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  function focusPanel() {
+    requestAnimationFrame(() => {
+      panel.current?.focus({ preventScroll: true });
+      panel.current?.scrollIntoView({ behavior: "instant", block: "start" });
+    });
+  }
+  function changeStep(next: number) { setStep(next); setError(""); focusPanel(); }
+  function clearTime() { setForm((previous) => ({ ...previous, startTime: "" })); setError(""); }
 
-  const { slots, loading: slotLoading } = useAvailability(
-    doctorId,
-    serviceId,
-    date,
-  );
+  useImperativeHandle(ref, () => ({
+    select(selection) {
+      if (submitting.current) return;
+      if (selection.serviceId !== undefined) setServiceId(selection.serviceId);
+      if (selection.doctorId !== undefined) setDoctorId(selection.doctorId);
+      clearTime();
+      setDate("");
+      setSuccess(false);
+      setQuery(""); setCategory(""); setPage(0);
+      changeStep(selection.serviceId || serviceId ? 2 : 1);
+    },
+  }));
 
-  const doctor = doctors.find((x: Doctor) => x.id === doctorId);
-  const service = services.find((x: Service) => x.id === serviceId);
-  const categories = [
-    "ALL",
-    ...Array.from(new Set(services.map((item) => item.category || "GENERAL"))),
-  ];
-  const visibleServices = services.filter(
-    (item) => category === "ALL" || (item.category || "GENERAL") === category,
-  );
-
-  // Fetch smart suggestions when doctor or service changes
   useEffect(() => {
-    let active = true;
-    const fetchSuggestions = async () => {
-      setLoadingSuggestions(true);
-      try {
-        const query = new URLSearchParams();
-        if (doctorId) query.set("doctorId", doctorId);
-        if (serviceId) query.set("serviceId", serviceId);
+    if (!serviceId) return;
+    const controller = new AbortController();
+    const params = new URLSearchParams({ serviceId });
+    if (doctorId) params.set("doctorId", doctorId);
+    void fetch(`/api/availability/suggest?${params}`, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error();
+        const data = await response.json();
+        if (!controller.signal.aborted) setSuggestionResponse({ key: suggestionKey, items: Array.isArray(data.data) ? data.data : [] });
+      })
+      .catch(() => { if (!controller.signal.aborted) setSuggestionResponse({ key: suggestionKey, items: [] }); });
+    return () => controller.abort();
+  }, [serviceId, doctorId, suggestionKey]);
 
-        const res = await fetch(
-          `/api/availability/suggest?${query.toString()}`,
-        );
-        const data = await res.json();
-        if (active && res.ok && Array.isArray(data.data)) {
-          setSuggestions(data.data);
-        }
-      } catch {
-        if (active) setSuggestions([]);
-      } finally {
-        if (active) setLoadingSuggestions(false);
-      }
-    };
+  function selectSuggestion(item: Suggestion) {
+    setDoctorId(item.doctorId); setDate(item.date);
+    const target = new Date(`${item.date}T00:00:00`);
+    setMonth(new Date(target.getFullYear(), target.getMonth(), 1));
+    setForm((previous) => ({ ...previous, startTime: item.slot }));
+    setError("");
+  }
 
-    void fetchSuggestions();
-    return () => {
-      active = false;
-    };
-  }, [doctorId, serviceId]);
-
-  const handleSelectSuggestion = (s: SuggestionItem) => {
-    if (s.doctorId && s.doctorId !== doctorId) {
-      setDoctorId(s.doctorId);
-    }
-    if (s.serviceId && s.serviceId !== serviceId) {
-      setServiceId(s.serviceId);
-    }
-
-    setDate(s.date);
-    const targetDate = new Date(`${s.date}T00:00:00`);
-    setMonth(new Date(targetDate.getFullYear(), targetDate.getMonth(), 1));
-    setForm((prev) => ({ ...prev, startTime: s.slot }));
-    notify(
-      true,
-      `${s.formattedDate} өдрийн ${s.slot} цаг автоматаар сонгогдлоо.`,
-    );
-  };
-
-  const cells = getCalendarCells(month);
-  const slotGroups = useMemo(() => {
-    const groups = [
-      { label: "Өглөө (Morning)", slots: [] as string[] },
-      { label: "Өдөр (Afternoon)", slots: [] as string[] },
-      { label: "Орой (Evening)", slots: [] as string[] },
-    ];
-
-    for (const slot of slots) {
-      const hour = Number(slot.split(":")[0]);
-      if (hour < 12) groups[0].slots.push(slot);
-      else if (hour < 17) groups[1].slots.push(slot);
-      else groups[2].slots.push(slot);
-    }
-
-    return groups.filter((group) => group.slots.length > 0);
-  }, [slots]);
-
-  const goNext = () => {
-    if (step === 1 && !serviceId) {
-      notify(false, "Үйлчилгээ сонгоно уу.");
-      return;
-    }
-    if (step === 2 && (!doctorId || !date)) {
-      notify(false, "Эмч болон өдрөө сонгоно уу.");
-      return;
-    }
-    if (step === 3 && !form.startTime) {
-      notify(false, "Боломжит цагаас сонгоно уу.");
-      return;
-    }
-    setStep((current) => Math.min(4, current + 1));
-  };
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSending(true);
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (submitting.current) return;
+    if (!validTime) { setError("Боломжит цагаа дахин сонгоно уу."); setStep(2); focusPanel(); return; }
+    submitting.current = true; setSending(true); setError("");
     try {
-      const r = await fetch("/api/appointments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          doctorId,
-          serviceId,
-          appointmentDate: date,
-        }),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || "Server error");
-      setOpen(false);
-      setResult({
-        success: true,
-        message: d.notificationSent
-          ? "Захиалга бүртгэгдэж, эмчид Telegram мэдэгдэл илгээгдлээ."
-          : "Захиалга амжилттай бүртгэгдлээ.",
-      });
-      notify(true, "Цаг амжилттай захиалагдлаа.");
-      setForm({ ...form, startTime: "" });
-    } catch (e) {
-      const message =
-        e instanceof Error ? e.message : "Сервертэй холбогдож чадсангүй.";
-      setResult({ success: false, message });
-      notify(false, message);
-    } finally {
-      setSending(false);
-    }
-  };
+      const response = await fetch("/api/appointments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, fullName: form.fullName.trim(), phone: form.phone.trim(), doctorId, serviceId, appointmentDate: date }) });
+      const data = await response.json();
+      if (!response.ok) {
+        if (response.status === 409) { clearTime(); setRefresh((value) => value + 1); setStep(2); }
+        throw new Error(data.error || "Захиалгыг бүртгэж чадсангүй.");
+      }
+      setSuccess(true); resetForm(); setRefresh((value) => value + 1); focusPanel();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Сервертэй холбогдож чадсангүй. Дахин оролдоно уу."); }
+    finally { submitting.current = false; setSending(false); }
+  }
 
   return (
-    <section id="booking" className="bg-slate-100/70 py-20">
-      <div className="mx-auto max-w-6xl px-4">
-        <div className="mb-10 text-center">
-          <p className="text-xs font-semibold tracking-widest text-brand-600">
-            ОНЛАЙН ЦАГ БҮРТГЭЛ
-          </p>
-          <h2 className="mt-2 text-3xl font-semibold sm:text-4xl">
-            Захиалга хийх
-          </h2>
-          <p className="mt-2 text-slate-600">
-            Эмч болон боломжит цагаа сонгоод захиалгаа баталгаажуулна уу.
-          </p>
+    <section id="booking" className="border-y border-brand-100 bg-brand-50/60 py-12 sm:py-20">
+      <div className="mx-auto max-w-3xl px-3 sm:px-6">
+        <div className="mb-6 text-center">
+          <p className="eyebrow">ОНЛАЙН ЦАГ ЗАХИАЛГА</p>
+          <h2 className="mt-2 text-2xl font-semibold text-brand-900 sm:text-4xl">Үзлэгийн цагаа захиалаарай</h2>
+          <p className="mt-3 text-sm text-slate-600">Үйлчилгээгээ сонгоод, өөрт тохирох цагаа баталгаажуулаарай.</p>
         </div>
-
-        <div className="mx-auto mb-8 grid max-w-3xl grid-cols-4 gap-2">
-          {["Үйлчилгээ", "Эмч ба өдөр", "Цаг", "Баталгаажуулах"].map(
-            (label, index) => (
-              <div key={label} className="flex items-center gap-2">
-                <div
-                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
-                    step >= index + 1
-                      ? "bg-brand-600 text-white"
-                      : "bg-white text-slate-400 ring-1 ring-slate-200"
-                  }`}
-                >
-                  {index + 1}
-                </div>
-                <span className="hidden text-xs font-bold text-slate-500 sm:block">
-                  {label}
-                </span>
-              </div>
-            ),
-          )}
-        </div>
-
-        <div className="overflow-hidden rounded-2xl bg-white shadow-lg shadow-slate-200">
-          <div className="grid lg:grid-cols-[1.2fr_.8fr]">
-            <div className="space-y-7 p-6 sm:p-10">
-              {step === 1 && (
-                <div className="space-y-5">
-                  <div className="flex flex-wrap gap-2">
-                    {categories.map((item) => (
-                      <button
-                        key={item}
-                        type="button"
-                        onClick={() => setCategory(item)}
-                        className={`rounded-full border px-3 py-1.5 text-xs font-bold ${
-                          category === item
-                            ? "border-brand-600 bg-brand-600 text-white"
-                            : "border-slate-200 text-slate-600 hover:border-brand-300"
-                        }`}
-                      >
-                        {item === "ALL" ? "Бүгд" : categoryLabels[item] || item}
-                      </button>
-                    ))}
+        <div ref={panel} tabIndex={-1} aria-label="Цаг захиалгын алхмууд" className="scroll-mt-28 overflow-hidden rounded-2xl border border-brand-100 bg-white shadow-sm focus:outline-none">
+          {success ? <div className="p-8 text-center" role="status"><CheckCircle2 className="mx-auto mb-4 h-12 w-12 text-brand-600" /><h3 className="text-xl font-semibold">Цаг амжилттай захиалагдлаа</h3><p className="mt-3 text-slate-600">Таны захиалгыг бүртгэж авлаа.</p><button type="button" className="button-primary mt-6" onClick={() => { setSuccess(false); setDate(""); changeStep(1); }}>Дахин цаг захиалах</button></div> : <>
+            <ol className="grid grid-cols-3 border-b border-brand-100 bg-brand-50/50 p-3 sm:p-5">
+              {["Үйлчилгээ", "Өдөр, цаг", "Баталгаажуулах"].map((label, index) => <li key={label} aria-current={step === index + 1 ? "step" : undefined} className="flex flex-col items-center gap-2 text-center text-[10px] sm:text-xs"><span className={`flex h-8 w-8 items-center justify-center rounded-full font-semibold ${step >= index + 1 ? "bg-brand-600 text-white" : "bg-white text-slate-400 ring-1 ring-slate-200"}`}>{step > index + 1 ? <Check size={16} /> : index + 1}</span><span className={step === index + 1 ? "font-semibold text-brand-800" : "text-slate-500"}>{label}</span></li>)}
+            </ol>
+            {(service || doctor) && <div className="flex items-start justify-between gap-3 border-b border-brand-100 px-4 py-3 text-xs sm:px-6"><div className="min-w-0"><p className="font-semibold text-brand-900">{service?.name || "Үйлчилгээгээ сонгоно уу"}</p><p className="mt-1 text-slate-600">{doctor?.name && `${doctor.name} · `}{service && `${service.durationMin} мин · ${money(service.price)}`}</p>{date && <p className="mt-1 text-brand-700">{date} {form.startTime && `· ${form.startTime}`}</p>}</div>{step > 1 && <button type="button" disabled={sending} onClick={() => changeStep(1)} className="min-h-11 shrink-0 text-brand-700 underline underline-offset-4">Солих</button>}</div>}
+            <div className="p-4 sm:p-6">
+              {step === 1 && <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Үйлчилгээ сонгох</h3>
+                <label className="flex items-center gap-2 rounded-xl border border-slate-200 px-3"><Search size={18} className="shrink-0 text-brand-600" /><input aria-label="Захиалах үйлчилгээ хайх" type="search" placeholder="Үйлчилгээний нэрээр хайх…" value={query} onChange={(event) => { setQuery(event.target.value); setPage(0); }} className="w-full bg-transparent py-3 outline-none" /></label>
+                <label className="flex items-center gap-3 text-xs text-slate-600">Ангилал<select aria-label="Захиалгын үйлчилгээний ангилал" className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3" value={category} onChange={(event) => { setCategory(event.target.value); setPage(0); }}><option value="">Бүх үйлчилгээ</option>{Array.from(new Set(services.map((item) => item.category || "GENERAL"))).map((item) => <option key={item} value={item}>{categories[item] || item}</option>)}</select></label>
+                {servicesLoading ? <p role="status" className="py-8 text-center text-slate-500">Үйлчилгээг ачаалж байна…</p> : !services.length ? <p role="status">Үйлчилгээний мэдээлэл олдсонгүй. Хуудсаа дахин ачаална уу.</p> : !filtered.length ? <p role="status" className="py-6 text-center text-slate-500">Хайлтад тохирох үйлчилгээ олдсонгүй.</p> : <>
+                  <div className="grid gap-2 sm:grid-cols-2">{filtered.slice(page * pageSize, (page + 1) * pageSize).map((item) => <button key={item.id} type="button" aria-pressed={serviceId === item.id} onClick={() => { if (serviceId !== item.id) { setServiceId(item.id); clearTime(); } changeStep(2); }} className={`flex min-h-16 items-center justify-between gap-3 rounded-xl border p-3 text-left ${serviceId === item.id ? "border-brand-600 bg-brand-50" : "border-slate-200 hover:border-brand-400 hover:bg-brand-50/50"}`}><span><span className="block text-sm font-medium">{item.name}</span><span className="mt-1 block text-xs text-slate-500">{item.durationMin} мин · {money(item.price)}</span></span><ArrowRight size={16} className="shrink-0 text-brand-600" /></button>)}</div>
+                  <div className="flex items-center justify-between gap-2 text-xs text-slate-500"><span>{filtered.length} үйлчилгээ · {page + 1}/{pageCount}</span><div className="flex gap-2"><button type="button" aria-label="Өмнөх үйлчилгээнүүд" disabled={page === 0} onClick={() => setPage((value) => value - 1)} className="button-secondary disabled:opacity-40"><ChevronLeft size={16} /></button><button type="button" aria-label="Дараах үйлчилгээнүүд" disabled={page + 1 >= pageCount} onClick={() => setPage((value) => value + 1)} className="button-secondary disabled:opacity-40"><ChevronRight size={16} /></button></div></div>
+                </>}
+              </div>}
+              {step === 2 && <div className="space-y-5">
+                <Field label="Эмч сонгох"><select disabled={doctorsLoading} value={doctorId} onChange={(event) => { setDoctorId(event.target.value); clearTime(); }}><option value="">{doctorsLoading ? "Эмч нарыг ачаалж байна…" : "Эмчээ сонгоно уу"}</option>{doctors.map((item) => <option key={item.id} value={item.id}>{item.name}{item.title ? ` · ${item.title}` : ""}</option>)}</select></Field>
+                {!doctorsLoading && !doctors.length && <p role="status" className="text-sm text-red-600">Эмчийн мэдээлэл олдсонгүй. Хуудсаа дахин ачаална уу.</p>}
+                {suggestions.length > 0 && <div className="rounded-xl bg-brand-50 p-3"><p className="mb-2 text-xs font-semibold text-brand-800">Ойрын боломжит цаг — нэг дараад сонгох</p><div className="grid grid-cols-2 gap-2">{suggestions.slice(0, 2).map((item) => <button key={`${item.doctorId}-${item.date}-${item.slot}`} type="button" onClick={() => selectSuggestion(item)} className="min-h-14 rounded-lg border border-brand-200 bg-white p-2 text-left text-xs text-brand-800 hover:border-brand-600"><span className="block font-semibold">{item.formattedDate} · {item.slot}</span><span className="mt-1 block">{item.doctorName}</span></button>)}</div></div>}
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <div className="rounded-xl border border-slate-200 p-2 sm:p-3">
+                    <div className="mb-2 flex items-center justify-between"><button type="button" aria-label="Өмнөх сар" disabled={month <= new Date(today.getFullYear(), today.getMonth(), 1)} onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))} className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-brand-50 disabled:opacity-30"><ChevronLeft size={18} /></button><span className="text-sm font-semibold">{month.getFullYear()} · {month.getMonth() + 1}-р сар</span><button type="button" aria-label="Дараах сар" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))} className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-brand-50"><ChevronRight size={18} /></button></div>
+                    <div className="grid grid-cols-7 gap-y-1 text-center text-xs">{["Ня", "Да", "Мя", "Лх", "Пү", "Ба", "Бя"].map((day) => <span key={day} className="py-2 text-slate-400">{day}</span>)}{getCalendarCells(month).map((day, index) => day ? <button key={iso(day)} type="button" aria-label={iso(day)} aria-pressed={date === iso(day)} disabled={isPastDate(day, today)} onClick={() => { setDate(iso(day)); clearTime(); }} className={`h-10 w-full rounded-lg font-medium disabled:text-slate-300 ${date === iso(day) ? "bg-brand-600 text-white" : "hover:bg-brand-50"}`}>{day.getDate()}</button> : <span key={`empty-${index}`} />)}</div>
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {visibleServices.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => setServiceId(item.id)}
-                        className={`rounded-2xl border p-4 text-left transition ${
-                          serviceId === item.id
-                            ? "border-brand-600 bg-brand-50 ring-2 ring-brand-100"
-                            : "border-slate-200 bg-white hover:border-brand-300"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <Stethoscope className="h-5 w-5 text-brand-600" />
-                          <span className="text-xs font-bold text-slate-400">
-                            {item.durationMin} мин
-                          </span>
-                        </div>
-                        <p className="mt-4 font-semibold text-slate-900">
-                          {item.name}
-                        </p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          {item.price
-                            ? `${Number(item.price).toLocaleString()}₮`
-                            : "Үнэ тодорхойгүй"}
-                        </p>
-                      </button>
-                    ))}
-                  </div>
+                  <div><h3 className="mb-3 text-sm font-semibold">Боломжит цагууд</h3>{!doctorId || !date ? <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">Эмч, өдрөө сонгоход сул цагууд энд харагдана.</p> : slotsLoading ? <p role="status" className="flex items-center gap-2 text-sm text-brand-700"><Loader2 size={18} className="animate-spin" />Цагуудыг шалгаж байна…</p> : slotsError ? <div role="alert"><p className="text-sm text-red-600">{slotsError}</p><button type="button" className="button-secondary mt-3" onClick={() => setRefresh((value) => value + 1)}>Дахин оролдох</button></div> : !slots.length ? <p role="status" className="rounded-xl bg-brand-50 p-4 text-sm text-slate-600">Энэ өдөр сул цаг алга. Өөр өдөр эсвэл эмч сонгоно уу.</p> : <div aria-label="Боломжит цагууд" className="grid max-h-64 grid-cols-3 gap-2 overflow-y-auto p-1">{slots.map((slot) => <button key={slot} type="button" aria-pressed={form.startTime === slot} onClick={() => setForm((previous) => ({ ...previous, startTime: slot }))} className={`min-h-11 rounded-lg border text-sm font-semibold ${form.startTime === slot ? "border-brand-600 bg-brand-600 text-white" : "border-slate-200 hover:bg-brand-50"}`}>{slot}</button>)}</div>}{form.startTime && !slotsLoading && !slotsError && !validTime && <p role="status" className="mt-3 text-sm text-red-600">Энэ цаг боломжгүй болсон байна. Өөр цаг сонгоно уу.</p>}</div>
                 </div>
-              )}
-
-              {step === 2 && (
-                <div className="space-y-7">
-                  <Select
-                    icon={<UserRound />}
-                    label="Эмч сонгох"
-                    value={doctorId}
-                    change={setDoctorId}
-                    options={doctors.map((x: Doctor) => [
-                      x.id,
-                      `${x.name}${x.title ? ` · ${x.title}` : ""}`,
-                    ])}
-                    loading={loading}
-                  />
-
-                  {/* SMART SUGGESTION BOX */}
-                  <div className="rounded-2xl border border-brand-100 bg-gradient-to-r from-brand-50/90 to-brand-50/70 p-4.5">
-                    <div className="mb-2.5 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="h-4 w-4 text-brand-600 animate-pulse" />
-                        <span className="text-xs font-semibold uppercase tracking-wider text-brand-900">
-                          Танд санал болгох боломжит цагууд
-                        </span>
-                      </div>
-                      {loadingSuggestions && (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin text-brand-600" />
-                      )}
-                    </div>
-
-                    {suggestions.length > 0 ? (
-                      <div className="space-y-2">
-                        <p className="text-xs text-slate-600">
-                          {doctor
-                            ? `${doctor.name} эмчийн хамгийн ойрын боломжит цагууд:`
-                            : "Хамгийн ойрын боломжит цагууд:"}
-                        </p>
-                        <div className="flex flex-wrap gap-2 pt-1">
-                          {suggestions.slice(0, 4).map((s) => (
-                            <button
-                              key={`${s.date}-${s.slot}-${s.doctorId}`}
-                              type="button"
-                              onClick={() => handleSelectSuggestion(s)}
-                              className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition shadow-sm ${
-                                date === s.date && form.startTime === s.slot
-                                  ? "border-brand-600 bg-brand-600 text-white"
-                                  : "border-brand-200 bg-white text-brand-950 hover:border-brand-400 hover:bg-brand-50"
-                              }`}
-                            >
-                              <Zap className="h-3 w-3 text-amber-500" />
-                              <span>
-                                {s.formattedDate} · {s.slot}
-                              </span>
-                              {!doctorId && (
-                                <span className="text-[10px] text-brand-700 opacity-80">
-                                  ({s.doctorName})
-                                </span>
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-xs text-slate-500">
-                        Эмч болон үйлчилгээ сонгоход ойрын боломжит цагуудыг
-                        автоматаар санал болгоно.
-                      </p>
-                    )}
-                  </div>
-
-                  {/* CALENDAR */}
-                  <div className="rounded-2xl border border-slate-200 p-5">
-                    <div className="mb-4 flex items-center justify-between">
-                      <button
-                        onClick={() =>
-                          setMonth(
-                            new Date(
-                              month.getFullYear(),
-                              month.getMonth() - 1,
-                              1,
-                            ),
-                          )
-                        }
-                        className="rounded-lg p-1 hover:bg-slate-100"
-                      >
-                        <ChevronLeft />
-                      </button>
-                      <b className="text-base font-semibold">
-                        {month.getFullYear()} · {month.getMonth() + 1}-р сар
-                      </b>
-                      <button
-                        onClick={() =>
-                          setMonth(
-                            new Date(
-                              month.getFullYear(),
-                              month.getMonth() + 1,
-                              1,
-                            ),
-                          )
-                        }
-                        className="rounded-lg p-1 hover:bg-slate-100"
-                      >
-                        <ChevronRight />
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-7 gap-1 text-center text-xs">
-                      {["Ня", "Да", "Мя", "Лх", "Пү", "Ба", "Бя"].map((x) => (
-                        <b className="p-2 text-slate-400" key={x}>
-                          {x}
-                        </b>
-                      ))}
-                      {cells.map((d: Date | null, i: number) =>
-                        !d ? (
-                          <span key={i} />
-                        ) : (
-                          <button
-                            key={iso(d)}
-                            disabled={isPastDate(d, today)}
-                            onClick={() => setDate(iso(d))}
-                            className={`mx-auto h-9 w-9 rounded-full font-bold transition ${
-                              date === iso(d)
-                                ? "bg-brand-600 text-white shadow-md shadow-brand-600/30"
-                                : isPastDate(d, today)
-                                  ? "text-slate-300"
-                                  : "hover:bg-brand-50 text-slate-700"
-                            }`}
-                          >
-                            {d.getDate()}
-                          </button>
-                        ),
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* SLOTS LIST */}
-              {step === 3 && (
-                <div>
-                  <h3 className="mb-3 font-semibold text-slate-800">
-                    Боломжит цагууд
-                  </h3>
-                  {slotLoading ? (
-                    <div className="flex items-center justify-center p-8">
-                      <Loader2 className="h-6 w-6 animate-spin text-brand-600" />
-                    </div>
-                  ) : slots.length ? (
-                    <div className="space-y-5">
-                      {slotGroups.map((group) => (
-                        <div key={group.label}>
-                          <p className="mb-2 text-xs font-semibold tracking-[0.2em] text-slate-400">
-                            {group.label}
-                          </p>
-                          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                            {group.slots.map((x: string) => (
-                              <button
-                                key={x}
-                                onClick={() =>
-                                  setForm({ ...form, startTime: x })
-                                }
-                                className={`rounded-xl border py-2.5 text-sm font-bold transition ${
-                                  form.startTime === x
-                                    ? "border-brand-600 bg-brand-600 text-white shadow-md"
-                                    : "border-slate-200 hover:border-brand-400 hover:bg-brand-50/50"
-                                }`}
-                              >
-                                {x}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="rounded-2xl bg-slate-50 p-5 text-center text-sm font-medium text-slate-500">
-                      {doctorId && serviceId && date
-                        ? "Энэ өдөр боломжит цаг байхгүй байна. Дээрх санал болгох цагуудаас сонгох боломжтой."
-                        : "Эмч, үйлчилгээ болон өдрөө сонгоно уу."}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {step === 4 && (
-                <div className="rounded-2xl border border-brand-100 bg-brand-50 p-5">
-                  <p className="text-xs font-semibold uppercase tracking-widest text-brand-700">
-                    Таны сонголт
-                  </p>
-                  <h3 className="mt-3 text-xl font-semibold text-slate-900">
-                    {service?.name || "Үйлчилгээ"}
-                  </h3>
-                  <p className="mt-2 text-sm text-slate-600">
-                    {doctor?.name || "Эмч сонгоогүй"} ·{" "}
-                    {date || "Өдөр сонгоогүй"} ·{" "}
-                    {form.startTime || "Цаг сонгоогүй"}
-                  </p>
-                  <p className="mt-4 text-sm font-bold text-brand-800">
-                    Үргэлжлүүлэхэд өвчтөний мэдээллээ оруулна.
-                  </p>
-                </div>
-              )}
+              </div>}
+              {step === 3 && <form id="booking-patient-form" onSubmit={submit}>
+                <h3 className="mb-4 text-lg font-semibold">Таны мэдээлэл</h3>
+                <fieldset disabled={sending} className="min-w-0"><div className="grid gap-x-4 sm:grid-cols-2"><Field label="Овог нэр *"><input required autoComplete="name" value={form.fullName} onChange={(event) => setForm({ ...form, fullName: event.target.value })} placeholder="Овог нэрээ оруулна уу" /></Field><Field label="Утасны дугаар *"><input required type="tel" autoComplete="tel" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} placeholder="Утасны дугаар" /></Field></div><details className="mt-1 rounded-xl border border-slate-200 p-3"><summary className="text-sm text-slate-600">Нэмэлт мэдээлэл (заавал биш)</summary><div className="mt-4 grid gap-x-4 sm:grid-cols-2"><Field label="Нас"><input type="number" min="0" max="150" value={form.age} onChange={(event) => setForm({ ...form, age: event.target.value })} /></Field><Field label="Хүйс"><select value={form.gender} onChange={(event) => setForm({ ...form, gender: event.target.value })}><option value="MALE">Эрэгтэй</option><option value="FEMALE">Эмэгтэй</option><option value="OTHER">Бусад</option></select></Field></div><Field label="Зовиур / Нэмэлт тайлбар"><textarea rows={3} value={form.chiefComplaint} onChange={(event) => setForm({ ...form, chiefComplaint: event.target.value })} /></Field></details></fieldset>
+              </form>}
+              {error && <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
             </div>
-
-            {/* SIDEBAR SELECTION SUMMARY */}
-            <aside className="flex flex-col justify-between bg-slate-950 p-8 text-white">
-              <div>
-                <p className="text-xs font-bold tracking-widest text-brand-400">
-                  ТАНЫ СОНГОЛТ
-                </p>
-                <div className="mt-8 space-y-6 text-sm">
-                  <Info
-                    icon={<UserRound />}
-                    title="Эмч"
-                    value={doctor?.name ?? "Сонгоогүй"}
-                  />
-                  <Info
-                    icon={<Stethoscope />}
-                    title="Үйлчилгээ"
-                    value={service?.name ?? "Сонгоогүй"}
-                  />
-                  <Info
-                    icon={<CalendarDays />}
-                    title="Өдөр"
-                    value={date || "Сонгоогүй"}
-                  />
-                  <Info
-                    icon={<Clock3 />}
-                    title="Цаг"
-                    value={form.startTime || "Сонгоогүй"}
-                  />
-                </div>
-              </div>
-
-              <div className="mt-8">
-                <div className="rounded-2xl bg-white/10 p-5 text-sm ">
-                  <p className="text-xs text-slate-400">Хугацаа ба Үнэ</p>
-                  <p className="mt-1 text-lg font-semibold">
-                    {service
-                      ? `${service.durationMin} мин · ${
-                          service.price
-                            ? String(service.price).toLocaleString() + "₮"
-                            : "Үнэ тодорхойгүй"
-                        }`
-                      : "Үйлчилгээ сонгоно уу"}
-                  </p>
-                </div>
-                <div className="mt-4 flex gap-2">
-                  {step > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => setStep((current) => current - 1)}
-                      className="flex-1 rounded-2xl border border-white/20 py-4 font-bold text-white transition hover:bg-white/10"
-                    >
-                      Өмнөх
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (step === 4) {
-                        setOpen(true);
-                      } else {
-                        goNext();
-                      }
-                    }}
-                    className="mt-4 w-full rounded-2xl bg-brand-500 py-4 font-semibold text-slate-950 shadow-lg shadow-brand-500/20 transition hover:bg-brand-400"
-                  >
-                    {step === 4 ? "Мэдээлэл оруулах" : "Үргэлжлүүлэх"}
-                  </button>
-                </div>
-              </div>
-            </aside>
-          </div>
+            {step > 1 && <div className="flex items-center gap-3 border-t border-slate-100 bg-white p-4 sm:px-6"><button type="button" disabled={sending} className="button-secondary" onClick={() => changeStep(step - 1)}><ChevronLeft size={16} />Буцах</button>{step === 2 ? <button type="button" disabled={!validTime} onClick={() => changeStep(3)} className="button-primary flex-1 disabled:opacity-40">Үргэлжлүүлэх<ArrowRight size={16} /></button> : <button type="submit" form="booking-patient-form" disabled={sending || !validTime} className="button-primary flex-1 disabled:opacity-40">{sending && <Loader2 size={16} className="animate-spin" />}{sending ? "Илгээж байна…" : "Захиалга баталгаажуулах"}</button>}</div>}
+          </>}
         </div>
       </div>
-
-      {/* Patient Modal */}
-      {open && (
-        <DialogFrame onClose={() => setOpen(false)} label="Үйлчлүүлэгчийн мэдээлэл" size="max-w-lg">
-          <form
-            onSubmit={submit}
-            className="w-full max-w-lg rounded-2xl bg-white p-8 shadow-lg"
-          >
-            <div className="mb-6 flex items-center justify-between">
-              <div>
-                <p className="text-xs font-bold text-brand-600">СҮҮЛИЙН АЛХАМ</p>
-                <h2 className="text-2xl font-semibold">Үйлчлүүлэгчийн мэдээлэл</h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                X
-              </button>
-            </div>
-            <div className="mb-6 rounded-2xl bg-brand-50 p-4 text-sm font-bold text-brand-950">
-              <p>
-                {doctor?.name} · {service?.name}
-              </p>
-              <p className="mt-1 text-xs text-brand-700">
-                {date} | {form.startTime}
-              </p>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Овог нэр *">
-                <input
-                  required
-                  placeholder="Баатар"
-                  value={form.fullName}
-                  onChange={(e) =>
-                    setForm({ ...form, fullName: e.target.value })
-                  }
-                />
-              </Field>
-              <Field label="Утасны дугаар *">
-                <input
-                  required
-                  type="tel"
-                  placeholder="9911----"
-                  value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                />
-              </Field>
-              <Field label="Нас">
-                <input
-                  type="number"
-                  min="0"
-                  max="150"
-                  placeholder="25"
-                  value={form.age}
-                  onChange={(e) => setForm({ ...form, age: e.target.value })}
-                />
-              </Field>
-              <Field label="Хүйс">
-                <select
-                  value={form.gender}
-                  onChange={(e) => setForm({ ...form, gender: e.target.value })}
-                >
-                  <option value="MALE">Эрэгтэй</option>
-                  <option value="FEMALE">Эмэгтэй</option>
-                  <option value="OTHER">Бусад</option>
-                </select>
-              </Field>
-            </div>
-            <Field label="Зовиур / Нэмэлт тайлбар">
-              <textarea
-                rows={3}
-                placeholder="Шүд өвдөж байгаа эсвэл зовиуртай хэсгээ бичнэ үү..."
-                value={form.chiefComplaint}
-                onChange={(e) =>
-                  setForm({ ...form, chiefComplaint: e.target.value })
-                }
-              />
-            </Field>
-            <button
-              disabled={sending}
-              className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-600 py-4 font-semibold text-white shadow-lg shadow-brand-600/25 hover:bg-brand-500"
-            >
-              {sending && <Loader2 className="h-5 w-5 animate-spin" />} Захиалга
-              баталгаажуулах
-            </button>
-          </form>
-        </DialogFrame>
-      )}
-
-      {/* Result Modal */}
-      {result && (
-        <DialogFrame onClose={() => setResult(null)} label="Захиалгын хариу" size="max-w-sm">
-          <div className="max-w-sm rounded-2xl bg-white p-8 text-center shadow-lg">
-            {result.success ? (
-              <div className="mx-auto h-16 w-16 text-brand-500">✔</div>
-            ) : (
-              <div className="mx-auto h-16 w-16 text-red-500">✖</div>
-            )}
-            <h2 className="mt-4 text-2xl font-semibold">
-              {result.success ? "Захиалга баталгаажлаа" : "Захиалга амжилтгүй"}
-            </h2>
-            <p className="mt-3 text-sm text-slate-600">{result.message}</p>
-            <button
-              onClick={() => setResult(null)}
-              className="mt-6 w-full rounded-2xl bg-slate-900 py-3.5 font-bold text-white shadow-lg"
-            >
-              Ойлголоо
-            </button>
-          </div>
-        </DialogFrame>
-      )}
     </section>
   );
 }

@@ -11,6 +11,10 @@ import { Toaster } from "@/components/ui/Toast";
 export const metadata: Metadata = {
   title: "BB Dental Clinic",
   description: "BB Dental Clinic захиалга удирдах систем",
+  icons: {
+    icon: { url: "/images/bb-dental-logo.jpg", type: "image/jpeg", sizes: "480x480" },
+    apple: "/images/bb-dental-logo.jpg",
+  },
 };
 
 export default function RootLayout({

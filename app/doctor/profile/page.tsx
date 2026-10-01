@@ -34,6 +34,7 @@ export default function DoctorProfilePage() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [testingTelegram, setTestingTelegram] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -109,6 +110,17 @@ export default function DoctorProfilePage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const testTelegram = async () => {
+    setTestingTelegram(true);
+    try {
+      const response = await fetch("/api/doctor/telegram/test", { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+      showToast(data.message, "success");
+    } catch (error) { showToast(error instanceof Error ? error.message : "Мэдэгдэл илгээж чадсангүй.", "error"); }
+    finally { setTestingTelegram(false); }
   };
 
   if (loading) {
@@ -284,7 +296,7 @@ export default function DoctorProfilePage() {
                 className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-emerald-500"
               />
               <p className="mt-1 text-xs text-slate-400">
-                Bot дээр /start дарсны дараа тоон Chat ID-гаа оруулна уу.
+                BB_dental_bot дээр /start дарсны дараа хувийн тоон Chat ID-гаа оруулаад хадгална уу. Группийн ID эсвэл @username оруулахгүй.
               </p>
             </div>
 
@@ -378,6 +390,8 @@ export default function DoctorProfilePage() {
               <p className="mt-3 break-all text-base font-bold text-slate-900">
                 {profile.telegramChatId || "Бүртгэгдээгүй"}
               </p>
+              <a href="https://t.me/BB_dental_bot" target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex min-h-11 items-center text-sm text-brand-700 underline">Telegram bot нээх</a>
+              <button type="button" disabled={!profile.telegramChatId || testingTelegram} onClick={testTelegram} className="button-secondary mt-2 w-full disabled:opacity-50">{testingTelegram ? "Илгээж байна…" : "Туршилтын мэдэгдэл илгээх"}</button>
             </div>
           </div>
         </div>

@@ -1,3 +1,4 @@
+import { notifyDoctorOnTelegram } from "@/lib/telegram";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ensureAppointmentSlotIsAvailable } from "@/lib/availability";
@@ -66,8 +67,19 @@ export async function POST(
       return tx.appointment.findUniqueOrThrow({ where: { id }, include: { doctor: true, patient: true, service: true, notes: { orderBy: { createdAt: "desc" } } } });
     }, { timeout: 15000 });
 
+    let notificationSent = false;
+    try {
+      notificationSent = await notifyDoctorOnTelegram({
+        chatId: targetDoctor.telegramChatId || "", appointmentId: id, doctorName: targetDoctor.name,
+        patientName: updatedAppointment.patientName, patientPhone: updatedAppointment.patientPhone,
+        serviceName: updatedAppointment.service.name, appointmentDate: updatedAppointment.appointmentDate,
+        startTime: updatedAppointment.startTime, chiefComplaint: updatedAppointment.chiefComplaint,
+      });
+    } catch { console.error("Transferred appointment notification failed"); }
+
     return NextResponse.json({
       success: true,
+      notificationSent,
       data: updatedAppointment,
       message: `Өвчтөний цагийг ${targetDoctor.name} эмч рүү амжилттай шилжүүллээ.`,
     });

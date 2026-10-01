@@ -1,4 +1,5 @@
 "use client";
+import { TelegramSetup } from "@/components/super-admin/TelegramSetup";
 
 import { ImageUpload } from "@/components/ui/ImageUpload";
 import React, { useEffect, useState } from "react";
@@ -423,6 +424,8 @@ export default function SuperAdminSettingsPage() {
 
             <div className="space-y-3 text-xs">
               <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-600">Telegram холболтын нууц түлхүүрийг системийн хариуцсан ажилтан тохируулна.</p>
+
+              <TelegramSetup />
 
               {/* Telegram Test Box */}
               <div className="rounded-2xl border border-brand-100 bg-brand-50/70 p-4 space-y-2.5">

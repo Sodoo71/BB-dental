@@ -290,6 +290,7 @@ export async function POST(request: Request) {
       return created;
     });
 
+    let notificationSent = false;
     if (doctorId && serviceId) {
       try {
         const doc = await prisma.doctor.findUnique({
@@ -301,7 +302,7 @@ export async function POST(request: Request) {
           select: { name: true },
         });
         if (doc && srv) {
-          await notifyDoctorOnTelegram({
+          notificationSent = await notifyDoctorOnTelegram({
             chatId: doc.telegramChatId || "",
             appointmentId: appointment.id,
             doctorName: doc.name,
@@ -319,7 +320,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(
-      { success: true, data: appointment },
+      { success: true, data: appointment, notificationSent },
       { status: 201 },
     );
   } catch (error: unknown) {

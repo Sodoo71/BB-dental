@@ -62,11 +62,11 @@ export function AdminSidebar({
         {/* Clinic Brand & Close button on mobile */}
         <div className="mb-6 flex items-center justify-between border-b border-slate-800 pb-5">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10/20 text-gold">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10/20 text-accent">
               <UserCheck className="h-6 w-6" />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-gold">
+              <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-accent">
                 Ресепшн портал
               </p>
               <h1 className="truncate text-base font-semibold text-white">
@@ -100,13 +100,13 @@ export function AdminSidebar({
                 onClick={() => handleSelect(id)}
                 className={`flex w-full items-center gap-3 rounded-2xl px-3.5 py-3 text-left text-sm font-semibold transition ${
                   isActive
-                    ? "bg-white/10 text-white shadow-[inset_3px_0_#d4af37]"
+                    ? "bg-white/10 text-white shadow-[inset_3px_0_#85ded3]"
                     : "text-slate-300 hover:bg-slate-900 hover:text-white"
                 }`}
               >
                 <Icon
                   className={`h-4 w-4 shrink-0 ${
-                    isActive ? "text-gold" : "text-brand-200"
+                    isActive ? "text-accent" : "text-brand-200"
                   }`}
                 />
                 <span className="truncate">{label}</span>
@@ -123,7 +123,7 @@ export function AdminSidebar({
                 href="/super-admin"
                 className="flex items-center gap-3 rounded-2xl border border-brand-800/40 bg-brand-950/30 px-3.5 py-2.5 text-sm font-semibold text-brand-300 transition hover:bg-brand-900/40 hover:text-white"
               >
-                <LayoutDashboard className="h-4 w-4 text-gold" />
+                <LayoutDashboard className="h-4 w-4 text-accent" />
                 <span>Super Admin самбар</span>
               </Link>
             </div>
@@ -141,7 +141,7 @@ export function AdminSidebar({
             <p className="truncate text-xs font-bold text-white">
               {user.name || "Ресепшн"}
             </p>
-            <p className="truncate text-[10px] text-gold">
+            <p className="truncate text-[10px] text-accent">
               {getRoleLabel(user.role)}
             </p>
           </div>

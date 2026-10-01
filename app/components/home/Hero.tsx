@@ -1,12 +1,58 @@
 "use client";
+
+import { useState } from "react";
+import Image from "next/image";
+import { ArrowUpRight, ChevronLeft, ChevronRight, CalendarDays, Smile, Stethoscope, HeartHandshake } from "lucide-react";
 import { useClinicInfo } from "@/components/layout/ClinicInfoProvider";
-import { ArrowDown, ArrowUpRight, CalendarDays, Clock3, Stethoscope } from "lucide-react";
+import styles from "./Hero.module.css";
+
+const cards = [
+  { title: "Таны инээмсэглэл, бидний халамж", label: "BB DENTAL CLINIC", icon: Smile, href: "#booking", logo: true },
+  { title: "Танд тохирох үйлчилгээ", label: "ҮЙЛЧИЛГЭЭ", icon: Stethoscope, href: "#services" },
+  { title: "Эмчтэйгээ танилцаарай", label: "МАНАЙ ЭМЧ НАР", icon: HeartHandshake, href: "#doctors" },
+  { title: "Өөрт тохирох цагаа сонгоорой", label: "ОНЛАЙН ЦАГ ЗАХИАЛГА", icon: CalendarDays, href: "#booking" },
+  { title: "Бид тантай ойрхон", label: "ХОЛБОО БАРИХ", icon: Smile, href: "#contact" },
+];
+
 export default function Hero({ scrollToBooking }: { scrollToBooking: () => void }) {
   const info = useClinicInfo();
-  return <header className="border-b border-slate-200 bg-parchment">
-    <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 py-14 sm:px-8 sm:py-20 lg:grid-cols-[1.15fr_.85fr] lg:gap-20 lg:py-24">
-      <div><p className="eyebrow mb-6 flex items-center gap-3"><span className="h-px w-9 bg-gold" />{info.clinicName}</p><h1 className="max-w-2xl text-4xl font-normal leading-[1.2] text-brand-700 sm:text-5xl lg:text-6xl">Эрүүл инээмсэглэл.<br /><span className="text-[#88702a]">Танд зориулсан<br className="hidden sm:block" /> халамж.</span></h1><p className="mt-7 max-w-lg text-base leading-8 text-slate-600">Шүдний эрүүл мэнддээ цаг гаргаарай. Үйлчилгээ, эмч болон өөрт тохирох цагаа сонгон үзлэгийн захиалгаа хялбар бүртгүүлээрэй.</p><div className="mt-9 flex flex-wrap gap-3"><button type="button" onClick={scrollToBooking} className="button-primary px-6 py-3.5">Үзлэгийн цаг авах<ArrowUpRight size={17} /></button><a href="#services" className="button-secondary bg-transparent px-6 py-3.5">Үйлчилгээ үзэх<ArrowDown size={16} /></a></div></div>
-      <div className="relative rounded-2xl bg-brand-700 p-7 text-white sm:p-10"><div className="mb-9 flex items-center justify-between border-b border-white/15 pb-6"><div><p className="text-[10px] tracking-[.2em] text-gold">ТАНЫ ДАРААГИЙН ҮЗЛЭГ</p><h2 className="mt-3 font-serif text-2xl font-normal">Цаг авахад хялбар.</h2></div><CalendarDays size={30} strokeWidth={1.2} className="text-gold" /></div><div className="space-y-7">{[{ icon: Stethoscope, label: "Үйлчилгээгээ сонгох", text: "Танд хэрэгтэй тусламж, үйлчилгээ" }, { icon: CalendarDays, label: "Эмч, өдрөө сонгох", text: "Эмчийн боломжит хуваариас" }, { icon: Clock3, label: "Цагаа баталгаажуулах", text: "Мэдээллээ оруулж захиалгаа илгээх" }].map(({ icon: Icon, label, text }, index) => <div key={label} className="flex items-center gap-4"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/15 text-gold"><Icon size={19} strokeWidth={1.5} /></span><div className="flex-1"><p className="text-sm font-medium">{label}</p><p className="mt-1 text-xs text-brand-100">{text}</p></div><span className="text-xs text-brand-200">0{index + 1}</span></div>)}</div><button type="button" onClick={scrollToBooking} className="mt-9 flex min-h-12 w-full items-center justify-between rounded-xl bg-white px-5 text-sm font-medium text-brand-700 hover:bg-parchment">Захиалгаа эхлүүлэх<ArrowUpRight size={18} /></button></div>
-    </div>
-  </header>;
+  const [active, setActive] = useState(0);
+  const move = (direction: number) => setActive((current) => (current + direction + cards.length) % cards.length);
+
+  return (
+    <header className={styles.hero}>
+      <div className={styles.layout}>
+        <div className={styles.intro}>
+          <p className="eyebrow mb-7 flex items-center gap-3"><span className="h-px w-9 bg-brand-500" />{info.clinicName}</p>
+          <p className={styles.wordmark}>BB Dental<span>CLINIC & CARE</span></p>
+          <h1 className={styles.headline}>Эрүүл инээмсэглэл.<br />Танд зориулсан халамж.</h1>
+          <p className="mt-6 max-w-lg text-base leading-8 text-slate-600">Шүдний эрүүл мэнддээ цаг гаргаарай. Үйлчилгээ, эмч болон өөрт тохирох цагаа сонгон үзлэгийн захиалгаа хялбар бүртгүүлээрэй.</p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <button type="button" onClick={scrollToBooking} className={styles.primary}>Үзлэгийн цаг авах<ArrowUpRight size={18} /></button>
+            <a href="#services" className={styles.secondary}>Үйлчилгээ үзэх</a>
+          </div>
+        </div>
+        <section className={styles.showcase} aria-label="Эмнэлгийн танилцуулга" aria-roledescription="карусель">
+          <div className={styles.deck}>
+            {cards.map((card, index) => {
+              const offset = ((index - active + cards.length + 2) % cards.length) - 2;
+              const Icon = card.icon;
+              return (
+                <a key={card.label} href={card.href} className={`${styles.card} ${card.logo ? styles.logoCard : ""}`} data-position={offset} tabIndex={offset === 0 ? 0 : -1} aria-hidden={offset !== 0} aria-label={`${card.title} — дэлгэрэнгүй`}>
+                  {card.logo ? <Image src={info.logoUrl || "/images/bb-dental-logo.jpg"} alt={`${info.clinicName} лого`} width={480} height={480} preload unoptimized className={styles.logo} /> : <div className={styles.illustration}><span className={styles.iconRing}><Icon size={76} strokeWidth={1} /></span><span className={styles.cardBrand}>BB Dental</span></div>}
+                  <div className={styles.caption}><p>{card.label}</p><h2>{card.title}</h2><ArrowUpRight size={20} aria-hidden="true" /></div>
+                </a>
+              );
+            })}
+          </div>
+          <p className={styles.hint}>← ШИЛЖҮҮЛЭХ · ДАРЖ ДЭЛГЭРЭНГҮЙ →</p>
+          <div className={styles.controls}>
+            <button type="button" onClick={() => move(-1)} aria-label="Өмнөх карт"><ChevronLeft size={20} /></button>
+            <span className="text-xs tabular-nums text-brand-700" aria-live="polite" aria-atomic="true"><span className="sr-only">{cards[active].title}, </span>0{active + 1} / 0{cards.length}</span>
+            <button type="button" onClick={() => move(1)} aria-label="Дараах карт"><ChevronRight size={20} /></button>
+          </div>
+        </section>
+      </div>
+    </header>
+  );
 }

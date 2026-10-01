@@ -21,7 +21,7 @@ export function StatusDonutChart({
   const total = pending + confirmed + completed + cancelled + noShow;
 
   const items = [
-    { label: "Дууссан", count: completed, color: "#0f2c59", bg: "bg-brand-600" },
+    { label: "Дууссан", count: completed, color: "#007779", bg: "bg-brand-600" },
     {
       label: "Баталгаажсан",
       count: confirmed,

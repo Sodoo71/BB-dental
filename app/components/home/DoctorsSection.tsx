@@ -2,7 +2,7 @@
 import { ClinicImage } from "@/components/ui/ClinicImage";
 
 import React, { useEffect, useState } from "react";
-import { ArrowRight, Loader2, Sparkles, Stethoscope, User } from "lucide-react";
+import { ArrowRight, Loader2, Stethoscope } from "lucide-react";
 
 type DoctorItem = {
   id: string;
@@ -15,7 +15,7 @@ type DoctorItem = {
   isActive?: boolean;
 };
 
-export default function DoctorsSection() {
+export default function DoctorsSection({ onBook }: { onBook: (doctorId: string) => void }) {
   const [doctors, setDoctors] = useState<DoctorItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -29,13 +29,6 @@ export default function DoctorsSection() {
       .catch(() => setDoctors([]))
       .finally(() => setLoading(false));
   }, []);
-
-  const handleBookDoctor = (doctorId: string) => {
-    const bookingEl = document.getElementById("booking");
-    if (bookingEl) {
-      bookingEl.scrollIntoView({ behavior: "smooth" });
-    }
-  };
 
   if (!loading && doctors.length === 0) {
     return null;
@@ -81,7 +74,7 @@ export default function DoctorsSection() {
                       <div className="absolute inset-0 bg-gradient-to-t from-slate-950/50 via-transparent to-transparent" />
                     </div>
                   ) : (
-                    <div className="relative flex h-60 w-full items-center justify-center bg-parchment">
+                    <div className="relative flex h-60 w-full items-center justify-center bg-surface-soft">
                       <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-brand-600 text-white shadow-lg shadow-brand-600/30 transition-transform group-hover:scale-110">
                         <Stethoscope className="h-10 w-10" />
                       </div>
@@ -102,7 +95,8 @@ export default function DoctorsSection() {
                 <div className="border-t border-slate-100 bg-slate-50/60 p-5">
                   <button
                     type="button"
-                    onClick={() => handleBookDoctor(doctor.id)}
+                    onClick={() => onBook(doctor.id)}
+                    aria-label={`${doctor.name} — цаг захиалах`}
                     className="flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 py-3 text-xs font-bold text-white shadow-sm transition hover:bg-brand-600"
                   >
                     <span>Цаг захиалах</span>
