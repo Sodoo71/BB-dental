@@ -1,0 +1,323 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  DOCTOR
+  RECEPTION
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  ARRIVED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  TRANSFER
+  QPAY
+}
+
+model User {
+  id             String          @id @default(uuid())
+  name           String
+  phone          String          @unique
+  email          String?         @unique
+  telegramChatId String          @default("")
+  approvalStatus ApprovalStatus  @default(APPROVED)
+  approvedById   String?
+  approvedAt     DateTime?
+  passwordResets PasswordReset[]
+  patientNotes   PatientNote[]
+  passwordHash   String
+  role           Role
+  active         Boolean         @default(true)
+  doctor         Doctor?
+  sessions       Session[]
+  createdAt      DateTime        @default(now())
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+
+  @@index([userId])
+}
+
+model RateLimit {
+  key       String   @id
+  count     Int      @default(1)
+  expiresAt DateTime
+}
+
+model Doctor {
+  id                String            @id @default(uuid())
+  userId            String?           @unique
+  user              User?             @relation(fields: [userId], references: [id])
+  name              String
+  specialty         String
+  bio               String            @default("")
+  imageUrl          String            @default("")
+  telegramChatId    String            @default("")
+  active            Boolean           @default(true)
+  schedules         Schedule[]
+  leaves            Leave[]
+  appointments      Appointment[]
+  treatments        Treatment[]
+  transfersSent     PatientTransfer[] @relation("TransferSource")
+  transfersReceived PatientTransfer[] @relation("TransferTarget")
+}
+
+model Schedule {
+  id        String @id @default(uuid())
+  doctorId  String
+  doctor    Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  weekday   Int
+  startTime String
+  endTime   String
+
+  @@unique([doctorId, weekday])
+}
+
+model Leave {
+  id        String @id @default(uuid())
+  doctorId  String
+  doctor    Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  date      String
+  startTime String @default("00:00")
+  endTime   String @default("23:59")
+  reason    String
+
+  @@index([doctorId, date])
+}
+
+model Service {
+  id           String        @id @default(uuid())
+  name         String
+  imageUrl     String        @default("")
+  category     String
+  description  String        @default("")
+  price        Int
+  duration     Int           @default(30)
+  doctorIds    String[]      @default([])
+  active       Boolean       @default(true)
+  appointments Appointment[]
+  treatments   Treatment[]
+
+  @@index([category, active])
+}
+
+model Patient {
+  id             String            @id @default(uuid())
+  name           String
+  phone          String            @unique
+  birthDate      String            @default("")
+  gender         String            @default("")
+  address        String            @default("")
+  allergies      String            @default("")
+  medicalHistory String            @default("")
+  active         Boolean           @default(true)
+  createdAt      DateTime          @default(now())
+  appointments   Appointment[]
+  treatments     Treatment[]
+  payments       Payment[]
+  documents      Document[]
+  notes          PatientNote[]
+  transfers      PatientTransfer[]
+}
+
+model Appointment {
+  id          String            @id @default(uuid())
+  patientId   String
+  patient     Patient           @relation(fields: [patientId], references: [id])
+  doctorId    String
+  doctor      Doctor            @relation(fields: [doctorId], references: [id])
+  serviceId   String
+  service     Service           @relation(fields: [serviceId], references: [id])
+  date        String
+  startTime   String
+  endTime     String
+  status      AppointmentStatus @default(PENDING)
+  note        String            @default("")
+  repeatOfId  String?
+  repeatOf    Appointment?      @relation("Repeat", fields: [repeatOfId], references: [id])
+  repeats     Appointment[]     @relation("Repeat")
+  createdById String?
+  createdAt   DateTime          @default(now())
+  treatments  Treatment[]
+  payments    Payment[]
+
+  @@index([doctorId, date])
+  @@index([patientId, date])
+  @@index([date, status])
+}
+
+model Treatment {
+  id            String       @id @default(uuid())
+  patientId     String
+  patient       Patient      @relation(fields: [patientId], references: [id])
+  doctorId      String
+  doctor        Doctor       @relation(fields: [doctorId], references: [id])
+  serviceId     String
+  service       Service      @relation(fields: [serviceId], references: [id])
+  appointmentId String?
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id])
+  tooth         Int?
+  diagnosis     String
+  procedure     String
+  note          String       @default("")
+  date          String
+  amount        Int
+  createdAt     DateTime     @default(now())
+
+  @@index([patientId, date])
+}
+
+model Payment {
+  id             String        @id @default(uuid())
+  patientId      String
+  patient        Patient       @relation(fields: [patientId], references: [id])
+  appointmentId  String?
+  appointment    Appointment?  @relation(fields: [appointmentId], references: [id])
+  amount         Int
+  method         PaymentMethod
+  note           String        @default("")
+  date           String
+  createdById    String
+  idempotencyKey String        @unique
+  voidedAt       DateTime?
+  voidReason     String        @default("")
+  createdAt      DateTime      @default(now())
+
+  @@index([date, voidedAt])
+}
+
+model Expense {
+  id          String @id @default(uuid())
+  title       String
+  category    String
+  amount      Int
+  date        String
+  note        String @default("")
+  createdById String
+}
+
+model InventoryItem {
+  id        String          @id @default(uuid())
+  name      String
+  sku       String          @unique
+  unit      String          @default("ш")
+  quantity  Int             @default(0)
+  minimum   Int             @default(5)
+  supplier  String          @default("")
+  active    Boolean         @default(true)
+  movements StockMovement[]
+}
+
+model StockMovement {
+  id          String        @id @default(uuid())
+  itemId      String
+  item        InventoryItem @relation(fields: [itemId], references: [id])
+  quantity    Int
+  reason      String
+  createdById String
+  createdAt   DateTime      @default(now())
+}
+
+model Document {
+  id          String    @id @default(uuid())
+  patientId   String
+  patient     Patient   @relation(fields: [patientId], references: [id])
+  title       String
+  type        String
+  content     String
+  consentName String    @default("")
+  consentAt   DateTime?
+  createdById String
+  createdAt   DateTime  @default(now())
+}
+
+model Setting {
+  key   String @id
+  value String
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  actorId   String
+  action    String
+  entity    String
+  entityId  String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model PasswordReset {
+  id        String    @id @default(uuid())
+  tokenHash String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, expiresAt])
+}
+
+model PatientNote {
+  id        String   @id @default(uuid())
+  patientId String
+  patient   Patient  @relation(fields: [patientId], references: [id])
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([patientId, createdAt])
+}
+
+model PatientTransfer {
+  id             String   @id @default(uuid())
+  patientId      String
+  patient        Patient  @relation(fields: [patientId], references: [id])
+  sourceDoctorId String
+  sourceDoctor   Doctor   @relation("TransferSource", fields: [sourceDoctorId], references: [id])
+  targetDoctorId String
+  targetDoctor   Doctor   @relation("TransferTarget", fields: [targetDoctorId], references: [id])
+  reason         String
+  createdById    String
+  createdAt      DateTime @default(now())
+
+  @@index([patientId, targetDoctorId])
+  @@index([sourceDoctorId, createdAt])
+}
+
+model NurseShift {
+  id String @id @default(uuid())
+  name String
+  date String
+  startTime String
+  endTime String
+  @@index([date])
+}
