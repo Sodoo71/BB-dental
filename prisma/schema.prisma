@@ -209,12 +209,15 @@ enum AppointmentStatus {
   NO_SHOW
 }
 
+// SUPER_ADMIN and PATIENT are deprecated read-compatibility labels, not primary roles.
+// The four-role migration maps rows and enforces allowed values with a SQL CHECK.
 enum UserRole {
   RECEPTION
   SUPER_ADMIN
   ADMIN
   DOCTOR
   PATIENT
+  USER
 }
 
 enum DoctorAvailabilityType {

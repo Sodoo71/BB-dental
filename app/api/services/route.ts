@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const includeInactive = searchParams.get("all") === "true";
-    if (includeInactive && !await requireRole("ADMIN", "SUPER_ADMIN")) {
+    if (includeInactive && !await requireRole("ADMIN")) {
       throw new HttpError(403, "Хандах эрхгүй байна.");
     }
 
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const user = await requireRole("SUPER_ADMIN", "ADMIN");
+  const user = await requireRole("ADMIN");
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
@@ -103,7 +103,7 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  const user = await requireRole("SUPER_ADMIN", "ADMIN");
+  const user = await requireRole("ADMIN");
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
@@ -187,7 +187,7 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const user = await requireRole("SUPER_ADMIN", "ADMIN");
+  const user = await requireRole("ADMIN");
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }

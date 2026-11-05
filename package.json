@@ -15,7 +15,8 @@
     "check:env": "bun scripts/check-env.ts",
     "db:inspect": "bun scripts/inspect-database.ts",
     "test:e2e": "playwright test",
-    "test:database": "bun scripts/test-database.js"
+    "test:database": "bun scripts/test-database.js",
+    "test:roles": "bun scripts/test-role-migration.js"
   },
   "dependencies": {
     "@fontsource/inter": "^5.3.0",

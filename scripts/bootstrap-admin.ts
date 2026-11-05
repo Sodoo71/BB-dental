@@ -11,7 +11,7 @@ try {
   await prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT pg_advisory_xact_lock(82173642)`;
     if (await tx.user.count({ where: { role: { in: ["SUPER_ADMIN", "ADMIN"] } } })) throw new Error("An administrator already exists. Use authenticated user management.");
-    const user = await tx.user.create({ data: { email, name: "Clinic administrator", passwordHash, role: "SUPER_ADMIN", status: "ACTIVE", isActive: true } });
+    const user = await tx.user.create({ data: { email, name: "Clinic administrator", passwordHash, role: "ADMIN", status: "ACTIVE", isActive: true } });
     await tx.auditLog.create({ data: { actorId: user.id, action: "ADMIN_BOOTSTRAPPED", entity: "User", entityId: user.id } });
   });
   console.info("Administrator created.");

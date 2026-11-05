@@ -1,14 +1,22 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/app/generated/prisma/client";
 import { mayManageUser, type StaffRole, type AccountState } from "@/lib/permissions/policy";
+import { normalizeRole, normalizeUserRole } from "@/lib/roles";
 import { HttpError } from "@/lib/security/http";
 export const publicUserSelect = { id: true, name: true, email: true, phone: true, avatarUrl: true, telegramChatId: true, role: true, status: true, isActive: true, doctorId: true, createdAt: true, updatedAt: true } satisfies Prisma.UserSelect;
 export async function lockUserAdministration(tx: Prisma.TransactionClient, actor?: { id: string; role: StaffRole }) {
   await tx.$queryRaw`SELECT pg_advisory_xact_lock(82173642)::text`;
   if (actor) {
     const current = await tx.user.findUnique({ where: { id: actor.id }, select: { role: true, status: true, isActive: true } });
-    if (!current || current.role !== actor.role || !current.isActive || current.status !== "ACTIVE" || !["ADMIN", "SUPER_ADMIN"].includes(current.role)) throw new HttpError(403, "Хандах эрх өөрчлөгдсөн байна. Дахин нэвтэрнэ үү.");
+    if (!current || normalizeRole(current.role) !== normalizeRole(actor.role) || !current.isActive || current.status !== "ACTIVE" || normalizeRole(current.role) !== "ADMIN") throw new HttpError(403, "Хандах эрх өөрчлөгдсөн байна. Дахин нэвтэрнэ үү.");
   }
+}
+// Call after lockUserAdministration, in the same transaction as the mutation.
+export async function preserveActiveAdministrator(tx: Prisma.TransactionClient, target: { id: string; role: StaffRole; status: string; isActive: boolean }, next: { role?: StaffRole; status?: string; isActive?: boolean }) {
+  if (normalizeRole(target.role) !== "ADMIN" || target.status !== "ACTIVE" || !target.isActive) return;
+  if (normalizeRole(next.role ?? target.role) === "ADMIN" && (next.status ?? target.status) === "ACTIVE" && (next.isActive ?? target.isActive)) return;
+  const others = await tx.user.count({ where: { id: { not: target.id }, role: { in: ["ADMIN", "SUPER_ADMIN"] }, status: "ACTIVE", isActive: true } });
+  if (!others) throw new HttpError(409, "Сүүлийн идэвхтэй админы эрхийг өөрчлөх боломжгүй.");
 }
 export async function syncDoctor(tx: Prisma.TransactionClient, userId: string) {
   const user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
@@ -27,11 +35,12 @@ export async function changeAccountState(actor: { id: string; role: StaffRole },
     const target = await tx.user.findUnique({ where: { id: userId } });
     if (!target) throw new HttpError(404, "Хэрэглэгч олдсонгүй.");
     if (!mayManageUser(actor, target)) throw new HttpError(403, "Энэ хэрэглэгчийн эрхийг өөрчлөх боломжгүй.");
+    await preserveActiveAdministrator(tx, target, { status, isActive: status === "ACTIVE" });
     await tx.user.update({ where: { id: userId }, data: { status, isActive: status === "ACTIVE" } });
     await syncDoctor(tx, userId);
     await tx.session.deleteMany({ where: { userId } });
     await tx.auditLog.create({ data: { actorId: actor.id, action: `USER_${status}`, entity: "User", entityId: userId, metadata: { previousStatus: target.status, status } } });
-    return tx.user.findUniqueOrThrow({ where: { id: userId }, select: publicUserSelect });
+    return normalizeUserRole(await tx.user.findUniqueOrThrow({ where: { id: userId }, select: publicUserSelect }));
   });
 }
 
@@ -47,6 +56,7 @@ export async function updateDoctorProfile(actor: { id: string; role: StaffRole }
     if (linked) {
       if (linked.id !== actor.id && !mayManageUser(actor, linked)) throw new HttpError(403, "Энэ ажилтны мэдээллийг өөрчлөх эрхгүй байна.");
       if (linked.id === actor.id && !input.isActive) throw new HttpError(400, "Өөрийн эрхийг түдгэлзүүлэх боломжгүй.");
+      if (!input.isActive) await preserveActiveAdministrator(tx, linked, { status: "SUSPENDED", isActive: false });
       await tx.user.update({ where: { id: linked.id }, data: {
         name: input.name, phone: input.phone, email: input.email || linked.email,
         avatarUrl: input.avatarUrl, telegramChatId: input.telegramChatId,

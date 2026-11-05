@@ -51,3 +51,7 @@ Use `bun scripts/bootstrap-admin.ts` only for an intentionally new database. It 
 Use provider snapshots plus a verified database backup and an isolated restore rehearsal. The application's JSON export is not a complete relational backup and cannot replace those procedures. Protect backups as confidential clinic data.
 
 For a code rollback, redeploy the reviewed prior Git revision without resetting the database. For future schema changes, prefer forward repair; determine restore/backfill consequences before deployment and document operator steps. No database migration or role conversion was performed in this branch, so no database rollback is required for these code changes.
+
+## Role rollout gate
+
+The four-role implementation and isolated rehearsal were approved on 2026-11-05. Production conversion remains unapproved. The pending migration directories contain both expansion and conversion; ordinary `db:deploy` applies both. Use the reviewed multi-stage release procedure in database/ROLE_MIGRATION_PLAN.md. Deploy the bridge on every instance before writing USER or converting legacy rows; keep the bridge as the rollback build. Do not return to a V1 Prisma client after USER rows exist.

@@ -4,7 +4,7 @@ import { requireRole } from "@/lib/auth";
 import { notifyAppointmentReminder } from "@/lib/telegram";
 
 export async function POST(request: Request) {
-  const user = await requireRole("ADMIN", "SUPER_ADMIN", "DOCTOR");
+  const user = await requireRole("ADMIN", "DOCTOR");
   if (!user) {
     return NextResponse.json(
       { error: "Хандах эрхгүй байна." },

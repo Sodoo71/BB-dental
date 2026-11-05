@@ -1178,7 +1178,7 @@ export default function ReceptionDashboard() {
 
           {activeTab === "DOCTOR_LEAVES" &&
             currentUser &&
-            ["ADMIN", "SUPER_ADMIN"].includes(currentUser.role) && (
+            ["ADMIN"].includes(currentUser.role) && (
               <DoctorLeaveRequests />
             )}
         </main>

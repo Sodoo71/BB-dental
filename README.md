@@ -1,6 +1,6 @@
 # BB DENTAL
 
-An existing dental-clinic booking and staff-management application being upgraded incrementally to V2. The current branch contains security remediation, safer appointment history, patient management, and query improvements. Clinical ERP, accounting, inventory, and the four-role migration are **not complete**.
+An existing dental-clinic booking and staff-management application being upgraded incrementally to V2. The current branch contains security remediation, safer appointment history, patient management, and query improvements. Clinical ERP, accounting and inventory are **not complete**. The approved four-role migration is implemented for isolated/staging verification and remains unapplied to production.
 
 ## Stack and package manager
 
@@ -28,6 +28,7 @@ bun run typecheck
 bun run lint
 bun test tests
 bun run test:database
+bun run test:roles
 bun run build
 bun run start
 bun run test:e2e
@@ -48,7 +49,7 @@ Playwright expects a separately running server at `http://localhost:3000`, or `P
 - Doctor dashboard, personal appointments, calendar, patient summaries, profile, schedules, and exceptions at `/doctor`.
 - Account approval, expiring/revocable sessions, shared database-backed rate limits, audit logs, Cloudinary profile images, and Telegram controls.
 
-The existing five role values remain until an approved migration. Dashboard monetary figures are current-catalog estimates, not recorded collections, recognized revenue, or profit.
+The application uses ADMIN, DOCTOR, RECEPTION and USER, with legacy stored-role read compatibility. The approved database conversion remains pending production rollout. Dashboard monetary figures are current-catalog estimates, not recorded collections, recognized revenue, or profit.
 
 ## Handover
 

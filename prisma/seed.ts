@@ -342,7 +342,7 @@ async function main() {
     create: {
       email: adminEmail,
       name: "С. Содбилэг (Super Admin)",
-      role: "SUPER_ADMIN",
+      role: "ADMIN",
       isActive: true,
       passwordHash: hashPassword(
         process.env.SUPER_ADMIN_PASSWORD!,

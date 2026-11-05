@@ -7,7 +7,7 @@ import { rateLimit } from "@/lib/security/rate-limit";
 export async function POST(request: Request) {
   try {
     const user = await requireSessionUser();
-    if (!user || user.role === "PATIENT") throw new HttpError(403, "Хандах эрхгүй байна.");
+    if (!user || user.role === "USER") throw new HttpError(403, "Хандах эрхгүй байна.");
     await rateLimit("profile-upload", user.id, 30);
     const size = Number(request.headers.get("content-length"));
     if (size > MAX_IMAGE_BYTES + 65536) throw new HttpError(413, "Файлын хэмжээ хэтэрсэн байна.");

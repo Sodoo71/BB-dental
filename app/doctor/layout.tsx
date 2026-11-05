@@ -15,9 +15,9 @@ export default async function DoctorLayout({
     redirect("/login");
   }
 
-  if (!["DOCTOR", "ADMIN", "SUPER_ADMIN"].includes(user.role)) {
+  if (!["DOCTOR", "ADMIN"].includes(user.role)) {
     redirect(
-      user.role === "ADMIN" || user.role === "SUPER_ADMIN"
+      user.role === "ADMIN"
         ? "/admin"
         : "/unauthorized",
     );

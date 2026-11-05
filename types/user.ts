@@ -1,4 +1,5 @@
-export type UserRole = "PATIENT" | "SUPER_ADMIN" | "ADMIN" | "RECEPTION" | "DOCTOR";
+export type { AppRole as UserRole } from "@/lib/roles";
+import type { AppRole as UserRole } from "@/lib/roles";
 
 export type UserRow = {
   id: string;

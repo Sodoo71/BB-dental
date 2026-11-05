@@ -286,8 +286,7 @@ export default function SuperAdminUsersPage() {
             <option value="DOCTOR">Эмч</option>
             <option value="ADMIN">Админ</option>
             <option value="RECEPTION">Ресепшн</option>
-            <option value="SUPER_ADMIN">Super Admin</option>
-            <option value="PATIENT">Өвчтөн</option>
+            <option value="USER">Хэрэглэгч</option>
           </select>
 
           <select
@@ -362,7 +361,7 @@ export default function SuperAdminUsersPage() {
                       <td className="p-4">
                         <span
                           className={`inline-block rounded-lg px-2.5 py-1 text-xs font-bold ${
-                            u.role === "SUPER_ADMIN"
+                            u.role === "ADMIN"
                               ? "bg-brand-100 text-brand-800"
                               : u.role === "ADMIN"
                                 ? "bg-brand-100 text-brand-800"
@@ -556,10 +555,7 @@ export default function SuperAdminUsersPage() {
                     <option value="DOCTOR">Эмч (Doctor)</option>
                     <option value="ADMIN">Админ</option>
                     <option value="RECEPTION">Ресепшн</option>
-                    <option value="SUPER_ADMIN">
-                      Супер Админ (Super Admin)
-                    </option>
-                    <option value="PATIENT">Өвчтөн (Patient)</option>
+                    <option value="USER">Хэрэглэгч (User)</option>
                   </select>
                 </label>
 

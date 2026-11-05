@@ -37,7 +37,7 @@ export async function GET(
   _request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const user = await requireRole("SUPER_ADMIN", "ADMIN");
+  const user = await requireRole("ADMIN");
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
@@ -210,7 +210,7 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const user = await requireRole("SUPER_ADMIN", "ADMIN");
+  const user = await requireRole("ADMIN");
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }

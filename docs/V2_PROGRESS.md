@@ -31,12 +31,13 @@ This is a tested security/core-workflow increment, **not a complete V2 delivery 
 | --- | --- |
 | `bun run typecheck` | Passed |
 | `bun run lint` | Passed, zero errors/warnings |
-| `bun test tests` | 40 passed, zero failed |
+| `bun test tests` | 44 passed, zero failed |
 | `bun run test:database` | Passed actual Prisma workflows on isolated in-memory PGlite; no production URL used |
 | Public booking Playwright suite | 4 passed with intercepted clinic APIs, including phone confirmation and 320/1280px layout checks |
 | `bun run build` | Passed with the local DATABASE_URL configuration supplied during the session |
 | `bun run check:env` | Failed: local AUTH_SECRET missing; not suppressed |
 | Read-only production metadata audit | Completed; all seven migration records finished, 45 indexes, role counts and constraints inspected |
+| `bun run test:roles` | Passed isolated legacy-schema migration, actual login/session continuity and last-admin checks |
 | Production mutations / destructive migration / deployment | Not executed |
 | Native PostgreSQL concurrency / restored-staging migration rehearsal | Not executed |
 
@@ -66,7 +67,7 @@ About 81.5% lower median in this three-run sample. Excludes HTTP transport and d
 | Appointments | FIX / ADD | Rescheduling, day/week views, coordinated schedule-edit locking, durable reminders, repeat-booking flag/audit semantics |
 | Patients | ADD / FIX | Medical/financial/document history depends on new durable models; authenticated UI QA |
 | Doctor/employee management | FIX / ADD | Doctor-service eligibility, employment fields and all lifecycle tests |
-| Four primary roles | ADD / migration | Approval required; concrete mapping in database/ROLE_MIGRATION_PLAN.md; no values changed |
+| Four primary roles | ADD / migration | Mapping approved for implementation/staging; code and two migrations implemented/rehearsed locally; native staging and production conversion pending |
 | Odontogram / structured clinical records | ADD | Models, migrations, clinical policy, UI and integration tests |
 | Documents / consent | ADD | Private file delivery, authorization, retention and records |
 | Laboratory | ADD | Confirm clinic workflow, model and implement if required |
@@ -86,13 +87,13 @@ Schema expansion and production role conversion are not attempted against the on
 - The reception appointment list still returns the full authorized list to preserve current filtering/statistics behavior; server/client pagination migration is pending.
 - Missing AUTH_SECRET prevents real rate-limited login/registration/upload/booking operations until configured. Check-env reports it; no local or production secrets were silently changed.
 - Credential removal from source does not revoke exposed credentials or scrub Git history. Provider rotation is pending explicit operational access/approval.
-- Five role values remain, and no phone-based public appointment-history access was enabled without ownership proof.
+- The application exposes four primary roles with legacy read normalization. Two deprecated enum labels remain solely for decoder compatibility; a pending migration enforces four allowed stored values. Production roles remain unchanged. No phone-based public appointment-history access was enabled without ownership proof.
 - `pg` emits an SSL-mode future-compatibility warning for the configured connection. Certificate verification was not disabled to hide it.
 - Existing JSON export is incomplete for disaster recovery; use verified provider/database backups.
 
 ## Database changes
 
-None to production or Prisma schema/migrations. Read-only metadata/count queries and a small read-only handler benchmark were performed. Isolated PGlite data was created only in memory for tests and disposed afterward.
+None to production. The subsequent approved role increment adds USER to the Prisma compatibility enum and supplies two unapplied forward-only role migrations. Read-only metadata/count queries and a small read-only handler benchmark were performed. Isolated PGlite data was created only in memory for tests and disposed afterward.
 
 ## Files removed
 
@@ -100,7 +101,7 @@ No existing application source file, migration, asset or documentation file was 
 
 ## Handover and next action
 
-Use README.md and the architecture/API/database/development/deployment guides. Review the four-role mapping proposal and obtain staging/native PostgreSQL test capability before database work. Set the missing AUTH_SECRET through the intended environment workflow, rotate exposed credentials with provider approval, and verify authenticated staff workflows before release. No complete-V2 acceptance claim is made.
+Use README.md and the architecture/API/database/development/deployment guides. The four-role mapping is approved and implemented; obtain native PostgreSQL staging capability and separate production approval before executing its migrations. Set the missing AUTH_SECRET through the intended environment workflow, rotate exposed credentials with provider approval, and verify authenticated staff workflows before release. No complete-V2 acceptance claim is made.
 
 ## Files changed in this increment
 
@@ -169,3 +170,9 @@ Use README.md and the architecture/API/database/development/deployment guides. R
 - `tests/v2-regressions.test.ts`
 
 `package-lock.json` remains the pre-existing user change and is excluded from V2 commits. `.env` is user-provided, ignored, and was neither committed nor edited by this work.
+
+## Approved role increment
+
+User approval received on 2026-11-05 covers implementation and staging tests only. Implemented ADMIN/DOCTOR/RECEPTION/USER primary types, legacy SUPER_ADMIN/PATIENT read mapping, canonical login/session/account-list responses, role assignment/UI updates, equal-admin management and last-active-admin guards. Pending SQL adds USER, maps legacy rows with audits, validates four-role storage and adds a last-admin trigger. Both actual SQL files pass an isolated legacy-schema PGlite rehearsal, including actual administrator logins and session preservation; no native staging or production conversion occurred.
+
+Important paths: `lib/roles.ts`, `lib/permissions/policy.ts`, `lib/auth.ts`, `lib/auth/users.ts`, `app/api/admin/users/route.ts`, `prisma/schema.prisma`, both `prisma/migrations/20261105000*` directories, `scripts/test-role-migration.js`, `tests/roles.test.ts` and `docs/database/ROLE_MIGRATION_PLAN.md`. Existing route URLs and operator environment variable names remain compatible. Updated callers, layouts, bootstrap/seed, UI, docs and policy tests reference the canonical roles. No application data/models were deleted.

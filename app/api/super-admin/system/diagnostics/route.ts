@@ -5,7 +5,7 @@ import { readdir, unlink } from "fs/promises";
 import path from "path";
 
 export async function POST(request: Request) {
-  const user = await requireRole("SUPER_ADMIN", "ADMIN");
+  const user = await requireRole("ADMIN");
   if (!user) {
     return NextResponse.json(
       { error: "Хандах эрхгүй байна." },

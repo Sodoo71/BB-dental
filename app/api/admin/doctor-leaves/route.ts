@@ -5,7 +5,7 @@ import { hasDoctorLeaveConflict } from "@/lib/doctor-leaves";
 import { apiError, HttpError } from "@/lib/security/http";
 
 export async function GET(request: Request) {
-  const user = await requireRole("ADMIN", "SUPER_ADMIN");
+  const user = await requireRole("ADMIN");
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const user = await requireRole("ADMIN", "SUPER_ADMIN");
+  const user = await requireRole("ADMIN");
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }

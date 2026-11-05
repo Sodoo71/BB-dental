@@ -24,7 +24,7 @@ Earlier `docs/SECURITY_ROLLOUT.md` described a database without Prisma history. 
 
 ## Changes in this branch
 
-No Prisma schema edits, new migrations, backfills or production data changes. Service/doctor DELETE endpoints archive using existing `isActive` fields. Appointment DELETE cancels using the existing status field. The cascade constraint remains in the database, so direct SQL deletion is still dangerous.
+The initial increment made no schema changes. The subsequent approved role increment adds USER to the compatibility enum and supplies two forward-only role migrations; these were tested only in isolated PGlite and have not been applied to production. Service/doctor DELETE endpoints archive using existing `isActive` fields. Appointment DELETE cancels using the existing status field. The cascade constraint remains in the database, so direct SQL deletion is still dangerous.
 
 ## Forward migration work
 
@@ -46,3 +46,7 @@ Financial expansion should use Decimal monetary values and immutable invoice/pay
 `bun run db:inspect` prints table/column names. `bun run db:inspect --audit` prints role counts, migration states, constraints, indexes and one warm ping. `--verify-security` checks security-table presence and account-state consistency. All run inside read-only transactions and never print credentials or patient rows.
 
 The old `scripts/apply-security-upgrade.ts` entry point now refuses execution rather than referencing an absent migration or guessing a baseline.
+
+## Approved role implementation
+
+See ROLE_MIGRATION_PLAN.md for the implemented four-role normalization, two-stage migration, validated four-role CHECK and last-admin trigger, isolated rehearsal results, deployment ordering and recovery. The seven-migration production inventory above remains the last read-only observation; two new role migrations are pending.

@@ -34,7 +34,7 @@ export default function SuperAdminAdminsPage() {
         }
 
         const nextAdmins = ((payload.data ?? []) as AdminRow[]).filter((user) =>
-          ["SUPER_ADMIN", "ADMIN"].includes(user.role),
+          ["ADMIN"].includes(user.role),
         );
         setAdmins(nextAdmins);
       } finally {

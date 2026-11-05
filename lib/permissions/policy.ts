@@ -1,19 +1,19 @@
-export type StaffRole = "SUPER_ADMIN" | "ADMIN" | "RECEPTION" | "DOCTOR" | "PATIENT";
+import { normalizeRole, type StoredRole, type AppRole } from "@/lib/roles";
+export type StaffRole = StoredRole;
 export type AccountState = "PENDING" | "ACTIVE" | "REJECTED" | "SUSPENDED";
 export type Permission = "users:manage" | "settings:manage" | "appointments:manage" | "patients:read" | "clinical:own";
 export type Principal = { role: StaffRole; status: AccountState; isActive: boolean };
-const grants: Record<StaffRole, readonly Permission[]> = {
-  SUPER_ADMIN: ["users:manage", "settings:manage", "appointments:manage", "patients:read", "clinical:own"],
+const grants: Record<AppRole, readonly Permission[]> = {
   ADMIN: ["users:manage", "settings:manage", "appointments:manage", "patients:read", "clinical:own"],
   RECEPTION: ["appointments:manage", "patients:read"],
   DOCTOR: ["clinical:own"],
-  PATIENT: [],
+  USER: [],
 };
 export function hasPermission(user: Principal | null, permission: Permission): boolean {
-  return Boolean(user?.isActive && user.status === "ACTIVE" && grants[user.role].includes(permission));
+  const role = user && normalizeRole(user.role);
+  return Boolean(user?.isActive && user.status === "ACTIVE" && role && grants[role].includes(permission));
 }
 export function mayManageUser(actor: { id: string; role: StaffRole }, target: { id: string; role: StaffRole }, nextRole?: StaffRole) {
-  if (actor.role !== "SUPER_ADMIN" && actor.role !== "ADMIN") return false;
-  if (actor.id === target.id) return false;
-  return actor.role === "SUPER_ADMIN" || (target.role !== "SUPER_ADMIN" && nextRole !== "SUPER_ADMIN");
+  return normalizeRole(actor.role) === "ADMIN" && actor.id !== target.id &&
+    (nextRole === undefined || (nextRole !== "SUPER_ADMIN" && nextRole !== "PATIENT"));
 }

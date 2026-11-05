@@ -6,7 +6,7 @@ import { sendTelegramRaw } from "@/lib/telegram";
 import { apiError, HttpError } from "@/lib/security/http";
 export async function POST(request: Request) {
   try {
-    const actor = await requireRole("SUPER_ADMIN", "ADMIN");
+    const actor = await requireRole("ADMIN");
     if (!actor) throw new HttpError(403, "Хандах эрхгүй байна.");
     const { chatId, text } = z
       .object({

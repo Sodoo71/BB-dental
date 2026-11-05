@@ -10,7 +10,7 @@ export async function GET(
   context: { params: Promise<{ id: string }> },
 ) {
   const { id: doctorId } = await context.params;
-  const user = await requireRole("ADMIN", "SUPER_ADMIN", "RECEPTION");
+  const user = await requireRole("ADMIN", "RECEPTION");
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
@@ -34,7 +34,7 @@ export async function POST(
   context: { params: Promise<{ id: string }> },
 ) {
   const { id: doctorId } = await context.params;
-  const user = await requireRole("ADMIN", "SUPER_ADMIN");
+  const user = await requireRole("ADMIN");
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
@@ -138,7 +138,7 @@ export async function DELETE(
   context: { params: Promise<{ id: string }> },
 ) {
   const { id: doctorId } = await context.params;
-  const user = await requireRole("ADMIN", "SUPER_ADMIN");
+  const user = await requireRole("ADMIN");
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 

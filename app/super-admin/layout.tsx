@@ -14,7 +14,7 @@ export default async function SuperAdminLayout({
     redirect("/login");
   }
 
-  if (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN") {
+  if (user.role !== "ADMIN") {
     redirect("/unauthorized");
   }
 

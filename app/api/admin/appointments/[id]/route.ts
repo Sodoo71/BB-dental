@@ -6,7 +6,7 @@ import { changeAppointmentStatus } from "@/lib/appointments/service";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireRole("ADMIN", "SUPER_ADMIN", "RECEPTION");
+    const user = await requireRole("ADMIN", "RECEPTION");
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     const { status } = z.object({ status: z.enum(["PENDING", "CONFIRMED", "COMPLETED", "CANCELLED", "NO_SHOW"]) }).parse(await request.json());
     const { id } = await params;
@@ -19,7 +19,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 // Legacy DELETE now cancels; appointment history and notes remain accessible.
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireRole("ADMIN", "SUPER_ADMIN", "RECEPTION");
+    const user = await requireRole("ADMIN", "RECEPTION");
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     const { id } = await params;
     await changeAppointmentStatus(user, id, "CANCELLED");

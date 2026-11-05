@@ -15,7 +15,7 @@ hooks/                  Existing client data/booking hooks
 lib/
   appointments/         Field allowlists, state policy, transactional status service
   auth/                 Password/session/account lifecycle and registration policy
-  permissions/          Existing five-role permission map
+  permissions/          Four primary roles with legacy stored-role read compatibility
   security/             Origin checks, HTTP errors, rate limits, image validation
   validation/           Input schemas
 prisma/                 Existing schema and unchanged migration history
@@ -44,3 +44,5 @@ Cloudinary uploads use the existing signed HTTP API implementation, not the remo
 ## Boundaries still to implement
 
 No payment ledger, invoice, inventory, odontogram, private document, payroll or laboratory module is represented as complete. Their durable records and migration tests depend on a reviewed database expansion. OTP was explicitly declined. A typed phone confirmation must never be used as proof of identity for appointment history.
+
+The approved role increment canonicalizes session/login/account-list roles, allows equal administrators, and checks last-active-admin preservation inside account-management transactions. A pending database conversion adds a four-value CHECK and last-admin trigger. Deprecated enum labels remain for safe decoding during rollout; production has not been converted. See the role migration plan for deployment ordering and recovery.

@@ -30,6 +30,7 @@ bun run typecheck
 bun run lint
 bun test tests
 bun run test:database
+bun run test:roles
 bun run build
 # Start a local server separately, then:
 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3101 bun run test:e2e
@@ -48,3 +49,5 @@ PGlite and its socket helper are exact-version development dependencies already 
 `bun scripts/benchmark-availability.js 29be91d` compares the original and current suggestion handlers, three runs each. Every connection enforces `default_transaction_read_only=on`; output includes timings only. It chooses one active doctor/service and does not issue writes. This measures direct handler/database work, not HTTP transport or a production percentile. Review access before running against a clinic environment.
 
 Measured 2026-11-05: baseline suggestion handler 1416/1080/1354 ms; optimized handler 842/250/222 ms. Median of three: 1354 → 250 ms (about 81.5% lower). Same active doctor/service, sequential before/after pairs and pooled read-only connections. Small sample; no HTTP transport, no cold-start distribution, no production SLO claim. The baseline route was loaded from 29be91d while using the current shared availability helpers.
+
+`bun run test:roles` rehearses the approved expansion/conversion SQL against a synthetic legacy schema in PGlite. It also exercises actual login/session continuity and last-admin guards. It does not connect to production, prove native multi-connection behavior or authorize production deployment.

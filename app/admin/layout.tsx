@@ -13,7 +13,7 @@ export default async function AdminLayout({
     redirect("/login");
   }
 
-  if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN" && user.role !== "RECEPTION") {
+  if (user.role !== "ADMIN" && user.role !== "RECEPTION") {
     redirect("/unauthorized");
   }
 

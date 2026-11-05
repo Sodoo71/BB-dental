@@ -14,7 +14,7 @@ export type SuperAdminDashboard = {
 
 export async function getCurrentSuperAdminProfile() {
   const profile = await fetchJson("/api/auth/me");
-  if (!["SUPER_ADMIN", "ADMIN"].includes(profile?.data?.role)) {
+  if (!["ADMIN"].includes(profile?.data?.role)) {
     return null;
   }
 

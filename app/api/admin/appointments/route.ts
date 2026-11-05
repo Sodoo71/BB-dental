@@ -22,7 +22,7 @@ function addMinutes(startTime: string, durationMin: number) {
 }
 
 export async function GET(request: Request) {
-  const user = await requireRole("ADMIN", "SUPER_ADMIN", "RECEPTION");
+  const user = await requireRole("ADMIN", "RECEPTION");
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
@@ -100,7 +100,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const user = await requireRole("ADMIN", "SUPER_ADMIN", "RECEPTION");
+  const user = await requireRole("ADMIN", "RECEPTION");
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 

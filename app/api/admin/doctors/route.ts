@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
 
 export async function GET() {
-  const user = await requireRole("ADMIN", "SUPER_ADMIN", "RECEPTION");
+  const user = await requireRole("ADMIN", "RECEPTION");
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   try {
@@ -24,7 +24,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const user = await requireRole("ADMIN", "SUPER_ADMIN");
+  const user = await requireRole("ADMIN");
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   try {

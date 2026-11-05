@@ -5,7 +5,7 @@ import { hasPermission, type Permission } from "@/lib/permissions/policy";
 import { newSessionToken, sessionTokenHash, validSessionToken, SESSION_COOKIE, SESSION_SECONDS } from "@/lib/auth/session-token";
 export { hashPassword, verifyPassword } from "@/lib/auth/password";
 export { getDashboardRouteForRole, getRoleLabel, type AppRole } from "@/lib/roles";
-import type { AppRole } from "@/lib/roles";
+import { normalizeRole, normalizeUserRole, type StoredRole } from "@/lib/roles";
 
 export async function sessionUser() {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
@@ -14,12 +14,13 @@ export async function sessionUser() {
     where: { tokenHash: sessionTokenHash(token) },
     select: { expiresAt: true, user: { select: { id: true, role: true, status: true, isActive: true, doctorId: true, name: true, email: true } } },
   });
-  return activeSessionUser(session);
+  const user = activeSessionUser(session);
+  return user ? normalizeUserRole(user) : null;
 }
 export const requireSessionUser = sessionUser;
-export async function requireRole(...roles: AppRole[]) {
+export async function requireRole(...roles: StoredRole[]) {
   const user = await sessionUser();
-  return user && (roles.includes(user.role) || (roles.includes("DOCTOR") && Boolean(user.doctorId) && (user.role === "ADMIN" || user.role === "SUPER_ADMIN"))) ? user : null;
+  return user && (roles.some(role => normalizeRole(role) === user.role) || (roles.includes("DOCTOR") && Boolean(user.doctorId) && user.role === "ADMIN")) ? user : null;
 }
 export async function requirePermission(permission: Permission) {
   const user = await sessionUser();

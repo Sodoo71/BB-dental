@@ -17,3 +17,11 @@
 - Added architecture, API, database, role-migration, development, deployment and progress handover documents.
 
 No schema migrations, role conversion, production writes, production secrets or deployments were performed. Financial, inventory, odontogram, private document, payroll and laboratory expansion remain pending.
+
+## 2026-11-05 — approved four-role migration implementation
+
+- User approved SUPER_ADMIN → ADMIN and PATIENT → USER for implementation/staging, with equal administrators and a last-active-admin safeguard; production approval remains separate.
+- Added four canonical primary roles, legacy read normalization, canonical login/session/account responses, four-role assignment validation/UI, and ADMIN bootstrap/seed creation.
+- Added service guards for the last active administrator and forward-only enum expansion/backfill/CHECK/trigger migrations. Deprecated enum labels remain decoder compatibility values, not assignable primary roles.
+- Added isolated legacy-schema migration rehearsal covering actual administrator login/session continuity, preserved account fields, audit entries, invalid legacy writes, USER isolation, equal-admin management, last-admin protection and fail-safe rollback.
+- No production schema, account, role or environment secret was changed.

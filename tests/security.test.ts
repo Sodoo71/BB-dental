@@ -65,10 +65,10 @@ describe("permissions", () => {
       false,
     );
   });
-  it("prevents self-deactivation and manipulation of superior administrators", () => {
+  it("prevents self-management while treating legacy super administrators as equal admins", () => {
     const actor = { id: "a", role: "ADMIN" as const };
     assert.equal(mayManageUser(actor, actor), false);
-    assert.equal(mayManageUser(actor, { id: "b", role: "SUPER_ADMIN" }), false);
+    assert.equal(mayManageUser(actor, { id: "b", role: "SUPER_ADMIN" }), true);
     assert.equal(
       mayManageUser(actor, { id: "b", role: "DOCTOR" }, "SUPER_ADMIN"),
       false,

@@ -1,3 +1,4 @@
+import { normalizeRole } from "@/lib/roles";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sessionCookie, verifyPassword } from "@/lib/auth";
@@ -15,7 +16,7 @@ export async function POST(request: Request) {
     if (!user || !valid) throw new HttpError(401, "Нэвтрэх мэдээлэл буруу байна.");
     if (user.status === "PENDING") throw new HttpError(403, "Таны бүртгэл админы баталгаажуулалт хүлээж байна.");
     if (!user.isActive || user.status !== "ACTIVE") throw new HttpError(403, "Таны бүртгэлийн эрх идэвхгүй байна. Админтай холбогдоно уу.");
-    const response = NextResponse.json({ success: true, data: { name: user.name, role: user.role, doctorId: user.doctorId } });
+    const response = NextResponse.json({ success: true, data: { name: user.name, role: normalizeRole(user.role), doctorId: user.doctorId } });
     response.cookies.set(await sessionCookie(user.id));
     response.headers.set("Cache-Control", "no-store");
     return response;

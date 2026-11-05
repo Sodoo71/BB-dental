@@ -7,7 +7,7 @@ import { receptionAppointmentSelect } from "@/lib/appointments/dto";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireRole("ADMIN", "SUPER_ADMIN", "RECEPTION", "DOCTOR");
+    const user = await requireRole("ADMIN", "RECEPTION", "DOCTOR");
     if (!user || (user.role === "DOCTOR" && !user.doctorId)) throw new HttpError(403, "Хандах эрхгүй байна.");
     const { id } = await params;
     const page = patientPageSchema.parse(new URL(request.url).searchParams.get("page") ?? 1);
@@ -28,7 +28,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireRole("ADMIN", "SUPER_ADMIN", "RECEPTION");
+    const user = await requireRole("ADMIN", "RECEPTION");
     if (!user) throw new HttpError(403, "Хандах эрхгүй байна.");
     const { id } = await params;
     const input = patientSchema.partial().parse(await request.json());

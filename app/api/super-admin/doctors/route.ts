@@ -6,7 +6,7 @@ import { apiError } from "@/lib/security/http";
 
 export async function GET() {
   try {
-    if (!await requireRole("SUPER_ADMIN", "ADMIN")) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    if (!await requireRole("ADMIN")) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     const today = new Date(`${clinicDateKey()}T00:00:00Z`);
     const [doctors, totals, todayTotals, patientGroups, schedules] = await Promise.all([
       prisma.doctor.findMany({ orderBy: [{ name: "asc" }, { id: "asc" }] }),

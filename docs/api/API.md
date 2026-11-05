@@ -52,7 +52,7 @@ Service POST/PUT/DELETE requires ADMIN/SUPER_ADMIN. Price must be a nonnegative 
 
 ## Other preserved endpoint families
 
-- `/api/admin/users`, `/approve`, `/reset-password`: account administration with superior/self-management protection.
+- `/api/admin/users`, `/approve`, `/reset-password`: account administration with equal-administrator, self-management and last-active-administrator protection.
 - `/api/admin/doctors`, `/[id]/schedule`, `/[id]/availability`: doctor administration and availability.
 - `/api/admin/doctor-leaves`, `/api/doctor/availability`, `/api/doctor/exceptions`: schedule and leave workflows.
 - `/api/super-admin/overview`, `/doctors`, `/doctors/[id]`: operational analytics and doctor detail.
@@ -61,3 +61,7 @@ Service POST/PUT/DELETE requires ADMIN/SUPER_ADMIN. Price must be a nonnegative 
 - `/api/telegram/*`: delivery checks, setup, tests, doctor reminders and secret-authenticated webhook.
 
 Administrator overview retains legacy monetary keys for compatibility and adds `financialReporting.basis = CURRENT_CATALOG_ESTIMATE`. Payment/expense/recognized-revenue fields are null because corresponding transaction models are absent. Consumers must not label legacy estimates as collected revenue or profit.
+
+## Approved role compatibility increment
+
+Authorization, login, session and account-list responses expose ADMIN/DOCTOR/RECEPTION/USER. Legacy SUPER_ADMIN/PATIENT rows normalize to ADMIN/USER during rollout. New role assignments reject legacy values. `/super-admin` URLs remain stable. The database expansion/backfill/CHECK/trigger migrations are implemented but not run against production; see database/ROLE_MIGRATION_PLAN.md for ordering.

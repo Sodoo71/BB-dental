@@ -1,6 +1,6 @@
 import { doctorProfileSchema } from "@/lib/validation/doctor";
 import { apiError, HttpError } from "@/lib/security/http";
-import { lockUserAdministration } from "@/lib/auth/users";
+import { lockUserAdministration, preserveActiveAdministrator } from "@/lib/auth/users";
 import { mayManageUser } from "@/lib/permissions/policy";
 import { NextResponse } from "next/server";
 import { updateDoctorProfile } from "@/lib/auth/users";
@@ -11,7 +11,7 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const user = await requireRole("ADMIN", "SUPER_ADMIN");
+  const user = await requireRole("ADMIN");
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   const { id } = await context.params;
@@ -34,7 +34,7 @@ export async function DELETE(
   context: { params: Promise<{ id: string }> },
 ) {
   const { id } = await context.params;
-  const user = await requireRole("ADMIN", "SUPER_ADMIN");
+  const user = await requireRole("ADMIN");
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   try {
@@ -49,6 +49,7 @@ export async function DELETE(
       const linked = await tx.user.findUnique({ where: { doctorId: id } });
       if (linked && !mayManageUser(user, linked)) throw new HttpError(403, "Энэ хэрэглэгчийн эрхийг өөрчлөх боломжгүй.");
       if (linked) {
+        await preserveActiveAdministrator(tx, linked, { isActive: false, status: "SUSPENDED" });
         await tx.user.update({ where: { id: linked.id }, data: { isActive: false, status: "SUSPENDED" } });
         await tx.session.deleteMany({ where: { userId: linked.id } });
       }

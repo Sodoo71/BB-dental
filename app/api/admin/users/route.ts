@@ -4,10 +4,12 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword, requirePermission } from "@/lib/auth";
 import {
   publicUserSelect,
+  preserveActiveAdministrator,
   lockUserAdministration,
   syncDoctor,
   changeAccountState,
 } from "@/lib/auth/users";
+import { normalizeUserRole } from "@/lib/roles";
 import { mayManageUser } from "@/lib/permissions/policy";
 import {
   emailSchema,
@@ -67,7 +69,7 @@ export async function GET(request: Request) {
       prisma.doctor.findMany({ where: { user: null, ...(params.get("pending") === "true" ? { id: "" } : {}), ...(search ? { OR: [{ name: { contains: search, mode: "insensitive" } }, { email: { contains: search, mode: "insensitive" } }] } : {}) } }),
     ]);
     const staff = [
-      ...users.map(u => ({ ...u, hasAccount: true, doctorTitle: u.doctor?.title ?? null })),
+      ...users.map(u => ({ ...normalizeUserRole(u), hasAccount: true, doctorTitle: u.doctor?.title ?? null })),
       ...doctors.map(d => ({ id: d.id, doctorId: d.id, name: d.name, email: d.email ?? "", phone: d.phone, avatarUrl: d.avatarUrl ?? d.imageUrl, telegramChatId: d.telegramChatId, role: "DOCTOR", status: d.isActive ? "ACTIVE" : "SUSPENDED", isActive: d.isActive, createdAt: d.createdAt, updatedAt: d.updatedAt, doctorTitle: d.title, hasAccount: false })),
     ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id));
     return NextResponse.json({ success: true, data: staff.slice((page - 1) * 50, page * 50), pagination: { page, pageSize: 50, total: staff.length } });
@@ -82,8 +84,6 @@ export async function POST(request: Request) {
     const input = fields
       .extend({ password: passwordSchema })
       .parse(await request.json());
-    if (input.role === "SUPER_ADMIN" && actor.role !== "SUPER_ADMIN")
-      throw new HttpError(403, "Энэ эрхийг олгох боломжгүй.");
     const passwordHash = await hashPassword(input.password);
     const status = input.status ?? (input.isActive ? "ACTIVE" : "PENDING");
     const user = await prisma.$transaction(async (tx) => {
@@ -116,7 +116,7 @@ export async function POST(request: Request) {
         select: publicUserSelect,
       });
     });
-    return NextResponse.json({ success: true, data: user }, { status: 201 });
+    return NextResponse.json({ success: true, data: normalizeUserRole(user) }, { status: 201 });
   } catch (error) {
     return apiError(error);
   }
@@ -153,6 +153,7 @@ export async function PUT(request: Request) {
             : target.status === "PENDING"
               ? "PENDING"
               : "SUSPENDED");
+      await preserveActiveAdministrator(tx, target, { role: input.role, status, isActive: status === "ACTIVE" });
       await tx.user.update({
         where: { id },
         data: {
@@ -188,7 +189,7 @@ export async function PUT(request: Request) {
         select: publicUserSelect,
       });
     });
-    return NextResponse.json({ success: true, data: user });
+    return NextResponse.json({ success: true, data: normalizeUserRole(user) });
   } catch (error) {
     return apiError(error);
   }

@@ -8,7 +8,7 @@ import { resolveDaySchedule } from "@/lib/availability-slots";
 const days = ["Ням", "Дав", "Мяг", "Лха", "Пүр", "Баа", "Бям"];
 export async function GET() {
   try {
-    if (!await requireRole("SUPER_ADMIN", "ADMIN")) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    if (!await requireRole("ADMIN")) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     const today = new Date(`${clinicDateKey()}T00:00:00Z`);
     const tomorrow = new Date(today.getTime() + 86400000);
     const weekStart = new Date(today.getTime() - 6 * 86400000);
