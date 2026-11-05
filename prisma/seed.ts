@@ -6,14 +6,26 @@ import * as dotenv from "dotenv";
 
 dotenv.config();
 
+// This is a demo-data utility, never production initialization.
+if (process.env.NODE_ENV !== "development" || process.env.ALLOW_DEVELOPMENT_SEED !== "true") {
+  throw new Error("Development seed disabled. Set NODE_ENV=development and ALLOW_DEVELOPMENT_SEED=true only for an isolated development database.");
+}
+const databaseUrl = process.env.DATABASE_URL?.trim();
+if (!databaseUrl) throw new Error("DATABASE_URL is required; there is no fallback database.");
+const databaseName = new URL(databaseUrl).pathname.slice(1);
+if (!process.env.SEED_DATABASE_NAME || databaseName !== process.env.SEED_DATABASE_NAME || !/(?:^|[_-])(dev|test)(?:$|[_-])/i.test(databaseName)) {
+  throw new Error("Seed requires an explicitly matched SEED_DATABASE_NAME containing a dev or test name segment.");
+}
+if (!process.env.SUPER_ADMIN_EMAIL || !process.env.SUPER_ADMIN_PASSWORD || process.env.SUPER_ADMIN_PASSWORD.length < 12 || !process.env.SEED_STAFF_PASSWORD || process.env.SEED_STAFF_PASSWORD.length < 12) {
+  throw new Error("Explicit administrator email and passwords of at least 12 characters are required for development seed accounts.");
+}
+
 function hashPassword(password: string) {
   const salt = randomUUID();
   return `${salt}:${scryptSync(password, salt, 64).toString("hex")}`;
 }
 
-const rawDbUrl =
-  process.env.DATABASE_URL?.trim() ||
-  "postgresql://neondb_owner:npg_DA7cev5GBxrQ@ep-cold-breeze-azyxz1o0-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require";
+const rawDbUrl = databaseUrl;
 
 const cleanDbUrl = rawDbUrl
   .replace(/channel_binding=[^&]+&?/g, "")
@@ -22,7 +34,6 @@ const cleanDbUrl = rawDbUrl
 
 const pool = new Pool({
   connectionString: cleanDbUrl,
-  ssl: { rejectUnauthorized: false },
 });
 
 const prisma = new PrismaClient({
@@ -325,8 +336,7 @@ async function main() {
   // 3. SYSTEM USERS
   console.log("Creating system users...");
   const adminEmail =
-    process.env.SUPER_ADMIN_EMAIL?.toLowerCase().trim() ||
-    "sodoosodbileg71@gmail.com";
+    process.env.SUPER_ADMIN_EMAIL!.toLowerCase().trim();
   await prisma.user.upsert({
     where: { email: adminEmail },
     create: {
@@ -335,18 +345,12 @@ async function main() {
       role: "SUPER_ADMIN",
       isActive: true,
       passwordHash: hashPassword(
-        process.env.SUPER_ADMIN_PASSWORD || "123456789",
+        process.env.SUPER_ADMIN_PASSWORD!,
       ),
       phone: "95963531",
       telegramChatId: process.env.ADMIN_CHAT_ID || "8411351733",
     },
-    update: {
-      role: "SUPER_ADMIN",
-      isActive: true,
-      passwordHash: hashPassword(
-        process.env.SUPER_ADMIN_PASSWORD || "123456789",
-      ),
-    },
+    update: {},
   });
 
   const receptionEmail = "reception@bbdental.mn";
@@ -355,16 +359,12 @@ async function main() {
     create: {
       email: receptionEmail,
       name: "А. Номин (Ресепшн)",
-      role: "ADMIN",
+      role: "RECEPTION",
       isActive: true,
-      passwordHash: hashPassword("123456789"),
+      passwordHash: hashPassword(process.env.SEED_STAFF_PASSWORD!),
       phone: "95963531",
     },
-    update: {
-      role: "ADMIN",
-      isActive: true,
-      passwordHash: hashPassword("123456789"),
-    },
+    update: {},
   });
 
   if (createdDoctors[0]) {
@@ -377,16 +377,11 @@ async function main() {
         role: "DOCTOR",
         isActive: true,
         doctorId: createdDoctors[0].id,
-        passwordHash: hashPassword("123456789"),
+        passwordHash: hashPassword(process.env.SEED_STAFF_PASSWORD!),
         phone: createdDoctors[0].phone,
         telegramChatId: createdDoctors[0].telegramChatId,
       },
-      update: {
-        doctorId: createdDoctors[0].id,
-        role: "DOCTOR",
-        isActive: true,
-        passwordHash: hashPassword("123456789"),
-      },
+      update: {},
     });
   }
 

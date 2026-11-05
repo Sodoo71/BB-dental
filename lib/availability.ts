@@ -1,5 +1,10 @@
+import { resolveDaySchedule } from "@/lib/availability-slots";
 import { clinicDateKey, clinicMinutes } from "@/lib/doctor-workspace";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@/app/generated/prisma/client";
+import { HttpError } from "@/lib/security/http";
+
+type AvailabilityDatabase = Pick<Prisma.TransactionClient, "doctor" | "service" | "doctorSchedule" | "doctorAvailabilityException" | "appointment">;
 
 const timePattern = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
@@ -64,22 +69,18 @@ export function withinRange(
   return cStart < aEnd && cEnd > aStart;
 }
 
-export async function getDoctorDaySchedule(doctorId: string, date: Date) {
+export async function getDoctorDaySchedule(doctorId: string, date: Date, db: AvailabilityDatabase = prisma) {
   const dayStart = new Date(
     Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
   );
   const dayEnd = new Date(dayStart);
   dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
 
-  const weekly = await prisma.doctorSchedule.findUnique({
+  const weekly = await db.doctorSchedule.findUnique({
     where: { doctorId_dayOfWeek: { doctorId, dayOfWeek: date.getUTCDay() } },
   });
 
-  let startTime = weekly?.startTime ?? null;
-  let endTime = weekly?.endTime ?? null;
-  let isDayOff = Boolean(weekly?.isDayOff || weekly?.isActive === false);
-
-  const exceptions = await prisma.doctorAvailabilityException.findMany({
+  const exceptions = await db.doctorAvailabilityException.findMany({
     where: {
       doctorId,
       isActive: true,
@@ -88,44 +89,7 @@ export async function getDoctorDaySchedule(doctorId: string, date: Date) {
     orderBy: { createdAt: "asc" },
   });
 
-  for (const entry of exceptions) {
-    if (entry.type === "DAY_OFF") {
-      isDayOff = true;
-      startTime = null;
-      endTime = null;
-      continue;
-    }
-    if (
-      entry.type === "SCHEDULE_OVERRIDE" &&
-      entry.startTime &&
-      entry.endTime
-    ) {
-      startTime = entry.startTime;
-      endTime = entry.endTime;
-      isDayOff = false;
-      continue;
-    }
-    if (entry.type === "BLOCKED_RANGE") {
-      // handled separately
-    }
-  }
-
-  return {
-    startTime,
-    endTime,
-    isDayOff,
-    blockedRanges: exceptions
-      .filter(
-        (entry) =>
-          entry.type === "BLOCKED_RANGE" && entry.startTime && entry.endTime,
-      )
-      .map((entry) => ({
-        startTime: entry.startTime as string,
-        endTime: entry.endTime as string,
-        reason: entry.reason,
-      })),
-    overrides: exceptions,
-  };
+  return { ...resolveDaySchedule(weekly, exceptions), overrides: exceptions };
 }
 
 export function getServiceDurationMinutes(
@@ -145,18 +109,22 @@ export async function generateAvailableSlots({
   doctorId,
   serviceId,
   date,
+  db = prisma,
+  excludeAppointmentId,
 }: {
   doctorId: string;
   serviceId: string;
   date: Date;
+  db?: AvailabilityDatabase;
+  excludeAppointmentId?: string;
 }) {
-  const doctor = await prisma.doctor.findFirst({
+  const doctor = await db.doctor.findFirst({
     where: { id: doctorId, isActive: true },
     select: { id: true },
   });
   if (!doctor) return [];
 
-  const service = await prisma.service.findFirst({
+  const service = await db.service.findFirst({
     where: { id: serviceId, isActive: true },
     select: { durationMin: true },
   });
@@ -165,7 +133,7 @@ export async function generateAvailableSlots({
   const durationMin = getServiceDurationMinutes(service.durationMin);
   if (durationMin <= 0) return [];
 
-  const daySchedule = await getDoctorDaySchedule(doctorId, date);
+  const daySchedule = await getDoctorDaySchedule(doctorId, date, db);
   if (!daySchedule.startTime || !daySchedule.endTime || daySchedule.isDayOff)
     return [];
 
@@ -176,11 +144,12 @@ export async function generateAvailableSlots({
   const nextDay = new Date(date);
   nextDay.setUTCDate(nextDay.getUTCDate() + 1);
 
-  const appointments = await prisma.appointment.findMany({
+  const appointments = await db.appointment.findMany({
     where: {
       doctorId,
       appointmentDate: { gte: date, lt: nextDay },
       status: { notIn: ["CANCELLED"] },
+      ...(excludeAppointmentId ? { id: { not: excludeAppointmentId } } : {}),
     },
     select: { startTime: true, endTime: true },
   });
@@ -254,18 +223,24 @@ export async function ensureAppointmentSlotIsAvailable({
   serviceId,
   appointmentDate,
   startTime,
+  db,
+  excludeAppointmentId,
 }: {
   doctorId: string;
   serviceId: string;
   appointmentDate: Date;
   startTime: string;
+  db?: AvailabilityDatabase;
+  excludeAppointmentId?: string;
 }) {
   const slots = await generateAvailableSlots({
     doctorId,
     serviceId,
     date: appointmentDate,
+    db,
+    excludeAppointmentId,
   });
   if (!slots.includes(startTime)) {
-    throw new Error("The selected time is no longer available.");
+    throw new HttpError(409, "The selected time is no longer available.");
   }
 }

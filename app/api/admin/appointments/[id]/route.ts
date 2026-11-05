@@ -1,98 +1,28 @@
 import { NextResponse } from "next/server";
-import { AppointmentStatus } from "@/app/generated/prisma/client";
-import { prisma } from "@/lib/prisma";
+import { z } from "zod";
 import { requireRole } from "@/lib/auth";
+import { apiError } from "@/lib/security/http";
+import { changeAppointmentStatus } from "@/lib/appointments/service";
 
-// Захиалгын статус шинэчлэх (PATCH)
-export async function PATCH(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> }, // 2. Promise болгож төрлийг нь засав
-) {
-  const user = await requireRole("ADMIN", "SUPER_ADMIN", "RECEPTION");
-  if (!user)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = await params; // params-ийг await хийнэ
-    const { status }: { status?: unknown } = await req.json();
-    if (
-      !Object.values(AppointmentStatus).includes(status as AppointmentStatus)
-    ) {
-      return NextResponse.json(
-        { error: "Захиалгын төлөв буруу байна." },
-        { status: 400 },
-      );
-    }
-    const appointment = await prisma.appointment.findUnique({
-      where: { id },
-      select: { id: true },
-    });
-    if (!appointment) {
-      return NextResponse.json(
-        { error: "Захиалга олдсонгүй." },
-        { status: 404 },
-      );
-    }
-
-    const updated = await prisma.$transaction(async tx => {
-    const updated = await tx.appointment.update({
-      where: { id },
-      data: { status: status as AppointmentStatus },
-    });
-
-    await tx.auditLog.create({ data: { actorId: user.id, action: "APPOINTMENT_UPDATED", entity: "Appointment", entityId: id, metadata: { status: String(status) } } });
-    return updated;
-    });
-    return NextResponse.json({ success: true, data: updated });
-  } catch (error: unknown) {
-    console.error("PATCH Error:", error);
-    return NextResponse.json(
-      {
-        error: "Шинэчлэхэд алдаа гарлаа",
-        details: error instanceof Error ? error.message : String(error),
-      },
-      { status: 500 },
-    );
-  }
+    const user = await requireRole("ADMIN", "SUPER_ADMIN", "RECEPTION");
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    const { status } = z.object({ status: z.enum(["PENDING", "CONFIRMED", "COMPLETED", "CANCELLED", "NO_SHOW"]) }).parse(await request.json());
+    const { id } = await params;
+    const appointment = await changeAppointmentStatus(user, id, status);
+    const { id: appointmentId, appointmentDate, startTime, endTime, status: nextStatus } = appointment;
+    return NextResponse.json({ success: true, data: { id: appointmentId, appointmentDate, startTime, endTime, status: nextStatus } });
+  } catch (error) { return apiError(error); }
 }
 
-// Захиалга устгах (DELETE)
-export async function DELETE(
-  _req: Request,
-  { params }: { params: Promise<{ id: string }> }, // 2. Promise болгож төрлийг нь засав
-) {
-  const user = await requireRole("ADMIN", "SUPER_ADMIN", "RECEPTION");
-  if (!user)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+// Legacy DELETE now cancels; appointment history and notes remain accessible.
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = await params; // params-ийг await хийнэ
-    const appointment = await prisma.appointment.findUnique({
-      where: { id },
-      select: { id: true },
-    });
-    if (!appointment) {
-      return NextResponse.json(
-        { error: "Захиалга олдсонгүй." },
-        { status: 404 },
-      );
-    }
-
-    await prisma.$transaction([
-      prisma.appointment.delete({ where: { id } }),
-      prisma.auditLog.create({ data: { actorId: user.id, action: "APPOINTMENT_DELETED", entity: "Appointment", entityId: id } }),
-    ]);
-
-    return NextResponse.json({
-      success: true,
-      message: "Амжилттай устгагдлаа",
-    });
-  } catch (error: unknown) {
-    console.error("DELETE Error:", error);
-    return NextResponse.json(
-      {
-        error: "Устгахад алдаа гарлаа",
-        details: error instanceof Error ? error.message : String(error),
-      },
-      { status: 500 },
-    );
-  }
+    const user = await requireRole("ADMIN", "SUPER_ADMIN", "RECEPTION");
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    const { id } = await params;
+    await changeAppointmentStatus(user, id, "CANCELLED");
+    return NextResponse.json({ success: true, message: "Захиалга цуцлагдлаа. Түүх хадгалагдсан." });
+  } catch (error) { return apiError(error); }
 }

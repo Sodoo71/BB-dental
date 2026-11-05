@@ -32,6 +32,7 @@ export default function BookingSection({ ref }: { ref?: Ref<BookingHandle> }) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const submitting = useRef(false);
+  const [confirmedPhone, setConfirmedPhone] = useState("");
   const panel = useRef<HTMLDivElement>(null);
   const { slots, loading: slotsLoading, error: slotsError } = useAvailability(doctorId, serviceId, date, refresh);
   const [suggestionResponse, setSuggestionResponse] = useState<{ key: string; items: Suggestion[] } | null>(null);
@@ -92,15 +93,16 @@ export default function BookingSection({ ref }: { ref?: Ref<BookingHandle> }) {
     event.preventDefault();
     if (submitting.current) return;
     if (!validTime) { setError("Боломжит цагаа дахин сонгоно уу."); setStep(2); focusPanel(); return; }
+    if (confirmedPhone !== form.phone.trim()) { setError("Утасны дугаараа зөв эсэхийг баталгаажуулна уу."); return; }
     submitting.current = true; setSending(true); setError("");
     try {
-      const response = await fetch("/api/appointments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, fullName: form.fullName.trim(), phone: form.phone.trim(), doctorId, serviceId, appointmentDate: date }) });
+      const response = await fetch("/api/appointments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, phoneConfirmed: true, fullName: form.fullName.trim(), phone: form.phone.trim(), doctorId, serviceId, appointmentDate: date }) });
       const data = await response.json();
       if (!response.ok) {
         if (response.status === 409) { clearTime(); setRefresh((value) => value + 1); setStep(2); }
         throw new Error(data.error || "Захиалгыг бүртгэж чадсангүй.");
       }
-      setSuccess(true); resetForm(); setRefresh((value) => value + 1); focusPanel();
+      setSuccess(true); setConfirmedPhone(""); resetForm(); setRefresh((value) => value + 1); focusPanel();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Сервертэй холбогдож чадсангүй. Дахин оролдоно уу."); }
     finally { submitting.current = false; setSending(false); }
   }
@@ -143,7 +145,7 @@ export default function BookingSection({ ref }: { ref?: Ref<BookingHandle> }) {
               </div>}
               {step === 3 && <form id="booking-patient-form" onSubmit={submit}>
                 <h3 className="mb-4 text-lg font-semibold">Таны мэдээлэл</h3>
-                <fieldset disabled={sending} className="min-w-0"><div className="grid gap-x-4 sm:grid-cols-2"><Field label="Овог нэр *"><input required autoComplete="name" value={form.fullName} onChange={(event) => setForm({ ...form, fullName: event.target.value })} placeholder="Овог нэрээ оруулна уу" /></Field><Field label="Утасны дугаар *"><input required type="tel" autoComplete="tel" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} placeholder="Утасны дугаар" /></Field></div><details className="mt-1 rounded-xl border border-slate-200 p-3"><summary className="text-sm text-slate-600">Нэмэлт мэдээлэл (заавал биш)</summary><div className="mt-4 grid gap-x-4 sm:grid-cols-2"><Field label="Нас"><input type="number" min="0" max="150" value={form.age} onChange={(event) => setForm({ ...form, age: event.target.value })} /></Field><Field label="Хүйс"><select value={form.gender} onChange={(event) => setForm({ ...form, gender: event.target.value })}><option value="MALE">Эрэгтэй</option><option value="FEMALE">Эмэгтэй</option><option value="OTHER">Бусад</option></select></Field></div><Field label="Зовиур / Нэмэлт тайлбар"><textarea rows={3} value={form.chiefComplaint} onChange={(event) => setForm({ ...form, chiefComplaint: event.target.value })} /></Field></details></fieldset>
+                <fieldset disabled={sending} className="min-w-0"><div className="grid gap-x-4 sm:grid-cols-2"><Field label="Овог нэр *"><input required autoComplete="name" value={form.fullName} onChange={(event) => setForm({ ...form, fullName: event.target.value })} placeholder="Овог нэрээ оруулна уу" /></Field><Field label="Утасны дугаар *"><input required type="tel" autoComplete="tel" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} placeholder="Утасны дугаар" /></Field></div><label className="mb-4 flex min-h-11 items-center gap-3 rounded-xl border border-slate-200 p-3 text-sm"><input type="checkbox" required checked={Boolean(form.phone.trim()) && confirmedPhone === form.phone.trim()} onChange={(event) => setConfirmedPhone(event.target.checked ? form.phone.trim() : "")} />{form.phone.trim() || "Оруулсан"} — энэ утасны дугаар зөв.</label><details className="mt-1 rounded-xl border border-slate-200 p-3"><summary className="text-sm text-slate-600">Нэмэлт мэдээлэл (заавал биш)</summary><div className="mt-4 grid gap-x-4 sm:grid-cols-2"><Field label="Нас"><input type="number" min="0" max="150" value={form.age} onChange={(event) => setForm({ ...form, age: event.target.value })} /></Field><Field label="Хүйс"><select value={form.gender} onChange={(event) => setForm({ ...form, gender: event.target.value })}><option value="MALE">Эрэгтэй</option><option value="FEMALE">Эмэгтэй</option><option value="OTHER">Бусад</option></select></Field></div><Field label="Зовиур / Нэмэлт тайлбар"><textarea rows={3} value={form.chiefComplaint} onChange={(event) => setForm({ ...form, chiefComplaint: event.target.value })} /></Field></details></fieldset>
               </form>}
               {error && <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
             </div>

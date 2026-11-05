@@ -1,5 +1,7 @@
 import { doctorProfileSchema } from "@/lib/validation/doctor";
-import { apiError } from "@/lib/security/http";
+import { apiError, HttpError } from "@/lib/security/http";
+import { lockUserAdministration } from "@/lib/auth/users";
+import { mayManageUser } from "@/lib/permissions/policy";
 import { NextResponse } from "next/server";
 import { updateDoctorProfile } from "@/lib/auth/users";
 import { prisma } from "@/lib/prisma";
@@ -42,15 +44,19 @@ export async function DELETE(
     });
     if (!doctor)
       return NextResponse.json({ error: "Эмч олдсонгүй." }, { status: 404 });
-    await prisma.doctor.delete({ where: { id } });
-    return NextResponse.json({ success: true });
+    await prisma.$transaction(async tx => {
+      await lockUserAdministration(tx, user);
+      const linked = await tx.user.findUnique({ where: { doctorId: id } });
+      if (linked && !mayManageUser(user, linked)) throw new HttpError(403, "Энэ хэрэглэгчийн эрхийг өөрчлөх боломжгүй.");
+      if (linked) {
+        await tx.user.update({ where: { id: linked.id }, data: { isActive: false, status: "SUSPENDED" } });
+        await tx.session.deleteMany({ where: { userId: linked.id } });
+      }
+      await tx.doctor.update({ where: { id }, data: { isActive: false } });
+      await tx.auditLog.create({ data: { actorId: user.id, action: "DOCTOR_ARCHIVED", entity: "Doctor", entityId: id } });
+    });
+    return NextResponse.json({ success: true, message: "Эмч идэвхгүй боллоо. Захиалгын түүх хадгалагдсан." });
   } catch (error) {
-    console.error("DELETE /api/admin/doctors/[id] error:", error);
-    return NextResponse.json(
-      {
-        error: "Энэ эмч захиалгатай тул устгах боломжгүй. Идэвхгүй болгоно уу.",
-      },
-      { status: 409 },
-    );
+    return apiError(error);
   }
 }

@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import { rateLimit } from "@/lib/security/rate-limit";
+import { apiError, HttpError } from "@/lib/security/http";
+import { phoneSchema } from "@/lib/validation/phone";
+import { bookingConfirmationSelect } from "@/lib/appointments/dto";
 import { Gender } from "@/app/generated/prisma/client";
 import {
   ensureAppointmentSlotIsAvailable,
@@ -31,6 +35,7 @@ export async function POST(req: Request) {
     }
 
     const {
+      phoneConfirmed,
       fullName,
       phone,
       age,
@@ -57,13 +62,17 @@ export async function POST(req: Request) {
     }
 
     const date = parseDateInput(appointmentDate);
-    const normalizedPhone = phone.trim();
+    if (phoneConfirmed !== true) throw new HttpError(400, "Утасны дугаараа зөв эсэхийг баталгаажуулна уу.");
+    const normalizedPhone = phoneSchema.parse(phone);
+    await rateLimit("public-booking", "clinic", 200, 15);
+    await rateLimit("public-booking-phone", normalizedPhone, 5, 15);
     const normalizedName = fullName.trim();
     const parsedAge = age === "" || age === undefined ? null : Number(age);
     const validGenders = Object.values(Gender);
 
     if (
-      !normalizedName ||
+      !normalizedName || normalizedName.length > 120 ||
+      (typeof chiefComplaint === "string" && chiefComplaint.length > 2000) ||
       !normalizedPhone ||
       !date ||
       !timePattern.test(startTime) ||
@@ -127,7 +136,10 @@ export async function POST(req: Request) {
 
     const appointment = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`${doctorId}:${date.toISOString().slice(0, 10)}`}))::text`;
+      const currentService = await tx.service.findFirst({ where: { id: serviceId, isActive: true }, select: { durationMin: true } });
+      if (!currentService || currentService.durationMin !== durationMin) throw new HttpError(409, "Үйлчилгээний хугацаа өөрчлөгдсөн байна. Дахин цаг сонгоно уу.");
 
+      await ensureAppointmentSlotIsAvailable({ doctorId, serviceId, appointmentDate: date, startTime, db: tx });
       const existing = await tx.appointment.findFirst({
         where: {
           doctorId,
@@ -155,18 +167,13 @@ export async function POST(req: Request) {
       });
 
       if (existing) {
-        throw new Error(
-          "Энэ цагийг өөр хүн захиалсан байна. Өөр цаг сонгоно уу.",
-        );
+        throw new HttpError(409, "Энэ цагийг өөр хүн захиалсан байна. Өөр цаг сонгоно уу.");
       }
 
       const patient = await tx.patient.upsert({
         where: { phone: normalizedPhone },
-        update: {
-          fullName: normalizedName,
-          age: parsedAge,
-          gender: gender as Gender | null | undefined,
-        },
+        // Confirmation checks typing only; it does not prove phone ownership.
+        update: {},
         create: {
           phone: normalizedPhone,
           fullName: normalizedName,
@@ -191,25 +198,21 @@ export async function POST(req: Request) {
               ? chiefComplaint.trim() || null
               : null,
         },
+        select: bookingConfirmationSelect,
       });
       await tx.auditLog.create({ data: { action: "APPOINTMENT_CREATED", entity: "Appointment", entityId: created.id } });
       return created;
     });
 
-    const patient = await prisma.patient.findUnique({
-      where: { phone: normalizedPhone },
-      select: { fullName: true, phone: true },
-    });
-
     let notificationSent = false;
-    if (patient) {
+    {
       try {
         notificationSent = await notifyDoctorOnTelegram({
           chatId: doctor.telegramChatId || "",
           appointmentId: appointment.id,
           doctorName: doctor.name,
-          patientName: patient.fullName,
-          patientPhone: patient.phone,
+          patientName: normalizedName,
+          patientPhone: normalizedPhone,
           serviceName: service.name,
           appointmentDate: date,
           startTime,
@@ -228,20 +231,6 @@ export async function POST(req: Request) {
       { status: 201 },
     );
   } catch (error: unknown) {
-    console.error("❌ [POST /api/appointments Error]:", error);
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error && error.message
-            ? error.message
-            : "Захиалга үүсгэхэд алдаа гарлаа.",
-      },
-      {
-        status:
-          error instanceof Error && error.message.includes("available")
-            ? 409
-            : 500,
-      },
-    );
+    return apiError(error);
   }
 }

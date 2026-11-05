@@ -114,6 +114,8 @@ export function AdminSidebar({
             );
           })}
 
+          <Link href="/admin/patients" onClick={onCloseMobile} className="flex items-center gap-3 rounded-2xl px-3.5 py-3 text-sm font-semibold text-slate-300 hover:bg-slate-900 hover:text-white"><Users className="h-4 w-4" />Үйлчлүүлэгч бүртгэх / засах</Link>
+
           {["SUPER_ADMIN", "ADMIN"].includes(user.role) && (
             <div className="pt-3">
               <div className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">

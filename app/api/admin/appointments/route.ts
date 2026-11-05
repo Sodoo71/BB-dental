@@ -1,3 +1,5 @@
+import { receptionAppointmentSelect } from "@/lib/appointments/dto";
+import { apiError, HttpError } from "@/lib/security/http";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
@@ -75,7 +77,7 @@ export async function GET(request: Request) {
 
     const appointments = await prisma.appointment.findMany({
       where,
-      include: { patient: true, doctor: true, service: true, notes: true },
+      select: user.role === "RECEPTION" ? receptionAppointmentSelect : { ...receptionAppointmentSelect, note: true, chiefComplaint: true, notes: true },
       orderBy: { createdAt: "desc" },
     });
 
@@ -88,20 +90,12 @@ export async function GET(request: Request) {
         age: null,
         gender: null,
       },
-      notes: app.notes || [],
+
     }));
 
     return NextResponse.json({ success: true, data: mapped });
   } catch (error: unknown) {
-    console.error("❌ [GET /api/admin/appointments Error]:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Захиалгын дата авахад алдаа гарлаа",
-        details: error instanceof Error ? error.message : String(error),
-      },
-      { status: 500 },
-    );
+    return apiError(error);
   }
 }
 
@@ -174,7 +168,7 @@ export async function POST(request: Request) {
         { status: 404 },
       );
     }
-    const force = body.force === true;
+    const force = body.force === true && user.role !== "RECEPTION";
 
     if (!force) {
       await ensureAppointmentSlotIsAvailable({
@@ -210,6 +204,10 @@ export async function POST(request: Request) {
 
     const appointment = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`${doctorId}:${date.toISOString().slice(0, 10)}`}))::text`;
+      const currentService = await tx.service.findFirst({ where: { id: serviceId, isActive: true }, select: { durationMin: true } });
+      if (!currentService || currentService.durationMin !== durationMin) throw new HttpError(409, "Үйлчилгээний хугацаа өөрчлөгдсөн байна. Дахин цаг сонгоно уу.");
+
+      if (!force) await ensureAppointmentSlotIsAvailable({ doctorId, serviceId, appointmentDate: date, startTime, db: tx });
 
       const match = patientId
         ? await tx.patient.findUnique({
@@ -278,6 +276,7 @@ export async function POST(request: Request) {
               : "PENDING",
           chiefComplaint,
         },
+        select: { ...receptionAppointmentSelect, chiefComplaint: user.role !== "RECEPTION" },
       });
       await tx.auditLog.create({
         data: {
@@ -311,7 +310,7 @@ export async function POST(request: Request) {
             serviceName: srv.name,
             appointmentDate: appointment.appointmentDate,
             startTime: appointment.startTime,
-            chiefComplaint: appointment.chiefComplaint,
+            chiefComplaint: user.role === "RECEPTION" ? null : chiefComplaint,
           });
         }
       } catch (tgErr) {
@@ -324,15 +323,6 @@ export async function POST(request: Request) {
       { status: 201 },
     );
   } catch (error: unknown) {
-    console.error("POST /api/admin/appointments error:", error);
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Захиалгыг үүсгэхэд алдаа гарлаа.",
-      },
-      { status: 409 },
-    );
+    return apiError(error);
   }
 }

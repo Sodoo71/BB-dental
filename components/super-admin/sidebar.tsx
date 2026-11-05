@@ -8,7 +8,7 @@ import LogoutButton from "@/components/auth/LogoutButton";
 import { getRoleLabel } from "@/lib/roles";
 const sections = [
   { label: "Ерөнхий", items: [{ href: "/super-admin", label: "Хянах самбар", icon: LayoutGrid }, { href: "/admin", label: "Цаг захиалга", icon: CalendarRange }] },
-  { label: "Удирдлага", items: [{ href: "/super-admin/services", label: "Үйлчилгээ", icon: Layers }, { href: "/super-admin/doctors", label: "Эмч нар", icon: Stethoscope }, { href: "/super-admin/users", label: "Ажилтнууд", icon: Users }, { href: "/super-admin/admins", label: "Админууд", icon: ShieldCheck }] },
+  { label: "Удирдлага", items: [{ href: "/super-admin/patients", label: "Үйлчлүүлэгчид", icon: Users }, { href: "/super-admin/services", label: "Үйлчилгээ", icon: Layers }, { href: "/super-admin/doctors", label: "Эмч нар", icon: Stethoscope }, { href: "/super-admin/users", label: "Ажилтнууд", icon: Users }, { href: "/super-admin/admins", label: "Админууд", icon: ShieldCheck }] },
   { label: "Систем", items: [{ href: "/super-admin/logs", label: "Үйлдлийн түүх", icon: Activity }, { href: "/super-admin/settings", label: "Тохиргоо", icon: Settings }] },
 ];
 export function SuperAdminSidebar({ user, collapsed, mobileOpen, onCloseMobile }: {

@@ -31,9 +31,10 @@ test("service selection skips the long list and submits the selected service", a
   await booking.getByRole("button", { name: "Үргэлжлүүлэх" }).click();
   await booking.getByLabel("Овог нэр *", { exact: true }).fill("Тест Хэрэглэгч");
   await booking.getByLabel("Утасны дугаар *", { exact: true }).fill("99112233");
+  await booking.getByRole("checkbox", { name: /энэ утасны дугаар зөв/ }).check();
   const request = page.waitForRequest((request) => request.url().endsWith("/api/appointments") && request.method() === "POST");
   await booking.getByRole("button", { name: "Захиалга баталгаажуулах", exact: true }).click();
-  expect((await request).postDataJSON()).toMatchObject({ serviceId: "service-2", doctorId: "doctor-1", startTime: "10:00", appointmentDate: day });
+  expect((await request).postDataJSON()).toMatchObject({ phoneConfirmed: true, serviceId: "service-2", doctorId: "doctor-1", startTime: "10:00", appointmentDate: day });
   await expect(booking.getByText("Цаг амжилттай захиалагдлаа", { exact: true })).toBeVisible();
 });
 
@@ -61,6 +62,7 @@ test("slot conflict keeps patient details and lets the user choose another time"
   await booking.getByRole("button", { name: "Үргэлжлүүлэх" }).click();
   await booking.getByLabel("Овог нэр *", { exact: true }).fill("Тест Нэр");
   await booking.getByLabel("Утасны дугаар *", { exact: true }).fill("99112233");
+  await booking.getByRole("checkbox", { name: /энэ утасны дугаар зөв/ }).check();
   await booking.getByRole("button", { name: "Захиалга баталгаажуулах", exact: true }).click();
   await expect(booking.getByRole("alert")).toContainText("Энэ цаг захиалагдсан байна.");
   await expect(booking.getByRole("button", { name: "Үргэлжлүүлэх" })).toBeDisabled();

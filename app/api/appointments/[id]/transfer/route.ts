@@ -51,12 +51,13 @@ export async function POST(
     const noteText = `Шилжүүлэг: ${prevDoctorName} -> ${targetDoctor.name}.${reason ? ` Шалтгаан: ${reason}` : ""}`;
 
     const updatedAppointment = await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM "Appointment" WHERE id = ${id} FOR UPDATE`;
       for (const doctorId of [appointment.doctorId, targetDoctorId].filter((id): id is string => Boolean(id)).sort()) {
         await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`${doctorId}:${appointment.appointmentDate.toISOString().slice(0, 10)}`}))::text`;
       }
       const current = await tx.appointment.findFirst({ where: { id, doctorId: appointment.doctorId, status: { in: ["PENDING", "CONFIRMED"] } } });
       if (!current) throw new HttpError(409, "Энэ захиалга өөрчлөгдсөн эсвэл дууссан байна. Жагсаалтаа шинэчилнэ үү.");
-      try { await ensureAppointmentSlotIsAvailable({ doctorId: targetDoctorId, serviceId: current.serviceId, appointmentDate: current.appointmentDate, startTime: current.startTime }); }
+      try { await ensureAppointmentSlotIsAvailable({ doctorId: targetDoctorId, serviceId: current.serviceId, appointmentDate: current.appointmentDate, startTime: current.startTime, db: tx }); }
       catch { throw new HttpError(409, "Сонгосон эмч энэ цагт ажиллахгүй эсвэл өөр захиалгатай байна."); }
       const collision = await tx.appointment.findFirst({ where: { doctorId: targetDoctorId, appointmentDate: current.appointmentDate, status: { in: ["PENDING", "CONFIRMED", "COMPLETED", "NO_SHOW"] }, startTime: { lt: current.endTime }, endTime: { gt: current.startTime } } });
       if (collision) throw new HttpError(409, "Сонгосон эмчийн цаг давхцаж байна.");

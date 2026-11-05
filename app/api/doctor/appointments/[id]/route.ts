@@ -11,6 +11,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const { id } = await params;
     const { status } = z.object({ status: z.enum(["PENDING", "CONFIRMED", "COMPLETED", "CANCELLED", "NO_SHOW"]) }).parse(await request.json());
     const updated = await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM "Appointment" WHERE id = ${id} FOR UPDATE`;
       const current = await tx.appointment.findFirst({ where: { id, doctorId: user.doctorId } });
       if (!current) throw new HttpError(404, "Захиалга олдсонгүй.");
       if (!canChangeAppointment(current.status, status)) throw new HttpError(409, "Энэ төлөвт шилжүүлэх боломжгүй. Жагсаалтаа шинэчилнэ үү.");

@@ -10,33 +10,7 @@ import React, {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
-import {
-  AlertCircle,
-  ArrowRightLeft,
-  CalendarCheck2,
-  CalendarDays,
-  CalendarRange,
-  Check,
-  CheckCircle2,
-  Clock,
-  FileText,
-  Loader2,
-  Menu,
-  MessageSquare,
-  Plus,
-  PlusCircle,
-  RefreshCw,
-  Search,
-  Send,
-  Sparkles,
-  Stethoscope,
-  Trash2,
-  User,
-  Users,
-  X,
-  XCircle,
-  Zap,
-} from "lucide-react";
+import { AlertCircle, ArrowRightLeft, Check, CheckCircle2, Clock, Loader2, Menu, MessageSquare, PlusCircle, RefreshCw, Search, Send, Users, X, XCircle, Zap } from "lucide-react";
 import { AdminSidebar } from "@/components/admin/sidebar";
 import { DoctorLeaveRequests } from "@/components/admin/DoctorLeaveRequests";
 import { showToast } from "@/components/ui/Toast";
@@ -54,6 +28,8 @@ interface Appointment {
   startTime: string;
   status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED" | "NO_SHOW";
   chiefComplaint?: string;
+  patientName?: string;
+  patientPhone?: string;
   patient: {
     id: string;
     fullName: string;
@@ -231,6 +207,18 @@ export default function ReceptionDashboard() {
       }
       const uData = await response.json();
       setCurrentUser(uData.data);
+      const prefill = new URL(window.location.href).searchParams;
+      if (prefill.get("patientId")) {
+        const response = await fetch(`/api/patients/${encodeURIComponent(prefill.get("patientId")!)}?summary=true`);
+        if (response.ok) {
+          const { data: patient } = await response.json();
+          setBookingForm(form => ({ ...form, patientName: patient.fullName, patientPhone: patient.phone }));
+          setActiveTab("QUICK_BOOK");
+          const doctorId = prefill.get("doctorId"); const serviceId = prefill.get("serviceId");
+          if (doctorId) setSelectedDoctorId(doctorId);
+          if (serviceId) setSelectedServiceId(serviceId);
+        }
+      }
       await Promise.all([fetchDoctors(), fetchServices(), fetchAppointments()]);
     };
 
@@ -238,11 +226,7 @@ export default function ReceptionDashboard() {
   }, [fetchAppointments, fetchDoctors, fetchServices, router]);
 
   useEffect(() => {
-    if (!selectedDoctorId || !selectedServiceId || !selectedDate) {
-      setAvailableSlots([]);
-      return;
-    }
-    void loadAvailableSlots(selectedDoctorId, selectedServiceId, selectedDate);
+    startTransition(() => { void loadAvailableSlots(selectedDoctorId, selectedServiceId, selectedDate); });
   }, [loadAvailableSlots, selectedDate, selectedDoctorId, selectedServiceId]);
 
   const handleBooking = useCallback(async () => {
@@ -345,26 +329,6 @@ export default function ReceptionDashboard() {
     },
     [],
   );
-
-  const handleDelete = useCallback(async (id: string) => {
-    if (!confirm("Энэ захиалгыг устгах уу?")) return;
-    try {
-      const response = await fetch(`/api/admin/appointments/${id}`, {
-        method: "DELETE",
-      });
-      const data = await response.json();
-      if (!response.ok)
-        throw new Error(data.error || "Устгах боломжгүй байна.");
-
-      setAppointments((current) => current.filter((item) => item.id !== id));
-      showToast("Захиалга устгагдлаа.", "success");
-    } catch (error) {
-      showToast(
-        error instanceof Error ? error.message : "Устгахад алдаа гарлаа.",
-        "error",
-      );
-    }
-  }, []);
 
   const handleSendReminder = async (appointmentId: string) => {
     setSendingReminderId(appointmentId);
@@ -486,9 +450,9 @@ export default function ReceptionDashboard() {
         startOfDayTimestamp(appointment.appointmentDate) ===
           startOfDayTimestamp(filterDate);
       const patientName =
-        appointment.patient?.fullName ?? (appointment as any).patientName ?? "";
+        appointment.patient?.fullName ?? appointment.patientName ?? "";
       const patientPhone =
-        appointment.patient?.phone ?? (appointment as any).patientPhone ?? "";
+        appointment.patient?.phone ?? appointment.patientPhone ?? "";
       const matchesSearch =
         !query ||
         patientName.toLowerCase().includes(query) ||
@@ -549,12 +513,12 @@ export default function ReceptionDashboard() {
       const id =
         a.patient?.id ||
         a.patient?.phone ||
-        (a as any).patientPhone ||
-        (a as any).patientName ||
+        a.patientPhone ||
+        a.patientName ||
         a.id;
       const fullName =
-        a.patient?.fullName || (a as any).patientName || "Үйлчлүүлэгч";
-      const phone = a.patient?.phone || (a as any).patientPhone || "-";
+        a.patient?.fullName || a.patientName || "Үйлчлүүлэгч";
+      const phone = a.patient?.phone || a.patientPhone || "-";
       if (!map.has(id)) {
         map.set(id, {
           patient: { id, fullName, phone },
@@ -805,12 +769,12 @@ export default function ReceptionDashboard() {
                             <td className="px-3 py-3">
                               <div className="truncate font-bold text-slate-900">
                                 {app.patient?.fullName ||
-                                  (app as any).patientName ||
+                                  app.patientName ||
                                   "Үйлчлүүлэгч"}
                               </div>
                               <div className="truncate text-sm text-slate-500">
                                 {app.patient?.phone ||
-                                  (app as any).patientPhone ||
+                                  app.patientPhone ||
                                   "-"}
                               </div>
                               {app.chiefComplaint && (
@@ -846,7 +810,7 @@ export default function ReceptionDashboard() {
                                   label={`Захиалгын үйлдлүүд: ${app.patient?.fullName || "Үйлчлүүлэгч"}`}
                                   disabled={updatingId === app.id}
                                   actions={[
-                                    {
+                                    ...(currentUser?.role !== "RECEPTION" ? [{
                                       label: "Эмч рүү шилжүүлэх",
                                       icon: (
                                         <ArrowRightLeft className="h-4 w-4 text-purple-600" />
@@ -861,7 +825,11 @@ export default function ReceptionDashboard() {
                                       onSelect: () => {
                                         void handleOpenNotes(app);
                                       },
-                                    },
+                                    }, {
+                                      label: sendingReminderId === app.id ? "Илгээж байна…" : "Telegram сануулга",
+                                      icon: <Send className="h-4 w-4" />,
+                                      onSelect: () => { if (!sendingReminderId) void handleSendReminder(app.id); },
+                                    }] : []),
                                     ...(app.status === "PENDING"
                                       ? [
                                           {
@@ -894,7 +862,7 @@ export default function ReceptionDashboard() {
                                           },
                                         ]
                                       : []),
-                                    ...(app.status !== "CANCELLED"
+                                    ...(["PENDING", "CONFIRMED"].includes(app.status)
                                       ? [
                                           {
                                             label: "Цуцлах",
@@ -910,14 +878,7 @@ export default function ReceptionDashboard() {
                                           },
                                         ]
                                       : []),
-                                    {
-                                      label: "Устгах",
-                                      icon: <Trash2 className="h-4 w-4" />,
-                                      destructive: true,
-                                      onSelect: () => {
-                                        void handleDelete(app.id);
-                                      },
-                                    },
+
                                   ]}
                                 />
                               </div>
@@ -1238,7 +1199,7 @@ export default function ReceptionDashboard() {
                 </p>
                 <h3 className="text-lg font-semibold text-slate-900">
                   {transferringApp.patient?.fullName ||
-                    (transferringApp as any).patientName ||
+                    transferringApp.patientName ||
                     "Үйлчлүүлэгч"}
                 </h3>
               </div>
@@ -1331,11 +1292,11 @@ export default function ReceptionDashboard() {
                 </p>
                 <h3 className="text-lg font-semibold text-slate-900">
                   {activeAppForNotes.patient?.fullName ||
-                    (activeAppForNotes as any).patientName ||
+                    activeAppForNotes.patientName ||
                     "Үйлчлүүлэгч"}{" "}
                   ·{" "}
                   {activeAppForNotes.patient?.phone ||
-                    (activeAppForNotes as any).patientPhone ||
+                    activeAppForNotes.patientPhone ||
                     ""}
                 </h3>
               </div>

@@ -1,24 +1,26 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
+import { apiError, HttpError } from "@/lib/security/http";
+import { publicServiceSelect } from "@/lib/appointments/dto";
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const includeInactive = searchParams.get("all") === "true";
+    if (includeInactive && !await requireRole("ADMIN", "SUPER_ADMIN")) {
+      throw new HttpError(403, "Хандах эрхгүй байна.");
+    }
 
     const services = await prisma.service.findMany({
       where: includeInactive ? undefined : { isActive: true },
+      select: includeInactive ? undefined : publicServiceSelect,
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }, { id: "asc" }],
     });
 
     return NextResponse.json({ success: true, data: services });
   } catch (error: unknown) {
-    console.error("GET /api/services error:", error);
-    return NextResponse.json(
-      { success: false, error: "Үйлчилгээний дата авахад алдаа гарлаа." },
-      { status: 500 },
-    );
+    return apiError(error);
   }
 }
 
@@ -67,6 +69,7 @@ export async function POST(request: Request) {
     }
 
     const parsedPrice = Number(price);
+    if (!Number.isInteger(parsedPrice) || parsedPrice < 0 || parsedPrice > 2147483647) throw new HttpError(400, "Үнэ 0–2147483647 бүхэл тоо байна.");
     const slug =
       typeof body.slug === "string" && body.slug.trim()
         ? body.slug.trim()
@@ -87,7 +90,7 @@ export async function POST(request: Request) {
         category,
         description: description || null,
         durationMin: parsedDuration,
-        price: Number.isFinite(parsedPrice) ? parsedPrice : 0,
+        price: parsedPrice,
         imageUrl: imageUrl || null,
         isActive,
       },
@@ -95,11 +98,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, data: service }, { status: 201 });
   } catch (error) {
-    console.error("POST /api/services error:", error);
-    return NextResponse.json(
-      { error: "Үйлчилгээ үүсгэхэд алдаа гарлаа." },
-      { status: 500 },
-    );
+    return apiError(error);
   }
 }
 
@@ -146,6 +145,7 @@ export async function PUT(request: Request) {
     const durationMin =
       body.durationMin !== undefined ? Number(body.durationMin) : undefined;
     const price = body.price !== undefined ? Number(body.price) : undefined;
+    if (price !== undefined && (!Number.isInteger(price) || price < 0 || price > 2147483647)) throw new HttpError(400, "Үнэ 0–2147483647 бүхэл тоо байна.");
     const imageUrl =
       typeof body.imageUrl === "string"
         ? body.imageUrl.trim()
@@ -182,11 +182,7 @@ export async function PUT(request: Request) {
 
     return NextResponse.json({ success: true, data: updated });
   } catch (error) {
-    console.error("PUT /api/services error:", error);
-    return NextResponse.json(
-      { error: "Үйлчилгээ шинэчлэхэд алдаа гарлаа." },
-      { status: 500 },
-    );
+    return apiError(error);
   }
 }
 
@@ -219,11 +215,14 @@ export async function DELETE(request: Request) {
       );
     }
 
-    await prisma.service.delete({ where: { id: serviceId } });
+    await prisma.$transaction(async tx => {
+      await tx.service.update({ where: { id: serviceId }, data: { isActive: false } });
+      await tx.auditLog.create({ data: { actorId: user.id, action: "SERVICE_ARCHIVED", entity: "Service", entityId: serviceId } });
+    });
 
     return NextResponse.json({
       success: true,
-      message: `${targetService.name} үйлчилгээ устгагдлаа.`,
+      message: `${targetService.name} үйлчилгээ идэвхгүй боллоо. Түүх хадгалагдсан.`,
     });
   } catch (error) {
     console.error("DELETE /api/services error:", error);

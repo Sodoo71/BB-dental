@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 import { registerSchema } from "@/lib/validation/auth";
 import { apiError } from "@/lib/security/http";
+import { shouldAutoApproveRegistration } from "@/lib/auth/registration-policy";
 import { rateLimit } from "@/lib/security/rate-limit";
 export async function POST(request: Request) {
   try {
@@ -15,7 +16,7 @@ export async function POST(request: Request) {
       const setting = await tx.systemSetting.findUnique({ where: { key: "registration_policy" } });
       let autoApprove = false;
       if (setting) {
-        try { autoApprove = JSON.parse(setting.value).autoApproveDoctors === true; } catch { /* fail closed */ }
+        try { autoApprove = shouldAutoApproveRegistration(input.role, JSON.parse(setting.value)); } catch { /* fail closed */ }
       }
       const user = await tx.user.create({
         data: { name: input.name, email: input.email, role: input.role, passwordHash, isActive: autoApprove, status: autoApprove ? "ACTIVE" : "PENDING" },
