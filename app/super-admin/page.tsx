@@ -1,22 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {
-  Activity,
-  CalendarCheck2,
-  Check,
-  CheckCircle2,
-  Clock,
-  CreditCard,
-  DollarSign,
-  ShieldCheck,
-  Stethoscope,
-  Trash2,
-  UserCheck,
-  UserPlus,
-  Users,
-  X,
-} from "lucide-react";
+import { Activity, CalendarCheck2, Check, CheckCircle2, CreditCard, Stethoscope, Trash2, UserPlus, X } from "lucide-react";
 import { useState } from "react";
 import { useSuperAdminData } from "@/hooks/useSuperAdminData";
 import { PageHeader } from "@/components/super-admin/page-header";
@@ -30,7 +15,7 @@ import { getRoleLabel } from "@/lib/roles";
 import { showToast } from "@/components/ui/Toast";
 
 export default function SuperAdminPage() {
-  const { overview, doctors, users, pendingUsers, loading, error, refresh } =
+  const { overview, doctors, pendingUsers, loading, error, refresh } =
     useSuperAdminData();
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -89,8 +74,8 @@ export default function SuperAdminPage() {
       detail: `${overview?.pendingUsers ?? pendingUsers.length} хэрэглэгч зөвшөөрөл хүлээж байна`,
       icon: <UserPlus className="h-5 w-5" />,
       accent: ((overview?.pendingUsers ?? pendingUsers.length) > 0
-        ? "amber"
-        : "emerald") as any,
+        ? "amber" as const
+        : "emerald" as const),
     },
     {
       title: "Өнөөдрийн захиалга",
@@ -100,9 +85,9 @@ export default function SuperAdminPage() {
       accent: "emerald" as const,
     },
     {
-      title: "Хуримтлагдсан орлого",
+      title: "Дууссан үзлэгийн тооцоолсон үнэ",
       value: formatMNT(overview?.totalCompletedRevenue ?? 0),
-      detail: `Өнөөдөр: ${formatMNT(overview?.todayEstimatedRevenue ?? 0)}`,
+      detail: "Одоогийн тарифаар тооцсон дүн; төлбөрийн тайлан биш.",
       icon: <CreditCard className="h-5 w-5" />,
       accent: "violet" as const,
     },

@@ -1,22 +1,9 @@
 "use client";
+import { ClinicImage } from "@/components/ui/ClinicImage";
 import { DialogFrame } from "@/components/ui/DialogFrame";
 
 import Link from "next/link";
-import {
-  Check,
-  Edit2,
-  KeyRound,
-  Mail,
-  MessageSquare,
-  Phone,
-  Plus,
-  Search,
-  Trash2,
-  UserCheck,
-  UserPlus,
-  UsersRound,
-  X,
-} from "lucide-react";
+import { Check, Edit2, Plus, Search, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/super-admin/page-header";
 import { approveUser, deleteUser } from "@/lib/api/super-admin";
@@ -352,7 +339,7 @@ export default function SuperAdminUsersPage() {
                       <td className="p-4">
                         <div className="flex items-center gap-3">
                           {u.avatarUrl ? (
-                            <img
+                            <ClinicImage
                               src={u.avatarUrl}
                               alt={u.name}
                               className="h-10 w-10 rounded-2xl object-cover border border-slate-200"

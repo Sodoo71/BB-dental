@@ -26,7 +26,7 @@ export function TopServicesCard({ services }: TopServicesCardProps) {
             Эрэлттэй үйлчилгээнүүд (ТОП 5)
           </h3>
           <p className="mt-0.5 text-sm text-slate-500">
-            Захиалгын тоо болон орлогод эзлэх хувиар эрэмбэлэгдсэн
+            Захиалгын тоо болон тооцоолсон үнэд эзлэх хувиар эрэмбэлэгдсэн
           </p>
         </div>
       </div>

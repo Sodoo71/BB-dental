@@ -1,7 +1,7 @@
 "use client";
 import { useClinicInfo } from "@/components/layout/ClinicInfoProvider";
 import React, { useState } from "react";
-import { Menu, Phone, Sparkles, X } from "lucide-react";
+import { Menu, Phone, X } from "lucide-react";
 import Link from "next/link";
 import { Brand } from "@/components/layout/Brand";
 

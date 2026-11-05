@@ -1,4 +1,5 @@
 "use client";
+import { ClinicImage } from "@/components/ui/ClinicImage";
 import { DialogFrame } from "@/components/ui/DialogFrame";
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -148,7 +149,7 @@ export default function SuperAdminServicesPage() {
   };
 
   const handleDelete = async (service: ServiceItem) => {
-    if (!confirm(`"${service.name}" үйлчилгээг бүрмөсөн устгах уу?`)) return;
+    if (!confirm(`"${service.name}" үйлчилгээг идэвхгүй болгох уу? Өмнөх захиалгууд хадгалагдана.`)) return;
 
     try {
       const response = await fetch("/api/services", {
@@ -159,7 +160,7 @@ export default function SuperAdminServicesPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Устгаж чадсангүй.");
       await loadServices();
-      showToast(`"${service.name}" үйлчилгээг устгалаа.`, "success");
+      showToast(`"${service.name}" үйлчилгээг идэвхгүй болголоо.`, "success");
     } catch (err) {
       showToast(
         err instanceof Error ? err.message : "Устгахад алдаа гарлаа.",
@@ -261,7 +262,7 @@ export default function SuperAdminServicesPage() {
                 <div>
                   {service.imageUrl ? (
                     <div className="h-40 w-full overflow-hidden bg-slate-100">
-                      <img
+                      <ClinicImage
                         src={service.imageUrl}
                         alt={service.name}
                         className="h-full w-full object-cover"
@@ -325,7 +326,7 @@ export default function SuperAdminServicesPage() {
                       type="button"
                       onClick={() => handleDelete(service)}
                       className="rounded-xl border border-red-200 bg-red-50 p-1.5 text-red-600 hover:bg-red-100"
-                      title="Устгах"
+                      title="Идэвхгүй болгох"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>

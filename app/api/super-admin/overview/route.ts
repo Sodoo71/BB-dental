@@ -1,234 +1,81 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
+import { clinicDateKey } from "@/lib/doctor-workspace";
+import { apiError } from "@/lib/security/http";
+import { resolveDaySchedule } from "@/lib/availability-slots";
 
-const MONGOLIAN_DAYS = ["Ням", "Дав", "Мяг", "Лха", "Пүр", "Баа", "Бям"];
-
+const days = ["Ням", "Дав", "Мяг", "Лха", "Пүр", "Баа", "Бям"];
 export async function GET() {
-  const user = await requireRole("SUPER_ADMIN", "ADMIN");
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-  }
-
-  const now = new Date();
-  const todayStart = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-  );
-  const todayEnd = new Date(todayStart);
-  todayEnd.setUTCDate(todayEnd.getUTCDate() + 1);
-
-  // Past 7 days window (from 6 days ago to today)
-  const sevenDaysAgo = new Date(todayStart);
-  sevenDaysAgo.setUTCDate(sevenDaysAgo.getUTCDate() - 6);
-
-  const [
-    totalUsers,
-    pendingUsers,
-    totalAdmins,
-    totalDoctors,
-    activeDoctors,
-    totalPatients,
-    totalAppointments,
-    todayAppointments,
-    pendingAppointments,
-    confirmedAppointments,
-    completedAppointments,
-    cancelledAppointments,
-    noShowAppointments,
-    upcomingAppointments,
-    doctorsWorkingToday,
-    servicesCount,
-    allAppointmentsForStats,
-    doctorsList,
-  ] = await Promise.all([
-    prisma.user.count().then(async count => count + await prisma.doctor.count({ where: { user: null } })),
-    prisma.user.count({ where: { status: "PENDING" } }),
-    prisma.user.count({
-      where: { role: { in: ["ADMIN", "SUPER_ADMIN"] } },
-    }),
-    prisma.doctor.count(),
-    prisma.doctor.count({ where: { isActive: true } }),
-    prisma.patient.count(),
-    prisma.appointment.count(),
-    prisma.appointment.count({
-      where: {
-        appointmentDate: { gte: todayStart, lt: todayEnd },
-      },
-    }),
-    prisma.appointment.count({ where: { status: "PENDING" } }),
-    prisma.appointment.count({ where: { status: "CONFIRMED" } }),
-    prisma.appointment.count({ where: { status: "COMPLETED" } }),
-    prisma.appointment.count({ where: { status: "CANCELLED" } }),
-    prisma.appointment.count({ where: { status: "NO_SHOW" } }),
-    prisma.appointment.count({
-      where: {
-        appointmentDate: { gte: todayStart },
-        status: { in: ["PENDING", "CONFIRMED"] },
-      },
-    }),
-    prisma.doctorSchedule.count({
-      where: {
-        dayOfWeek: now.getUTCDay(),
-        isDayOff: false,
-      },
-    }),
-    prisma.service.count(),
-    prisma.appointment.findMany({
-      select: {
-        id: true,
-        status: true,
-        appointmentDate: true,
-        doctorId: true,
-        serviceId: true,
-        service: {
-          select: {
-            id: true,
-            name: true,
-            price: true,
-          },
-        },
-      },
-    }),
-    prisma.doctor.findMany({
-      where: { isActive: true },
-      select: {
-        id: true,
-        name: true,
-        title: true,
-        avatarUrl: true,
-      },
-      orderBy: { sortOrder: "asc" },
-    }),
-  ]);
-
-  // Financial calculations
-  let totalCompletedRevenue = 0;
-  let todayEstimatedRevenue = 0;
-  let pendingPotentialRevenue = 0;
-
-  const serviceMap = new Map<
-    string,
-    { id: string; name: string; count: number; revenue: number }
-  >();
-
-  allAppointmentsForStats.forEach((app) => {
-    const price = app.service?.price || 0;
-    const isToday =
-      app.appointmentDate >= todayStart && app.appointmentDate < todayEnd;
-
-    if (app.status === "COMPLETED") {
-      totalCompletedRevenue += price;
-    }
-
-    if (isToday && (app.status === "COMPLETED" || app.status === "CONFIRMED")) {
-      todayEstimatedRevenue += price;
-    }
-
-    if (app.status === "PENDING" || app.status === "CONFIRMED") {
-      pendingPotentialRevenue += price;
-    }
-
-    if (app.service) {
-      const existing = serviceMap.get(app.service.id) ?? {
-        id: app.service.id,
-        name: app.service.name,
-        count: 0,
-        revenue: 0,
+  try {
+    if (!await requireRole("SUPER_ADMIN", "ADMIN")) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    const today = new Date(`${clinicDateKey()}T00:00:00Z`);
+    const tomorrow = new Date(today.getTime() + 86400000);
+    const weekStart = new Date(today.getTime() - 6 * 86400000);
+    const [users, unlinkedDoctors, totalPatients, groups, weeklyGroups, doctorGroups, services, doctors, schedules, exceptions, upcomingAppointments] = await Promise.all([
+      prisma.user.groupBy({ by: ["role", "status"], _count: true }),
+      prisma.doctor.count({ where: { user: null } }),
+      prisma.patient.count(),
+      prisma.appointment.groupBy({ by: ["status", "serviceId"], _count: true }),
+      prisma.appointment.groupBy({ by: ["status", "serviceId", "appointmentDate"], where: { appointmentDate: { gte: weekStart, lt: tomorrow } }, _count: true }),
+      prisma.appointment.groupBy({ by: ["doctorId", "status"], _count: true }),
+      prisma.service.findMany({ select: { id: true, name: true, price: true } }),
+      prisma.doctor.findMany({ select: { id: true, name: true, title: true, avatarUrl: true, isActive: true }, orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
+      prisma.doctorSchedule.findMany({ where: { dayOfWeek: today.getUTCDay() } }),
+      prisma.doctorAvailabilityException.findMany({ where: { date: { gte: today, lt: tomorrow }, isActive: true }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] }),
+      prisma.appointment.count({ where: { appointmentDate: { gte: today }, status: { in: ["PENDING", "CONFIRMED"] } } }),
+    ]);
+    const statusCount = (status: string) => groups.filter(row => row.status === status).reduce((sum, row) => sum + row._count, 0);
+    const priceMap = new Map(services.map(service => [service.id, service.price]));
+    const totalAppointments = groups.reduce((sum, row) => sum + row._count, 0);
+    const todayGroups = weeklyGroups.filter(row => row.appointmentDate >= today);
+    const weeklyTrend = Array.from({ length: 7 }, (_, offset) => {
+      const date = new Date(weekStart.getTime() + offset * 86400000);
+      const next = new Date(date.getTime() + 86400000);
+      const rows = weeklyGroups.filter(row => row.appointmentDate >= date && row.appointmentDate < next);
+      return { date: date.toISOString().slice(0, 10), dayName: days[date.getUTCDay()],
+        total: rows.reduce((sum, row) => sum + row._count, 0),
+        completed: rows.filter(row => row.status === "COMPLETED").reduce((sum, row) => sum + row._count, 0),
+        cancelled: rows.filter(row => row.status === "CANCELLED").reduce((sum, row) => sum + row._count, 0),
+        revenue: rows.filter(row => row.status === "COMPLETED").reduce((sum, row) => sum + row._count * (priceMap.get(row.serviceId) ?? 0), 0),
       };
-      existing.count += 1;
-      if (app.status === "COMPLETED") {
-        existing.revenue += price;
-      }
-      serviceMap.set(app.service.id, existing);
-    }
-  });
-
-  // Top services sorted by booking count
-  const topServices = Array.from(serviceMap.values())
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5)
-    .map((s) => ({
-      ...s,
-      percentage:
-        totalAppointments > 0
-          ? Math.round((s.count / totalAppointments) * 100)
-          : 0,
-    }));
-
-  // Doctor workload breakdown
-  const doctorWorkload = doctorsList.map((doc) => {
-    const docApps = allAppointmentsForStats.filter(
-      (app) => app.doctorId === doc.id,
-    );
-    const completedCount = docApps.filter(
-      (app) => app.status === "COMPLETED",
-    ).length;
-    const confirmedCount = docApps.filter(
-      (app) => app.status === "CONFIRMED",
-    ).length;
-
-    return {
-      id: doc.id,
-      name: doc.name,
-      title: doc.title,
-      avatarUrl: doc.avatarUrl,
-      totalAppointments: docApps.length,
-      completedCount,
-      confirmedCount,
-    };
-  });
-
-  // Past 7 days trend
-  const weeklyTrend = [];
-  for (let i = 6; i >= 0; i--) {
-    const day = new Date(todayStart);
-    day.setUTCDate(day.getUTCDate() - i);
-    const nextDay = new Date(day);
-    nextDay.setUTCDate(nextDay.getUTCDate() + 1);
-
-    const dayAppointments = allAppointmentsForStats.filter(
-      (a) => a.appointmentDate >= day && a.appointmentDate < nextDay,
-    );
-
-    const dayRevenue = dayAppointments
-      .filter((a) => a.status === "COMPLETED")
-      .reduce((sum, a) => sum + (a.service?.price || 0), 0);
-
-    weeklyTrend.push({
-      date: day.toISOString().slice(0, 10),
-      dayName: MONGOLIAN_DAYS[day.getUTCDay()],
-      total: dayAppointments.length,
-      completed: dayAppointments.filter((a) => a.status === "COMPLETED").length,
-      cancelled: dayAppointments.filter((a) => a.status === "CANCELLED").length,
-      revenue: dayRevenue,
     });
-  }
-
-  return NextResponse.json({
-    success: true,
-    data: {
-      totalUsers,
-      pendingUsers,
-      totalAdmins,
-      totalDoctors,
-      activeDoctors,
-      totalPatients,
-      totalAppointments,
-      todayAppointments,
-      pendingAppointments,
-      confirmedAppointments,
-      completedAppointments,
-      cancelledAppointments,
-      noShowAppointments,
-      upcomingAppointments,
-      doctorsWorkingToday,
-      servicesCount,
-      totalCompletedRevenue,
-      todayEstimatedRevenue,
-      pendingPotentialRevenue,
-      weeklyTrend,
-      topServices,
-      doctorWorkload,
-    },
-  });
+    const topServices = services.map(service => {
+      const rows = groups.filter(row => row.serviceId === service.id);
+      const count = rows.reduce((sum, row) => sum + row._count, 0);
+      return { id: service.id, name: service.name, count,
+        revenue: rows.filter(row => row.status === "COMPLETED").reduce((sum, row) => sum + row._count * service.price, 0),
+        percentage: totalAppointments ? Math.round(count / totalAppointments * 100) : 0,
+      };
+    }).filter(row => row.count).sort((a, b) => b.count - a.count || a.id.localeCompare(b.id)).slice(0, 5);
+    const activeDoctors = doctors.filter(doctor => doctor.isActive);
+    const doctorWorkload = activeDoctors.map(doctor => {
+      const rows = doctorGroups.filter(row => row.doctorId === doctor.id);
+      return { id: doctor.id, name: doctor.name, title: doctor.title, avatarUrl: doctor.avatarUrl,
+        totalAppointments: rows.reduce((sum, row) => sum + row._count, 0),
+        completedCount: rows.find(row => row.status === "COMPLETED")?._count ?? 0,
+        confirmedCount: rows.find(row => row.status === "CONFIRMED")?._count ?? 0,
+      };
+    });
+    return NextResponse.json({ success: true, data: {
+      totalUsers: users.reduce((sum, row) => sum + row._count, 0) + unlinkedDoctors,
+      pendingUsers: users.filter(row => row.status === "PENDING").reduce((sum, row) => sum + row._count, 0),
+      totalAdmins: users.filter(row => ["ADMIN", "SUPER_ADMIN"].includes(row.role)).reduce((sum, row) => sum + row._count, 0),
+      totalDoctors: doctors.length, activeDoctors: activeDoctors.length, totalPatients, totalAppointments,
+      todayAppointments: todayGroups.reduce((sum, row) => sum + row._count, 0),
+      pendingAppointments: statusCount("PENDING"), confirmedAppointments: statusCount("CONFIRMED"),
+      completedAppointments: statusCount("COMPLETED"), cancelledAppointments: statusCount("CANCELLED"), noShowAppointments: statusCount("NO_SHOW"),
+      upcomingAppointments, servicesCount: services.length,
+      doctorsWorkingToday: activeDoctors.filter(doctor => {
+        const schedule = resolveDaySchedule(schedules.find(row => row.doctorId === doctor.id) ?? null, exceptions.filter(row => row.doctorId === doctor.id));
+        return !schedule.isDayOff && schedule.startTime && schedule.endTime;
+      }).length,
+      // Legacy keys retained for API compatibility. These are catalog estimates, never payment totals.
+      totalCompletedRevenue: groups.filter(row => row.status === "COMPLETED").reduce((sum, row) => sum + row._count * (priceMap.get(row.serviceId) ?? 0), 0),
+      todayEstimatedRevenue: todayGroups.filter(row => ["COMPLETED", "CONFIRMED"].includes(row.status)).reduce((sum, row) => sum + row._count * (priceMap.get(row.serviceId) ?? 0), 0),
+      pendingPotentialRevenue: groups.filter(row => ["PENDING", "CONFIRMED"].includes(row.status)).reduce((sum, row) => sum + row._count * (priceMap.get(row.serviceId) ?? 0), 0),
+      financialReporting: { basis: "CURRENT_CATALOG_ESTIMATE", collectedPayments: null, recognizedRevenue: null, expenses: null, receivables: null },
+      weeklyTrend, topServices, doctorWorkload,
+    } });
+  } catch (error) { return apiError(error); }
 }

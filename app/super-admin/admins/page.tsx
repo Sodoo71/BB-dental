@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ShieldCheck, UserCog } from "lucide-react";
+import { UserCog } from "lucide-react";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/super-admin/page-header";
 import { getRoleLabel } from "@/lib/roles";

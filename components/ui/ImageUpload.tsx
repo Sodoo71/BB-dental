@@ -1,4 +1,5 @@
 "use client";
+import { ClinicImage } from "@/components/ui/ClinicImage";
 
 import React, { useRef, useState } from "react";
 import { Loader2, Trash2, UploadCloud } from "lucide-react";
@@ -151,7 +152,7 @@ export function ImageUpload({
 
       {value ? (
         <div className="relative group overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-          <img
+          <ClinicImage
             src={value}
             alt="Uploaded image"
             className="h-44 w-full object-cover"

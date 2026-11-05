@@ -30,18 +30,18 @@ export function RevenueChart({
               <TrendingUp className="h-4 w-4" />
             </span>
             <h3 className="text-lg font-semibold text-slate-900">
-              Орлогын динамик (Сүүлийн 7 хоног)
+              Үзлэгийн тооцоолсон үнэ (7 хоног)
             </h3>
           </div>
           <p className="mt-1 text-sm text-slate-500">
-            Өдөр бүрийн дууссан үзлэгүүдийн бодит орлогын хэмжээ
+            Одоогийн үйлчилгээний тарифаар тооцсон дүн. Төлбөр, буцаалт болон түүхэн үнийг илэрхийлэхгүй.
           </p>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div className="min-w-0">
             <span className="text-sm font-semibold text-slate-400">
-              Өнөөдрийн орлого
+              Өнөөдрийн тооцоо
             </span>
             <p className="break-words text-2xl font-semibold text-emerald-600">
               {formatMNT(todayRevenue)}
@@ -49,7 +49,7 @@ export function RevenueChart({
           </div>
           <div className="min-w-0 border-l border-slate-200 pl-4">
             <span className="text-sm font-semibold text-slate-400">
-              Нийт хуримтлагдсан
+              Нийт тооцоолсон үнэ
             </span>
             <p className="break-words text-2xl font-semibold text-slate-900">
               {formatMNT(totalRevenue)}
