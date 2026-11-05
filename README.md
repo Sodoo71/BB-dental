@@ -1,227 +1,62 @@
-# Time Clinic Booking System
+# BB DENTAL
 
-Энэ бол Next.js, Prisma, PostgreSQL, React дээр бүтээгдсэн бүрэн эмнэлгийн цаг захиалгын систем юм. Аппликешнд эмнэлгийн нүүр хуудас, өвчтөний цаг захиалах хэсэг, бодит боломжит цагийн тооцоо, эмч, хуваарь, захиалгын менежмент бүхий админ самбар багтсан байна.
+An existing dental-clinic booking and staff-management application being upgraded incrementally to V2. The current branch contains security remediation, safer appointment history, patient management, and query improvements. Clinical ERP, accounting, inventory, and the four-role migration are **not complete**.
 
-## Ерөнхий тойм
+## Stack and package manager
 
-Энэ төсөл нь эмнэлэг, шүдний эмнэлэг, клиникийн ажлын урсгалд зориулагдсан бөгөөд:
+Next.js 16.3.2 App Router, React 19.2.8, TypeScript, Prisma 7.9.1, PostgreSQL through `@prisma/adapter-pg`, Tailwind CSS 4, Cloudinary HTTP uploads, and Telegram HTTP integrations.
 
-- өвчтөн үйлчилгээ сонгон цаг захиалах боломжтой
-- эмч бүр долоо хоногийн хэвшилтэй хуваарьтай
-- тодорхой өдөр амралтын өдөр эсвэл хаалттай байх боломжтой
-- захиалгын цагийн сонголт статик биш, бодит дүрэмд тулгуурлан тооцогддог
-- админ захиалгын төлөвийг харах, удирдах боломжтой
-- шинэ захиалга бүрт эмч рүү Telegram мэдэгдэл илгээх боломжтой
+Use **Bun 1.3.14** and `bun.lock` as the authoritative dependency resolution. `package-lock.json` was already modified by the user before this work and is preserved; do not use it to install or regenerate dependencies for this branch. No framework or database provider was replaced.
 
-## Онцлог боломжууд
+## Setup
 
-### Нээлттэй вэб хэсэг
-- эмнэлгийн нүүр хуудас
-- статистик, үйлчилгээ, booking call-to-action хэсгүүд
-- өвчтөний цаг захиалах форма
-- эмч болон үйлчилгээ сонгох
-- сервер талдаа тооцогдсон бодит боломжит цагууд
-- утасны дугаараар өвчтөнийг upsert хийх логик
+1. Copy `.env.example` to `.env` and provide your own configuration. Never commit `.env`.
+2. Set `DATABASE_URL`, `AUTH_SECRET` (at least 32 random characters), and the exact browser origin in `APP_URL`. Generate a secret with `openssl rand -hex 32`; put it in the local environment without sharing it in chat or logs.
+3. Run `bun install --frozen-lockfile` and `bun run check:env`.
+4. Run `bun run dev` and open `http://localhost:3000`.
 
-### Эмчийн хуваарь
-- эмч бүрийн долоо хоногийн хуваарь
-- амралтын өдөр тэмдэглэх
-- тухайн өдөр өөрчлөх override
-- хаагдсан хугацааны муж нэмэх
+Installation generates Prisma Client. It does not apply migrations. Existing database history must be reconciled before any migration command. Never run demo seeds or mutation tests against the clinic database.
 
-### Захиалгын удирдлага
-- төлөвүүд: PENDING, CONFIRMED, COMPLETED, CANCELLED, NO_SHOW
-- админ хэсгээс захиалгуудыг харах, шүүх
-- админ хэсгээс шуурхай захиалга үүсгэх
-- дараагийн боломжит цагийг хурдан олох функц
+Cloudinary configuration is required for image uploads. Telegram configuration is optional for booking but required for real notifications. See [deployment](docs/deployment/DEPLOYMENT.md).
 
-### Аюулгүй байдал, эрхийн удирдлага
-- cookie-based session auth
-- админ route-ууд хамгаалагдсан
-- PATIENT, ADMIN, SUPER_ADMIN, DOCTOR эрхийн дэмжлэг
+## Commands
 
-### Мэдэгдэл
-- Telegram chat ID-ээр эмч рүү мэдэгдэл илгээх боломж
-- Telegram тохиргоо байхгүй үед аюулгүйгээр алгасах
-
-## Технологи
-
-- Next.js 16 (App Router)
-- React 19
-- TypeScript
-- Prisma ORM
-- PostgreSQL
-- Tailwind CSS
-- Lucide React icon
-
-## Төсөлний бүтэц
-
-```bash
-.
-├── app/
-│   ├── admin/
-│   ├── api/
-│   ├── components/
-│   ├── generated/prisma/
-│   ├── login/
-│   └── page.tsx
-├── hooks/
-├── lib/
-├── prisma/
-├── public/
-├── types/
-├── .env
-├── next.config.ts
-├── package.json
-├── prisma.config.ts
-├── tsconfig.json
-├── eslint.config.mjs
-├── README.md
-└── postcss.config.mjs
+```sh
+bun run dev
+bun run check:env
+bun run typecheck
+bun run lint
+bun test tests
+bun run test:database
+bun run build
+bun run start
+bun run test:e2e
+bun run db:inspect
+bun run db:inspect --audit
 ```
 
-## Үндсэн Prisma моделүүд
+Playwright expects a separately running server at `http://localhost:3000`, or `PLAYWRIGHT_BASE_URL`. The current browser suite intercepts clinic APIs and does not verify live database workflows.
 
-Энэ аппликешнд дараах моделүүд хэрэглэгдэнэ:
+`bun run db:deploy` remains the existing Prisma deployment entry point. **Do not execute it against production without the database review, backup, staging rehearsal, and approval described in the deployment guide.**
 
-- User
-- Doctor
-- DoctorSchedule
-- DoctorAvailabilityException
-- Service
-- Patient
-- Appointment
-- AppointmentNote
-- PatientNote
+## Current features
 
-Хуваарь тооцох логик нь дараах зүйлс дээр суурилдаг:
+- Public homepage, doctor/service browsing, real availability and booking.
+- Phone-number confirmation before booking, without OTP, as requested. Confirmation does not prove ownership; public appointment lookup is not exposed.
+- Reception appointment operations at `/admin`; patient registration/editing/history at `/admin/patients`.
+- Administrative management at `/super-admin`, including `/super-admin/patients`.
+- Doctor dashboard, personal appointments, calendar, patient summaries, profile, schedules, and exceptions at `/doctor`.
+- Account approval, expiring/revocable sessions, shared database-backed rate limits, audit logs, Cloudinary profile images, and Telegram controls.
 
-- долоо хоногийн тогтмол цаг
-- ганц өдрийн амралт / exception
-- өдөр тусгай override
-- хаагдсан цагийн муж
-- одоо байгаа захиалгуудын зөрчил
+The existing five role values remain until an approved migration. Dashboard monetary figures are current-catalog estimates, not recorded collections, recognized revenue, or profit.
 
-## Захиалгын логик
+## Handover
 
-Аппликешн нь [lib/availability.ts](lib/availability.ts) файл дахь availability engine ашиглан боломжит цагийг тооцоолдог.
-
-Энэ логик дараах зүйлсийг шалгана:
-
-- эмч идэвхтэй эсэх
-- үйлчилгээ идэвхтэй эсэх
-- сонгосон огноо зөв эсэх
-- эмч тухайн өдөр ажиллахгүй эсэх
-- сонгосон цаг хаагдсан мужид унаж байгаа эсэх
-- сонгосон цаг өмнөх захиалгатай давхцаж байгаа эсэх
-- цаг өмнөх өдөр/цаг болсон эсэх
-
-Ингэснээр боломжит цагийг зөвхөн UI-д биш, сервер талд шалгаж баталгаажуулдаг.
-
-## Нэвтрэлт, эрхийн систем
-
-Энэ төсөл нь [lib/auth.ts](lib/auth.ts) дээр ажилладаг cookie-based session auth ашигладаг.
-
-Дэмжигдсэн ролууд:
-
-- PATIENT
-- ADMIN
-- SUPER_ADMIN
-- DOCTOR
-
-Админ ба super-admin route-ууд зөвшөөрөлтэй session-гүйгээр нэвтрэх боломжгүй.
-
-## Environment Variables
-
-Проектийн root-д `.env` файл үүсгээд дараах утгуудыг бичнэ:
-
-```bash
-DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require"
-AUTH_SECRET="replace-with-a-strong-random-secret"
-TELEGRAM_BOT_TOKEN="optional-telegram-bot-token"
-NODE_ENV="development"
-```
-
-Тэмдэглэл:
-
-- `DATABASE_URL` заавал шаардлагатай
-- `AUTH_SECRET` session signing-д шаардлагатай
-- `TELEGRAM_BOT_TOKEN` сонголттой, байхгүй үед мэдэгдэл илгээхийг аюулгүйгээр алгасна
-
-## Локал хөгжүүлэлт
-
-Нэмэлтүүд суулгана:
-
-```bash
-npm install
-```
-
-Prisma client generate:
-
-```bash
-npx prisma generate
-```
-
-Database migration ажиллуулах:
-
-```bash
-npx prisma migrate dev
-```
-
-Dev server эхлүүлнэ:
-
-```bash
-npm run dev
-```
-
-Браузер дээр нээнэ:
-
-```text
-http://localhost:3000
-```
-
-## Production build
-
-```bash
-npm run build
-npm run start
-```
-
-## Хэрэгтэй script-ууд
-
-```bash
-npm run dev      # development server эхлүүлэх
-npm run build    # production build хийх
-npm run start    # production server ажиллуулах
-npm run lint     # lint шалгах
-npx prisma generate  # Prisma client шинэчлэх
-npx prisma migrate dev  # schema өөрчлөлтийг ашиглах
-```
-
-## Тэмдэглэл
-
-- Энэ апп нь mock биш, бодит клиникийн цаг захиалгын урсгалыг дагадаг
-- боломжит цагийн тооцоо төвлөрсөн нэг жишигт ажилладаг
-- Telegram мэдэгдэл нь optional бөгөөд bot token байхгүй үед аюулгүйгээр ажилладаг
-
-## Лиценз
-
-Энэ төсөл нь дотоод клиник/цаг захиалгын workflow-д зориулагдсан бөгөөд default лиценз файлгүй байна.
-
-### Production тохиргоо ба 503
-
-`.env.example`-ийн утгуудыг deployment орчны environment variables-д тохируулна.
-`DATABASE_URL` нь runtime PostgreSQL холболт; migration-д `DIRECT_URL` өгч болно.
-`APP_URL` нь сайтын үндсэн URL (жишээ: `https://clinic.example.com`). Байхгүй үед
-API нь тухайн хүсэлтийн origin-ийг ашиглах бөгөөд бүх API-г 503-аар хаахгүй.
-Cross-origin бичих хүсэлтүүд хаалттай хэвээр байна.
-
-Deploy дараалал: `bun install`, `bun run db:deploy`, `bun run build`.
-Лого upload хийхэд `CLOUDINARY_URL`, Telegram-д `TELEGRAM_BOT_TOKEN` шаардлагатай.
-Хувийн хүлээн авагч bot дээр `/start` дарсны дараа тоон Chat ID-г ашиглана.
-
-Тохиргооны хаяг, утас, цагийн хуваарь, лого нүүр хуудсанд харагдана.
-Үйлчилгээний “Харагдах эрэмбэ” бага байх тусам эхэнд гарна.
-Бодлогын үндсэн хугацаа шинэ үйлчилгээ үүсгэхэд хэрэглэгдэнэ; өмнөх үйлчилгээ,
-захиалгын хугацааг өөрчлөхгүй. Ажилтны нийт тоо нь данс болон дансгүй эмчийн
-бүртгэлийн нийлбэр; данстай холбоотой эмчийг дахин тоолохгүй.
+- [Progress, limitations and verification](docs/V2_PROGRESS.md)
+- [Architecture](docs/architecture/ARCHITECTURE.md)
+- [Database and migration plan](docs/database/DATABASE.md)
+- [Role migration proposal](docs/database/ROLE_MIGRATION_PLAN.md)
+- [API contracts](docs/api/API.md)
+- [Development conventions](docs/development/DEVELOPMENT.md)
+- [Deployment and recovery](docs/deployment/DEPLOYMENT.md)
+- [Changelog](docs/CHANGELOG.md)
