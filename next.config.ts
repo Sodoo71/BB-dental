@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/api/export/*": [
       "./public/fonts/NotoSans-Regular.ttf",
-      "./public/images/bb-dental-logo.jpg",
+      "./public/images/default-logo.png",
     ],
   },
   images: {

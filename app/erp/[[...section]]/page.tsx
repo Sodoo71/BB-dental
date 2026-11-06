@@ -31,5 +31,5 @@ export default async function Page({
     ].includes(module)
   )
     notFound();
-  return <ErpWorkspace module={module} />;
+  return <ErpWorkspace />;
 }

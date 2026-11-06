@@ -1,7 +1,7 @@
 "use client";
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { ClinicLogo } from "./clinic-branding";
 import { ArrowLeft, ArrowRight, Check, LockKeyhole } from "lucide-react";
 import PasswordInput from "./password-input";
 import { api } from "../erp/ui";
@@ -53,8 +53,7 @@ export default function AuthForm({
   return (
     <main className="login-page">
       <div className="login-story">
-        <Image
-          src="/images/bb-dental-logo.jpg"
+        <ClinicLogo
           width={86}
           height={86}
           alt="BB Dental"

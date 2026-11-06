@@ -11,7 +11,7 @@ BB Dental эмнэлгийн нэг салбарын дотоод ERP болон
 5. `/register` дээр хамгийн эхний ажилтны бүртгэл үүсгэнэ. Системийн хамгийн эхний бүртгэл автоматаар идэвхтэй `ADMIN` болно. Эсвэл `BOOTSTRAP_ADMIN_PHONE`, `BOOTSTRAP_ADMIN_PASSWORD` (8+ тэмдэгт), `BOOTSTRAP_ADMIN_NAME`, сонголтоор `BOOTSTRAP_ADMIN_EMAIL` утгуудыг тохируулж `bun run db:seed` ажиллуулж болно. Seed өмнөх админы нууц үгийг өөрчлөхгүй.
 6. `bun run dev` → http://localhost:3000. Ажилтан `/login`-оор нэвтэрнэ. Дотоод ажлын орчин `/erp`.
 
-Production: `APP_URL=https://...` тохируулна → `bun run db:migrate` → `bun run build` → `bun run start`. HTTPS шаардлагатай; production session cookie нь Secure. `public/fonts/NotoSans-Regular.ttf` файлыг deployment-д хамт оруулна (Next tracing тохиргоотой).
+Node.js production: `APP_URL=https://...` тохируулна → `bun run db:migrate` → `bun run build:next` → `bun run start`. HTTPS шаардлагатай; production session cookie нь Secure. `public/fonts/NotoSans-Regular.ttf` файлыг deployment-д хамт оруулна (Next tracing тохиргоотой).
 
 Supabase холболтгүй үед үндсэн нүүр хуудас, нэвтрэх форм харагдана. Өгөгдөл шаарддаг API нь тохиргоо хийгдээгүйг 503 төлөвөөр мэдэгдэнэ. Зохиомол эсвэл localStorage-д хадгалсан өгөгдөлд автоматаар шилжихгүй.
 
@@ -19,7 +19,7 @@ Supabase холболтгүй үед үндсэн нүүр хуудас, нэв�
 
 `wrangler.jsonc` дахь Worker-ийн `name` болон `WORKER_SELF_REFERENCE.service` хоёулаа `bb-dental` байна. Worker-ийн нэрийг соливол хоёуланг нь зэрэг шинэчилнэ. `package.json` дахь `bbdentalv2` нь npm төслийн нэр бөгөөд Worker-ийн нэрээс тусдаа.
 
-Cloudflare Workers Builds дээр одоогийн `bun run build` build command, `npx wrangler deploy` deploy command-ийг ашиглаж болно. Wrangler-ийн build hook нь `bun run build:cloudflare` ажиллуулж `.open-next/worker.js` болон assets-ийг бэлдэнэ. Давхар Next.js build хийхээс зайлсхийх бол Dashboard-ийн Build command-ийг хоосон үлдээгээд Deploy command-ийг `bun run deploy` болгоно. Локал шалгалт: `bun run build:cloudflare`; нийтлэх: `bun run deploy`.
+Cloudflare Workers Builds дээр Build command: `bun run build`, Deploy command: `npx wrangler deploy` ашиглана. `bun run build` нь OpenNext-ийг ажиллуулж, `open-next.config.ts` дахь `buildCommand`-аар `bun run build:next` (Prisma + Next.js) ажиллуулсны дараа `.open-next/worker.js`, compiled config болон assets-ийг бэлдэнэ. Wrangler-ийн build hook ашиглахгүй: Wrangler нь hook-оос өмнө OpenNext deploy руу шилждэг. Локал шалгалт: `bun run build`; дараа нь нийтлэх: `bun run deploy`. Deploy нь өмнө бэлдсэн OpenNext багцыг ашигладаг тул Build command-ийг хоосон үлдээж болохгүй.
 
 Runtime утгуудыг `bb-dental` Worker-ийн **Settings → Variables and Secrets** хэсэгт тохируулна. `keep_vars: true` нь Dashboard-д оруулсан хувьсагчдыг deploy үед хадгална. `DATABASE_URL`, `CLOUDINARY_URL`, `TELEGRAM_BOT_TOKEN` болон бусад нууц утгыг **Secret** төрлөөр хадгалж, репод оруулахгүй. Логт ил гарсан түлхүүрүүдийг сольж, шинэ утгаар шинэчилнэ. Build variables болон Worker-ийн runtime secrets нь тусдаа тохиргоо.
 
@@ -211,6 +211,6 @@ node -e 'console.log(require("crypto").randomBytes(32).toString("base64"))'
 
 Админ, эмч **Миний профайл** цэс эсвэл дээрх нэрийн дүрсээс `/erp/profile`-ийг нээж өөрийн нэр, утас, имэйл, Telegram Chat ID-г шинэчилнэ. Эмч мэргэжил, танилцуулга, Cloudinary профайлын зургаа өөрөө засна; энэ мэдээлэл нийтийн эмчийн танилцуулгад шинэчлэгдэнэ. `/api/profile` нь session-ийн эзний мэдээллийг л өөрчилнө; хэрэглэгчийн ID, эрх, идэвхтэй төлөв, зөвшөөрлийн төлөв зэрэг нэмэлт талбар хүлээн авахгүй. Эмч зөвхөн `doctors` зориулалтаар зураг upload хийх боломжтой. Үйлчилгээ болон лого upload нь админд хэвээр.
 
-`app/favicon.ico`, `app/icon.png`, `app/apple-icon.png` нь одоогийн BB Dental логоны browser tab, өндөр нягтрал болон Apple shortcut хувилбарууд. Browser хуучин icon-ийг cache-ласан бол хуудсыг дахин ачаалж шалгана.
+**Тохиргоо → Лого ба тайлан** хэсэгт оруулсан `logoUrl` нь нүүр хуудас, footer, нэвтрэх/бүртгэл/нууц үг сэргээх хуудас, ERP цэс, ачааллын дэлгэц, browser tab, Apple shortcut болон PDF-ийн лого болно. Хадгалсны дараа нээлттэй дэлгэцийн лого шууд шинэчлэгдэнэ; өөр tab руу буцаж ороход дахин уншина. `/api/branding` нь зөвхөн нийтийн `logoUrl` буцаах ба cache хийхгүй. Лого тохируулаагүй эсвэл зураг ачаалагдахгүй бол `public/images/default-logo.png` ашиглана. Browser хуучин shortcut icon-ийг cache-ласан бол дахин нэмэх шаардлагатай байж болно.
 
 `BrandLoader` нь цагаан BB Dental үсгийг зөөлөн хөдөлгөж харуулна. Route болон эрх шалгах үеийн бүтэн дэлгэц, ERP-ийн мэдээлэл ачаалах хэсэгт хэрэглэнэ. Хиймэл саатал, дуусах хувийн тоолуур нэмэхгүй; өгөгдөл ирэхэд шууд агуулга гарна. Reduced motion тохиргоотой үед хөдөлгөөн унтарна. Энэ өөрчлөлт нэмэлт migration шаардахгүй.

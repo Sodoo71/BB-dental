@@ -1,5 +1,6 @@
 "use client";
 import BrandLoader from "../components/brand-loader";
+import { useClinicBranding } from "../components/clinic-branding";
 import { useEffect, useState, type FormEvent } from "react";
 import {
   Check,
@@ -50,6 +51,7 @@ type TelegramStatus = {
   username: string;
 };
 export default function SettingsPanel() {
+  const { setLogoUrl } = useClinicBranding();
   const actor = useUser();
   const [tab, setTab] = useState("clinic"),
     [values, setValues] = useState(defaults),
@@ -101,6 +103,7 @@ export default function SettingsPanel() {
     setError("");
     try {
       await api("/api/erp/settings/clinic", "PATCH", values);
+      setLogoUrl(values.logoUrl);
       setMessage("Эмнэлэг болон footer-ийн мэдээлэл хадгалагдлаа.");
     } catch (e) {
       setError((e as Error).message);
@@ -170,7 +173,10 @@ export default function SettingsPanel() {
                 </span>
                 <div>
                   <h2>Таны эмнэлгийн брэнд</h2>
-                  <p>Нүүр хуудас болон PDF баримтуудад ашиглана.</p>
+                  <p>
+                    Сайт, нэвтрэх хуудас, ERP, ачааллын дэлгэц, browser icon
+                    болон PDF баримтуудад ашиглана.
+                  </p>
                 </div>
               </div>
               <ImageUpload
@@ -178,6 +184,7 @@ export default function SettingsPanel() {
                 purpose="logo"
                 onChange={async (value) => {
                   await api("/api/erp/settings/logoUrl", "PATCH", { value });
+                  setLogoUrl(value);
                   setValues((v) => ({ ...v, logoUrl: value }));
                   setMessage("Лого хадгалагдлаа.");
                 }}

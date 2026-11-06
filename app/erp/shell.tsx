@@ -1,7 +1,7 @@
 "use client";
 import { createContext, useContext, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { ClinicLogo } from "../components/clinic-branding";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
@@ -189,18 +189,15 @@ export function ErpShell({
         )}
         <aside className={`erp-sidebar ${open ? "open" : ""}`}>
           <Link href="/erp" className="erp-brand">
-            <Image
-              src="/images/bb-dental-logo.jpg"
-              alt=""
-              width={39}
-              height={39}
-            />
+            <ClinicLogo alt="" width={39} height={39} />
             <span>
               BB Dental<small>CLINIC WORKSPACE</small>
             </span>
           </Link>
           <div className="clinic-card">
-            <div className="clinic-avatar">BB</div>
+            <div className="clinic-avatar">
+              <ClinicLogo alt="" width={34} height={34} />
+            </div>
             <span>
               <strong>BB Dental Clinic</strong>
               <small>Эмнэлгийн удирдлага</small>

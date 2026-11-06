@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { ClinicLogo } from "./clinic-branding";
 export default function BrandLoader({
   fullScreen = false,
 }: {
@@ -11,6 +12,7 @@ export default function BrandLoader({
       aria-label="BB Dental мэдээллийг бэлтгэж байна"
       aria-live="polite"
     >
+      <ClinicLogo alt="" width={72} height={72} />
       <div className="brand-loader-word" aria-hidden="true">
         {Array.from("BB Dental").map((letter, index) => (
           <span key={index} style={{ "--letter": index } as CSSProperties}>

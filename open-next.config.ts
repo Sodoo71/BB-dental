@@ -1,3 +1,8 @@
 import { defineCloudflareConfig } from "@opennextjs/cloudflare";
 
-export default defineCloudflareConfig({});
+const config = defineCloudflareConfig({});
+
+// OpenNext invokes this command instead of recursively calling `bun run build`.
+config.buildCommand = "bun run build:next";
+
+export default config;

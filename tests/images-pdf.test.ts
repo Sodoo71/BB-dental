@@ -11,7 +11,7 @@ import {
 import { createClinicPdf, defaultLogoPath } from "../lib/pdf";
 test("image upload validates real formats, size and signed Cloudinary parameters", async () => {
   const bytes = await readFile(defaultLogoPath);
-  assert.equal(imageFormat(bytes), "jpg");
+  assert.equal(imageFormat(bytes), "png");
   assert.throws(() =>
     imageFormat(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>')),
   );

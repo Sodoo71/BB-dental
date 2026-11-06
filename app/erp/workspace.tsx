@@ -1,6 +1,6 @@
 "use client";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowDownToLine,
@@ -28,6 +28,7 @@ import { useUser } from "./shell";
 import Employees from "./employees";
 import Profile from "./profile";
 import BrandLoader from "../components/brand-loader";
+import { useClinicBranding } from "../components/clinic-branding";
 import RoleHome from "./role-home";
 import RosterCalendar from "./roster-calendar";
 import SettingsPanel from "./settings-panel";
@@ -388,7 +389,15 @@ function fieldsFor(
   }
 }
 
-export function ErpWorkspace({ module }: { module: string }) {
+export function ErpWorkspace() {
+  const { section } = useParams<{ section?: string[] }>();
+  const module = section?.[0] || "dashboard";
+  // All sections share a catch-all route. Follow the current router params,
+  // and give each section its own filters, forms and pending data requests.
+  return <WorkspaceSection key={module} module={module} />;
+}
+
+function WorkspaceSection({ module }: { module: string }) {
   if (module === "profile") return <Profile />;
   if (module === "users") return <Employees />;
   if (module === "settings") return <SettingsPanel />;
@@ -403,6 +412,7 @@ export function ErpWorkspace({ module }: { module: string }) {
   );
 }
 function StandardWorkspace({ module }: { module: string }) {
+  const { setLogoUrl } = useClinicBranding();
   const user = useUser();
   const urlParams = useSearchParams();
   const [search, setSearch] = useState(urlParams.get("q") || "");
@@ -833,6 +843,7 @@ function StandardWorkspace({ module }: { module: string }) {
               onChange={async (value) => {
                 try {
                   await api("/api/erp/settings/logoUrl", "PATCH", { value });
+                  setLogoUrl(value);
                   setItems((current) => [
                     ...current.filter((i) => i.key !== "logoUrl"),
                     { id: "logoUrl", key: "logoUrl", value },

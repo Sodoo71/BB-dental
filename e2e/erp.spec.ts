@@ -59,7 +59,7 @@ async function login(phone: string) {
   return ctx;
 }
 test.beforeAll(async () => {
-  asset = await readFile("public/images/bb-dental-logo.jpg");
+  asset = await readFile("public/images/default-logo.png");
   telegramMock = createServer((req, res) => {
     let raw = "";
     req.on("data", (chunk) => (raw += chunk));
@@ -90,7 +90,7 @@ test.beforeAll(async () => {
   cloudServer = createServer(async (req, res) => {
     if (req.url === "/asset") {
       delivered++;
-      res.setHeader("Content-Type", "image/jpeg");
+      res.setHeader("Content-Type", "image/png");
       res.end(asset);
       return;
     }
@@ -166,13 +166,13 @@ test.beforeAll(async () => {
 });
 test.beforeEach(async ({ page }) => {
   await page.route("https://res.cloudinary.com/qa-cloud/**", (route) =>
-    route.fulfill({ contentType: "image/jpeg", body: asset }),
+    route.fulfill({ contentType: "image/png", body: asset }),
   );
   await page.route("**/_next/image?*", (route) =>
     new URL(route.request().url()).searchParams
       .get("url")
       ?.startsWith("https://res.cloudinary.com/qa-cloud/")
-      ? route.fulfill({ contentType: "image/jpeg", body: asset })
+      ? route.fulfill({ contentType: "image/png", body: asset })
       : route.continue(),
   );
 });
@@ -450,6 +450,51 @@ test("public lookup is confirmed and contains booking fields only; CSRF blocked"
   ).toBe(403);
   await ctx.dispose();
 });
+test("sidebar navigation leaves reports and follows the URL through back and forward", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/login");
+  await page.getByLabel("Утасны дугаар", { exact: true }).fill(phones.admin);
+  await page.getByLabel("Нууц үг", { exact: true }).fill(password);
+  await page.getByRole("button", { name: "Нэвтрэх", exact: true }).click();
+  await expect(page).toHaveURL(/\/erp$/);
+  const nav = page.getByRole("navigation", { name: "Ажлын цэс" });
+  for (const [label, path, heading] of [
+    ["Тайлан", "/erp/reports", "Санхүү, үйл ажиллагааны тайлан"],
+    ["Хяналтын самбар", "/erp", "Хяналтын самбар"],
+    ["Өвчтөн", "/erp/patients", "Өвчтөний бүртгэл"],
+    ["Тайлан", "/erp/reports", "Санхүү, үйл ажиллагааны тайлан"],
+    ["Үйлчилгээ", "/erp/services", "Үйлчилгээ"],
+  ]) {
+    const link = nav.getByRole("link", { name: label, exact: true });
+    await link.click();
+    await expect(page).toHaveURL(new RegExp(`${path}$`));
+    await expect(link).toHaveAttribute("aria-current", "page");
+    await expect(
+      page.getByRole("heading", { level: 1, name: heading, exact: true }),
+    ).toBeVisible();
+    if (path !== "/erp/reports")
+      await expect(page.getByLabel("Тайлангийн үйлчилгээ")).toHaveCount(0);
+  }
+  await page.goBack();
+  await expect(
+    page.getByRole("heading", {
+      level: 1,
+      name: "Санхүү, үйл ажиллагааны тайлан",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page.goForward();
+  await expect(
+    page.getByRole("heading", {
+      level: 1,
+      name: "Үйлчилгээ",
+      exact: true,
+    }),
+  ).toBeVisible();
+});
+
 test("admin dashboard, patient card and responsive public UI", async ({
   page,
 }) => {
@@ -701,11 +746,11 @@ test("Cloudinary uploads enforce admin access, image formats and limits; branded
     ctx: APIRequestContext,
     purpose: string,
     buffer = asset,
-    mimeType = "image/jpeg",
+    mimeType = "image/png",
   ) =>
     ctx.post("/api/upload", {
       headers: { Origin: origin },
-      multipart: { purpose, file: { name: "photo.jpg", mimeType, buffer } },
+      multipart: { purpose, file: { name: "photo.png", mimeType, buffer } },
     });
   expect((await upload(doctor, "doctors")).status()).toBe(201);
   expect((await upload(doctor, "logo")).status()).toBe(403);
@@ -788,7 +833,7 @@ test("admin uploads service images and a PDF logo from the UI", async ({
   page,
 }) => {
   await page.route("https://res.cloudinary.com/**", (route) =>
-    route.fulfill({ contentType: "image/jpeg", body: asset }),
+    route.fulfill({ contentType: "image/png", body: asset }),
   );
   await page.goto("/login");
   await page.getByLabel("Утасны дугаар", { exact: true }).fill(phones.admin);
@@ -801,8 +846,8 @@ test("admin uploads service images and a PDF logo from the UI", async ({
     .filter({ hasText: `QA Үзлэг ${phoneBase}` });
   await row.getByRole("button", { name: "Засах", exact: true }).click();
   await page.getByRole("dialog").locator('input[type="file"]').setInputFiles({
-    name: "service.jpg",
-    mimeType: "image/jpeg",
+    name: "service.png",
+    mimeType: "image/png",
     buffer: asset,
   });
   await expect(
@@ -821,15 +866,46 @@ test("admin uploads service images and a PDF logo from the UI", async ({
     .click();
   await page
     .locator('input[type="file"]')
-    .setInputFiles({ name: "logo.jpg", mimeType: "image/jpeg", buffer: asset });
+    .setInputFiles({ name: "logo.png", mimeType: "image/png", buffer: asset });
   await expect(page.getByRole("status")).toContainText("Лого хадгалагдлаа");
+  const savedLogo = (
+    await db.setting.findUniqueOrThrow({ where: { key: "logoUrl" } })
+  ).value;
+  await expect(page.locator(".erp-brand img")).toHaveAttribute(
+    "src",
+    savedLogo,
+  );
+  await expect(page.locator('head link[rel="icon"]')).toHaveAttribute(
+    "href",
+    savedLogo,
+  );
+  await expect(
+    page.locator('head link[rel="apple-touch-icon"]'),
+  ).toHaveAttribute("href", savedLogo);
+  const branding = await page.request.get("/api/branding");
+  expect(await branding.json()).toEqual({ logoUrl: savedLogo });
+  expect(branding.headers()["cache-control"]).toBe("no-store");
   await page.goto("/");
+  for (const logo of await page.locator(".brand-logo, .hero-logo").all())
+    await expect(logo).toHaveAttribute("src", savedLogo);
   await expect(
     page
       .locator(".public-service-card")
       .filter({ hasText: `QA Үзлэг ${phoneBase}` })
       .getByRole("img"),
   ).toBeVisible();
+  for (const path of [
+    "/login",
+    "/register",
+    "/forgot-password",
+    "/reset-password",
+  ]) {
+    await page.goto(path);
+    await expect(page.locator(".login-story img")).toHaveAttribute(
+      "src",
+      savedLogo,
+    );
+  }
 });
 
 test("admin changes doctor, reception and admin roles while retaining clinical history", async () => {
@@ -1711,10 +1787,15 @@ test("self profile edits stay scoped and doctor changes reach the public catalog
     .click();
   await expect(page.getByRole("status")).toContainText("Профайл шинэчлэгдлээ");
   await expect(page.locator(".erp-user")).toContainText("QA Admin Updated");
-  expect((await page.request.get("/favicon.ico")).status()).toBe(200);
-  expect(
-    (await page.request.get("/icon.png")).headers()["content-type"],
-  ).toContain("image/png");
+  const branding = await (await page.request.get("/api/branding")).json();
+  const logoUrl = branding.logoUrl || "/images/default-logo.png";
+  await expect(page.locator('head link[rel="icon"]')).toHaveAttribute(
+    "href",
+    logoUrl,
+  );
+  await expect(
+    page.locator('head link[rel="apple-touch-icon"]'),
+  ).toHaveAttribute("href", logoUrl);
   await page.setViewportSize({ width: 390, height: 844 });
   await expect
     .poll(() =>

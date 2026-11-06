@@ -10,7 +10,7 @@ export type PdfBrand = {
 };
 export const defaultLogoPath = path.join(
   process.cwd(),
-  "public/images/bb-dental-logo.jpg",
+  "public/images/default-logo.png",
 );
 const colors = {
   teal: "#007F83",

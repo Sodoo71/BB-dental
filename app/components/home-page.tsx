@@ -1,8 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import { useState } from "react";
 import PublicClinic from "./public-clinic";
+import { ClinicLogo } from "./clinic-branding";
 
 type IconName =
   | "phone"
@@ -66,17 +66,10 @@ function Icon({ name }: { name: IconName }) {
     </svg>
   );
 }
-function Brand({
-  name = "BB Dental Clinic",
-  logoUrl,
-}: {
-  name?: string;
-  logoUrl?: string;
-}) {
+function Brand({ name = "BB Dental Clinic" }: { name?: string }) {
   return (
     <a href="#home" className="brand" aria-label="BB Dental Clinic нүүр хуудас">
-      <Image
-        src={logoUrl || "/images/bb-dental-logo.jpg"}
+      <ClinicLogo
         width={60}
         height={60}
         alt="BB Dental лого"
@@ -141,7 +134,7 @@ export default function HomePage() {
     <>
       <header className="site-header">
         <div className="header-inner">
-          <Brand name={clinic.clinicName} logoUrl={clinic.logoUrl} />
+          <Brand name={clinic.clinicName} />
           <button
             className="menu-toggle"
             aria-label={menuOpen ? "Цэс хаах" : "Цэс нээх"}
@@ -239,8 +232,7 @@ export default function HomePage() {
                     >
                       <div className="card-art">
                         {index === 0 ? (
-                          <Image
-                            src={clinic.logoUrl || "/images/bb-dental-logo.jpg"}
+                          <ClinicLogo
                             alt="BB Dental Clinic"
                             width={310}
                             height={310}
@@ -289,7 +281,7 @@ export default function HomePage() {
         <div className="footer-inner">
           <div className="footer-grid">
             <div className="footer-about">
-              <Brand name={clinic.clinicName} logoUrl={clinic.logoUrl} />
+              <Brand name={clinic.clinicName} />
               <p>
                 {clinic.footerDescription ||
                   "Танд болон таны гэр бүлд чанартай, сэтгэл ханамжтай шүдний тусламж үйлчилгээг үзүүлэхэд бид бэлэн байна."}

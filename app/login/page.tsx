@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import PasswordInput from "../components/password-input";
-import Image from "next/image";
+import { ClinicLogo } from "../components/clinic-branding";
 import { useState, type FormEvent } from "react";
 import { ArrowLeft, ArrowRight, LockKeyhole, Phone } from "lucide-react";
 import "../erp/erp.css";
@@ -31,8 +31,7 @@ export default function LoginPage() {
   return (
     <main className="login-page">
       <div className="login-story">
-        <Image
-          src="/images/bb-dental-logo.jpg"
+        <ClinicLogo
           alt="BB Dental"
           width={86}
           height={86}
