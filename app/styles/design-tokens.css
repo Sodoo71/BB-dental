@@ -1,0 +1,99 @@
+/* Extracted from the existing BB Dental v2 presentation. */
+:root {
+  color-scheme: light;
+  --brand: #007779;
+  --brand-dark: #005f62;
+  --accent: #85ded3;
+  --teal: var(--brand);
+  --deep: var(--brand-dark);
+  --ink: #183d3e;
+  --muted: #5c7778;
+  --background: #f6fbfa;
+  --foreground: var(--ink);
+  --surface: #fff;
+  --soft-surface: #f1f9f6;
+  --line: #dcebea;
+  --font-body: "Inter", system-ui, sans-serif;
+  --font-heading: "Merriweather", Georgia, serif;
+  --font-sans: var(--font-body);
+  --font-serif: var(--font-heading);
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --radius-control: 10px;
+  --radius-card: 16px;
+  --radius-pill: 999px;
+  --shadow-card: 0 2px 8px #00777904;
+  --shadow-dialog: 0 25px 100px #073a4633;
+  --border-width: 1px;
+  --control-height: 44px;
+  --auth-control-height: 48px;
+  --header-height: 80px;
+  --sidebar-width: 256px;
+  --sidebar-collapsed-width: 96px;
+  --sidebar-mobile-width: min(280px, 88vw);
+  --dialog-width: 660px;
+  --page-padding: 32px;
+  --dialog-padding: 25px;
+  --z-menu: 10;
+  --z-header: 20;
+  --z-shade: 29;
+  --z-sidebar: 30;
+  --z-public-header: 40;
+  --z-toast: 60;
+  --z-theme: 70;
+  --z-skip: 10000;
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
+  /* Documentation tokens: CSS media queries require literal values. */
+  --breakpoint-mobile: 600px;
+  --breakpoint-sidebar: 900px;
+  --breakpoint-compact: 1100px;
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --surface: #172731;
+  --soft-surface: #1d333d;
+  --ink: #e3edf1;
+  --muted: #a4bac5;
+  --line: #30454f;
+  --teal: #63c8c4;
+  --teal-dark: #9bded5;
+  --mint: #172f35;
+  --paper: #111f28;
+  --background: #101d25;
+  --foreground: #e3edf1;
+}
+@media (max-width: 600px) {
+  :root {
+    --dialog-padding: 20px;
+    --page-padding: 16px;
+  }
+}
+.erp-shell,
+.login-page {
+  --erp-accent: var(--brand);
+  --erp-text: var(--ink);
+  --erp-muted: var(--muted);
+  --erp-border: var(--line);
+  --erp-on-accent: #fff;
+}
+html[data-theme="dark"] :is(.erp-shell, .login-page) {
+  --erp-accent: #54c4bd;
+  --erp-text: #e3edf1;
+  --erp-muted: #a0b7c4;
+  --erp-border: #30454f;
+  --erp-on-accent: #101d25;
+}

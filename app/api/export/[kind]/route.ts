@@ -2,7 +2,14 @@ import { createClinicPdf } from "@/lib/pdf";
 import { pdfBranding } from "@/lib/pdf-branding";
 import ExcelJS from "exceljs";
 import { db } from "@/lib/db";
-import { audit, patientAccess, clinicalScope, requireUser } from "@/lib/auth";
+import {
+  audit,
+  patientAccess,
+  clinicalScope,
+  requireUser,
+  rateLimit,
+} from "@/lib/auth";
+import { exportClinicData } from "@/lib/data-export";
 import { ApiError, safe } from "@/lib/http";
 import { reportData } from "@/lib/reports";
 import {
@@ -29,6 +36,18 @@ export async function GET(
     const user = await requireUser();
     const { kind } = await ctx.params;
     const q = new URL(req.url).searchParams;
+    if (kind === "data") {
+      if (user.role !== "ADMIN")
+        throw new ApiError(403, "Зөвхөн админ өгөгдөл экспортлоно.");
+      await rateLimit(`data-export:${user.id}`, 3, 3600);
+      const data = await exportClinicData();
+      await audit(user, "CLINIC_DATA_EXPORTED", "system", user.id);
+      return download(
+        new TextEncoder().encode(JSON.stringify(data, null, 2)),
+        "application/json; charset=utf-8",
+        `bb-dental-data-${today()}.json`,
+      );
+    }
     if (kind === "patient") {
       const id = q.get("id");
       if (!id) throw new ApiError(400, "Өвчтөн сонгоно уу.");

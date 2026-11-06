@@ -80,6 +80,7 @@ model Doctor {
   imageUrl          String            @default("")
   telegramChatId    String            @default("")
   active            Boolean           @default(true)
+  sortOrder         Int               @default(0)
   schedules         Schedule[]
   leaves            Leave[]
   appointments      Appointment[]
@@ -100,13 +101,17 @@ model Schedule {
 }
 
 model Leave {
-  id        String @id @default(uuid())
-  doctorId  String
-  doctor    Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
-  date      String
-  startTime String @default("00:00")
-  endTime   String @default("23:59")
-  reason    String
+  id           String    @id @default(uuid())
+  doctorId     String
+  doctor       Doctor    @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  date         String
+  startTime    String    @default("00:00")
+  endTime      String    @default("23:59")
+  reason       String
+  kind         String    @default("BLOCKED_RANGE")
+  status       String    @default("APPROVED")
+  reviewedById String?
+  reviewedAt   DateTime?
 
   @@index([doctorId, date])
 }
@@ -121,6 +126,7 @@ model Service {
   duration     Int           @default(30)
   doctorIds    String[]      @default([])
   active       Boolean       @default(true)
+  sortOrder    Int           @default(0)
   appointments Appointment[]
   treatments   Treatment[]
 
@@ -314,10 +320,11 @@ model PatientTransfer {
 }
 
 model NurseShift {
-  id String @id @default(uuid())
-  name String
-  date String
+  id        String @id @default(uuid())
+  name      String
+  date      String
   startTime String
-  endTime String
+  endTime   String
+
   @@index([date])
 }

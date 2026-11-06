@@ -1,16 +1,15 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
   ArrowLeft,
   ArrowRight,
   CalendarDays,
   Check,
-  Phone,
   Search,
   Stethoscope,
 } from "lucide-react";
-import { api, type Entity } from "../erp/ui";
+import { api, Feedback, useResource, type Entity } from "../erp/ui";
 import { money, normalizePhone, statusNames, today } from "@/lib/domain";
 
 type Catalog = {
@@ -23,25 +22,30 @@ export default function PublicClinic({
 }: {
   onClinic?: (clinic: Record<string, string>) => void;
 }) {
-  const [catalog, setCatalog] = useState<Catalog>({
-    services: [],
-    doctors: [],
-  });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const {
+    data: catalogData,
+    error,
+    loading,
+    retry: retryCatalog,
+  } = useResource<Catalog>("/api/public/catalog");
+  const catalog = catalogData || { services: [], doctors: [] };
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
   const [step, setStep] = useState(1);
   const [service, setService] = useState<Entity | null>(null);
   const [doctorId, setDoctorId] = useState("");
   const [date, setDate] = useState(today());
-  const [suggestions, setSuggestions] = useState<
-    { doctor: Entity; slots: string[] }[]
+  const [earliest, setEarliest] = useState<
+    { date: string; startTime: string; doctorId: string; doctorName: string }[]
   >([]);
-  const [suggesting, setSuggesting] = useState(false);
-  const [slots, setSlots] = useState<string[]>([]);
+  const [findingEarliest, setFindingEarliest] = useState(false);
+  const [earliestError, setEarliestError] = useState("");
+  const earliestRequest = useRef(0);
   const [suggestedTime, setSuggestedTime] = useState("");
-  const [time, setTime] = useState("");
+  const [timeSelection, setTimeSelection] = useState<{
+    key: string;
+    value: string;
+  }>({ key: "", value: "" });
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [busy, setBusy] = useState(false);
@@ -54,74 +58,42 @@ export default function PublicClinic({
   const [lookupError, setLookupError] = useState("");
   const [lookupBusy, setLookupBusy] = useState(false);
   useEffect(() => {
-    let alive = true;
-    api<Catalog>("/api/public/catalog")
-      .then((r) => {
-        if (alive) {
-          setCatalog(r);
-          if (r.clinic) onClinic?.(r.clinic);
-          setError("");
-        }
-      })
-      .catch((e) => {
-        if (alive) setError(e.message);
-      })
-      .finally(() => {
-        if (alive) setLoading(false);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [onClinic]);
-  useEffect(() => {
-    setTime("");
-    setSlots([]);
-    if (!service || !doctorId || !date) return;
-    let alive = true;
-    api<{ slots: string[] }>(
-      `/api/public/availability?${new URLSearchParams({ serviceId: service.id, doctorId, date })}`,
-    )
-      .then((r) => {
-        if (alive) {
-          setSlots(r.slots);
-          setTime(r.slots.includes(suggestedTime) ? suggestedTime : "");
-          setBookingError("");
-        }
-      })
-      .catch((e) => {
-        if (alive) setBookingError(e.message);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [service, doctorId, date, suggestedTime]);
-  useEffect(() => {
-    setSuggestions([]);
-    setTime("");
-    if (!service || !date) return;
-    let alive = true;
-    setSuggesting(true);
-    api<{ suggestions: { doctor: Entity; slots: string[] }[] }>(
-      `/api/public/suggestions?${new URLSearchParams({ serviceId: service.id, date })}`,
-    )
-      .then((r) => {
-        if (alive) {
-          setSuggestions(r.suggestions);
-          setDoctorId((current) =>
-            r.suggestions.some((s) => s.doctor.id === current) ? current : "",
-          );
-        }
-      })
-      .catch((e) => {
-        if (alive) setBookingError(e.message);
-      })
-      .finally(() => {
-        if (alive) setSuggesting(false);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [service, date]);
+    if (catalogData?.clinic) onClinic?.(catalogData.clinic);
+  }, [catalogData, onClinic]);
+  const suggestionsUrl =
+    service && date
+      ? `/api/public/suggestions?${new URLSearchParams({ serviceId: service.id, date })}`
+      : null;
+  const {
+    data: suggestionData,
+    error: suggestionError,
+    loading: suggesting,
+    retry: retrySuggestions,
+  } = useResource<{ suggestions: { doctor: Entity; slots: string[] }[] }>(
+    suggestionsUrl,
+  );
+  const suggestions = suggestionData?.suggestions || [];
+  const availabilityUrl =
+    service && doctorId && date
+      ? `/api/public/availability?${new URLSearchParams({ serviceId: service.id, doctorId, date })}`
+      : null;
+  const {
+    data: availability,
+    error: availabilityError,
+    loading: slotsLoading,
+    retry: retrySlots,
+  } = useResource<{ slots: string[] }>(availabilityUrl);
+  const slots = availability?.slots || [];
+  const time =
+    timeSelection.key === availabilityUrl
+      ? slots.includes(timeSelection.value)
+        ? timeSelection.value
+        : ""
+      : slots.includes(suggestedTime)
+        ? suggestedTime
+        : "";
+  const setTime = (value: string) =>
+    setTimeSelection({ key: availabilityUrl || "", value });
   const contactTel = `tel:+976${(catalog.clinic?.phone || "95963531").replace(/\D/g, "").replace(/^976/, "")}`;
   const categories = [
     ...new Set(catalog.services.map((s) => s.category || "Бусад")),
@@ -133,6 +105,10 @@ export default function PublicClinic({
         s.name?.toLocaleLowerCase().includes(search.toLocaleLowerCase())),
   );
   function choose(s: Entity) {
+    earliestRequest.current++;
+    setFindingEarliest(false);
+    setEarliest([]);
+    setEarliestError("");
     setSuggestedTime("");
     setDoctorId("");
     setService(s);
@@ -142,6 +118,7 @@ export default function PublicClinic({
   }
   return (
     <>
+      {error && <Feedback retry={retryCatalog}>{error}</Feedback>}
       <section className="public-services" id="services">
         <div className="section-heading">
           <p className="eyebrow">МАНАЙ ҮЙЛЧИЛГЭЭ</p>
@@ -253,10 +230,23 @@ export default function PublicClinic({
               </article>
             ))
           ) : (
-            <p className="public-empty">Эмчийн мэдээлэл удахгүй нэмэгдэнэ.</p>
+            <p className="public-empty">
+              {loading
+                ? "Эмчийн мэдээлэл ачаалж байна…"
+                : error
+                  ? "Эмчийн мэдээлэл ачаалж чадсангүй."
+                  : "Эмчийн мэдээлэл удахгүй нэмэгдэнэ."}
+            </p>
           )}
         </div>
       </section>
+      {suggestionError && (
+        <Feedback retry={retrySuggestions}>{suggestionError}</Feedback>
+      )}
+      {availabilityError && (
+        <Feedback retry={retrySlots}>{availabilityError}</Feedback>
+      )}
+      {slotsLoading && <p role="status">Боломжит цаг ачаалж байна…</p>}
       <section
         className="booking-section"
         id="booking"
@@ -298,7 +288,6 @@ export default function PublicClinic({
                     setComplete(false);
                     setService(null);
                     setTime("");
-                    setSlots([]);
                     setName("");
                     setPhone("");
                   }}
@@ -393,6 +382,61 @@ export default function PublicClinic({
                       </label>
                     </div>
                     <div className="suggestion-list" aria-live="polite">
+                      <button
+                        type="button"
+                        disabled={findingEarliest}
+                        onClick={async () => {
+                          if (!service) return;
+                          const request = ++earliestRequest.current;
+                          setFindingEarliest(true);
+                          setEarliestError("");
+                          setEarliest([]);
+                          try {
+                            const response = await api<{
+                              items: typeof earliest;
+                            }>(
+                              `/api/public/earliest?${new URLSearchParams({ serviceId: service.id, from: today() })}`,
+                            );
+                            if (request !== earliestRequest.current) return;
+                            setEarliest(response.items);
+                            if (!response.items.length)
+                              setEarliestError(
+                                "Ойрын 31 хоногт сул цаг олдсонгүй.",
+                              );
+                          } catch (e) {
+                            if (request === earliestRequest.current)
+                              setEarliestError((e as Error).message);
+                          } finally {
+                            if (request === earliestRequest.current)
+                              setFindingEarliest(false);
+                          }
+                        }}
+                      >
+                        {findingEarliest
+                          ? "Ойрын сул цаг хайж байна…"
+                          : "Ойрын 31 хоногийн сул цаг олох"}
+                      </button>
+                      {earliestError && <p role="status">{earliestError}</p>}
+                      {earliest.length > 0 && (
+                        <div
+                          className="earliest-slots"
+                          aria-label="Ойрын сул цагууд"
+                        >
+                          {earliest.map((slot) => (
+                            <button
+                              type="button"
+                              key={`${slot.doctorId}-${slot.date}-${slot.startTime}`}
+                              onClick={() => {
+                                setDate(slot.date);
+                                setDoctorId(slot.doctorId);
+                                setSuggestedTime(slot.startTime);
+                              }}
+                            >
+                              {slot.date} · {slot.startTime} · {slot.doctorName}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                       <h4>Танд санал болгох эмч, цаг</h4>
                       {suggesting ? (
                         <p>Боломжит цагийг тооцоолж байна…</p>

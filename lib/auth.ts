@@ -13,7 +13,7 @@ const userSelect = {
   role: true,
   active: true,
   approvalStatus: true,
-  doctor: { select: { id: true } },
+  doctor: { select: { id: true, imageUrl: true } },
 } as const;
 export async function currentUser() {
   const token = (await cookies()).get(COOKIE)?.value;
@@ -60,7 +60,7 @@ export async function rateLimit(key: string, limit: number, seconds: number) {
   const hashed = digest(key);
   const rows = await db.$queryRaw<
     { count: number }[]
-  >`INSERT INTO "RateLimit" ("key","count","expiresAt") VALUES (${hashed},1,${new Date(Date.now() + seconds * 1000)}) ON CONFLICT ("key") DO UPDATE SET "count" = CASE WHEN "RateLimit"."expiresAt" < NOW() THEN 1 ELSE "RateLimit"."count" + 1 END, "expiresAt" = CASE WHEN "RateLimit"."expiresAt" < NOW() THEN EXCLUDED."expiresAt" ELSE "RateLimit"."expiresAt" END RETURNING "count"`;
+  >`INSERT INTO "RateLimit" ("key","count","expiresAt") VALUES (${hashed},1,${new Date(Date.now() + seconds * 1000)}) ON CONFLICT ("key") DO UPDATE SET "count" = CASE WHEN "RateLimit"."expiresAt" < (NOW() AT TIME ZONE 'UTC') THEN 1 ELSE "RateLimit"."count" + 1 END, "expiresAt" = CASE WHEN "RateLimit"."expiresAt" < (NOW() AT TIME ZONE 'UTC') THEN EXCLUDED."expiresAt" ELSE "RateLimit"."expiresAt" END RETURNING "count"`;
   if (rows[0].count > limit)
     throw new ApiError(
       429,

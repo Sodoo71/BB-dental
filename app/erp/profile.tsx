@@ -1,32 +1,58 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useMessage } from "./ui";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { UserRound, ShieldCheck, Check } from "lucide-react";
+import { UserRound, ShieldCheck, Check, Send, Link2 } from "lucide-react";
 import { useUser } from "./shell";
-import { api, EntityForm, type Entity, type Field } from "./ui";
+import {
+  api,
+  EntityForm,
+  Feedback,
+  useResource,
+  type Entity,
+  type Field,
+} from "./ui";
 import { roleNames } from "@/lib/domain";
 import BrandLoader from "../components/brand-loader";
+import UserAvatar from "../components/user-avatar";
 export default function Profile() {
   const actor = useUser(),
     router = useRouter();
-  const [profile, setProfile] = useState<Entity | null>(null),
+  const [savedProfile, setProfile] = useState<Entity | null>(null),
     [error, setError] = useState(""),
-    [message, setMessage] = useState("");
+    [message, setMessage] = useMessage();
   const allowed = actor.role === "ADMIN" || actor.role === "DOCTOR";
-  useEffect(() => {
-    if (!allowed) return;
-    let alive = true;
-    api<Entity>("/api/profile")
-      .then((p) => {
-        if (alive) setProfile(p);
-      })
-      .catch((e) => {
-        if (alive) setError(e.message);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [allowed]);
+  const [telegramBusy, setTelegramBusy] = useState(false);
+  const [telegramLink, setTelegramLink] = useState("");
+  async function telegram(action: "link" | "test") {
+    setTelegramBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      if (action === "link") {
+        const result = await api<{ url: string }>(
+          "/api/erp/telegram-link",
+          "POST",
+          {},
+        );
+        setTelegramLink(result.url);
+      } else {
+        await api("/api/erp/telegram-user-test", "POST", {});
+        setMessage("Telegram туршилт илгээгдлээ.");
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setTelegramBusy(false);
+    }
+  }
+  const {
+    data: response,
+    error: loadError,
+    loading,
+    retry,
+  } = useResource<Entity>(allowed ? "/api/profile" : null);
+  const profile = savedProfile || response;
   const fields: Field[] = [
     { key: "name", label: "Овог нэр", required: true },
     { key: "phone", label: "Утас", type: "tel", required: true },
@@ -64,6 +90,7 @@ export default function Profile() {
           <p>Холбоо барих мэдээлэл, өөрийн танилцуулгаа шинэчлээрэй.</p>
         </div>
       </div>
+      {loadError && <Feedback retry={retry}>{loadError}</Feedback>}
       {error && (
         <p className="erp-alert" role="alert">
           {error}
@@ -75,14 +102,19 @@ export default function Profile() {
           {message}
         </div>
       )}
-      {!profile && !error ? (
+      {loading ? (
         <BrandLoader />
       ) : (
         profile && (
           <div className="profile-layout">
             <aside className="erp-panel profile-summary">
               <span className="profile-avatar">
-                <UserRound size={36} />
+                <UserAvatar
+                  imageUrl={profile.doctor?.imageUrl}
+                  name={profile.name || actor.name}
+                  size={76}
+                  fallback={<UserRound size={36} />}
+                />
               </span>
               <h2>{profile.name}</h2>
               <span className="profile-role">
@@ -91,6 +123,43 @@ export default function Profile() {
               </span>
               <p>{profile.phone}</p>
               <p>{profile.email || "Имэйл оруулаагүй"}</p>
+              <div
+                className="profile-telegram-actions"
+                aria-busy={telegramBusy}
+              >
+                {telegramBusy && (
+                  <p role="status">Telegram хүсэлт илгээж байна…</p>
+                )}
+                <button
+                  className="erp-secondary"
+                  disabled={telegramBusy}
+                  onClick={() => telegram("link")}
+                >
+                  <Link2 size={16} />
+                  Telegram холбох
+                </button>
+                <button
+                  className="erp-secondary"
+                  disabled={telegramBusy}
+                  onClick={() => telegram("test")}
+                >
+                  <Send size={16} />
+                  Холболт шалгах
+                </button>
+                {telegramLink && (
+                  <p>
+                    <a
+                      href={telegramLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="erp-secondary"
+                    >
+                      Bot нээж Start дарах
+                    </a>
+                    <small>Холбоос 15 минут хүчинтэй.</small>
+                  </p>
+                )}
+              </div>
               {actor.role === "DOCTOR" && (
                 <small>
                   Профайлд оруулсан нэр, мэргэжил, зураг, танилцуулга

@@ -6,7 +6,7 @@ export default async function Page({
   params: Promise<{ section?: string[] }>;
 }) {
   const { section } = await params;
-  const module = section?.[0] || "dashboard";
+  const sectionName = section?.[0] || "dashboard";
   if (
     (section && section.length > 1) ||
     ![
@@ -28,7 +28,7 @@ export default async function Page({
       "users",
       "settings",
       "audit",
-    ].includes(module)
+    ].includes(sectionName)
   )
     notFound();
   return <ErpWorkspace />;

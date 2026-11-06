@@ -19,6 +19,11 @@ export async function registerAccount(
     // The same lock serializes first-account registration, admin changes and seed.
     await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext('bb-users'))::text AS locked`;
     const first = (await tx.user.count()) === 0;
+    const policy = await tx.setting.findUnique({
+      where: { key: "autoApproveDoctors" },
+    });
+    const approved =
+      first || (data.requestedRole === "DOCTOR" && policy?.value === "true");
     const user = await tx.user.create({
       data: {
         name: data.name,
@@ -27,9 +32,9 @@ export async function registerAccount(
         telegramChatId: data.telegramChatId,
         passwordHash,
         role: first ? "ADMIN" : data.requestedRole,
-        active: first,
-        approvalStatus: first ? "APPROVED" : "PENDING",
-        approvedAt: first ? new Date() : null,
+        active: approved,
+        approvalStatus: approved ? "APPROVED" : "PENDING",
+        approvedAt: approved ? new Date() : null,
       },
       select: { id: true, role: true, approvalStatus: true },
     });
@@ -40,13 +45,17 @@ export async function registerAccount(
           name: data.name,
           specialty: "Шүдний эмч",
           telegramChatId: data.telegramChatId,
-          active: false,
+          active: approved,
         },
       });
     await tx.auditLog.create({
       data: {
         actorId: user.id,
-        action: first ? "FIRST_ADMIN_REGISTERED" : "REGISTRATION_PENDING",
+        action: first
+          ? "FIRST_ADMIN_REGISTERED"
+          : approved
+            ? "DOCTOR_AUTO_APPROVED"
+            : "REGISTRATION_PENDING",
         entity: "users",
         entityId: user.id,
       },

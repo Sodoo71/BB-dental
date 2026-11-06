@@ -7,9 +7,23 @@ import {
   Plus,
   Users,
 } from "lucide-react";
-import { api, EntityForm, Modal, type Entity } from "./ui";
+import {
+  api,
+  useResource,
+  Feedback,
+  EntityForm,
+  Modal,
+  type Entity,
+} from "./ui";
+import { calendarKeyNavigation } from "../components/calendar-keyboard";
 import { useUser } from "./shell";
 import { today, statusNames } from "@/lib/domain";
+import {
+  workIntervals,
+  leaveKindNames,
+  leaveStatusNames,
+} from "@/lib/work-schedule";
+import WeekScheduleEditor from "./week-schedule-editor";
 type RosterDoctor = Entity & {
   schedules: Entity[];
   leaves: Entity[];
@@ -29,11 +43,10 @@ export default function RosterCalendar() {
   const user = useUser();
   const [month, setMonth] = useState(today().slice(0, 7));
   const [day, setDay] = useState(today());
-  const [data, setData] = useState<Roster>({ doctors: [], nurses: [] });
   const [doctor, setDoctor] = useState<RosterDoctor | null>(null);
   const [adding, setAdding] = useState(false);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [editingWeek, setEditingWeek] = useState(false);
+  const [actionError, setError] = useState("");
   const [version, setVersion] = useState(0);
   useEffect(() => {
     const refresh = () => setVersion((v) => v + 1);
@@ -44,50 +57,38 @@ export default function RosterCalendar() {
   count.setUTCMonth(count.getUTCMonth() + 1, 0);
   const end = count.toISOString().slice(0, 10);
   const offset = (new Date(`${month}-01T12:00:00Z`).getUTCDay() + 6) % 7;
-  useEffect(() => {
-    let alive = true;
-    setLoading(true);
-    api<Roster>(`/api/erp/roster?from=${month}-01&to=${end}`)
-      .then((r) => {
-        if (alive) {
-          setData(r);
-          setError("");
-        }
-      })
-      .catch((e) => {
-        if (alive) setError(e.message);
-      })
-      .finally(() => {
-        if (alive) setLoading(false);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [month, end, version]);
+  const {
+    data: response,
+    error: loadError,
+    loading,
+    retry,
+  } = useResource<Roster>(
+    `/api/erp/roster?from=${month}-01&to=${end}`,
+    version,
+  );
+  const error = loadError || actionError;
+  const data = response || { doctors: [], nurses: [] };
   function shift(date: string, d: RosterDoctor) {
     const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
     const schedule = d.schedules.find((s) => s.weekday === weekday);
-    if (!schedule) return null;
-    const leaves = d.leaves
-      .filter((l) => l.date === date)
-      .sort((a, b) => a.startTime!.localeCompare(b.startTime!));
-    // Show actual remaining working intervals, including partial-day leave.
-    let intervals = [{ start: schedule.startTime!, end: schedule.endTime! }];
-    for (const l of leaves)
-      intervals = intervals.flatMap((i) =>
-        l.endTime! <= i.start || l.startTime! >= i.end
-          ? [i]
-          : [
-              ...(l.startTime! > i.start
-                ? [{ start: i.start, end: l.startTime! }]
-                : []),
-              ...(l.endTime! < i.end
-                ? [{ start: l.endTime!, end: i.end }]
-                : []),
-            ],
-      );
-    return intervals.length ? intervals : null;
+    const intervals = workIntervals(
+      schedule
+        ? { startTime: schedule.startTime!, endTime: schedule.endTime! }
+        : null,
+      d.leaves
+        .filter((l) => l.date === date)
+        .map((l) => ({
+          startTime: l.startTime!,
+          endTime: l.endTime!,
+          kind: l.kind,
+          status: l.status,
+        })),
+    );
+    return intervals.length
+      ? intervals.map((i) => ({ start: i.startTime, end: i.endTime }))
+      : null;
   }
+
   function move(delta: number) {
     const date = new Date(`${month}-01T12:00:00Z`);
     date.setUTCMonth(date.getUTCMonth() + delta);
@@ -112,6 +113,15 @@ export default function RosterCalendar() {
           </p>
         </div>
         <div className="roster-month">
+          {user.role !== "RECEPTION" && (
+            <button
+              className="erp-secondary"
+              disabled={loading || !data.doctors.length}
+              onClick={() => setEditingWeek(true)}
+            >
+              Долоо хоног засах
+            </button>
+          )}
           <button aria-label="Өмнөх сар" onClick={() => move(-1)}>
             <ChevronLeft size={18} />
           </button>
@@ -132,9 +142,14 @@ export default function RosterCalendar() {
         </div>
       </div>
       {error && (
-        <p role="alert" className="erp-alert">
+        <Feedback
+          retry={() => {
+            setError("");
+            retry();
+          }}
+        >
           {error}
-        </p>
+        </Feedback>
       )}
       <div className="roster-layout">
         <div>
@@ -143,7 +158,13 @@ export default function RosterCalendar() {
               <span key={d}>{d}</span>
             ))}
           </div>
-          <div className="roster-days" aria-busy={loading}>
+          <div
+            className="roster-days"
+            role="group"
+            aria-label={`${month} · Өдөр сонгох`}
+            aria-busy={loading}
+            onKeyDown={(event) => calendarKeyNavigation(event, offset)}
+          >
             {Array.from({ length: offset }, (_, i) => (
               <span key={`gap-${i}`} />
             ))}
@@ -159,6 +180,7 @@ export default function RosterCalendar() {
                   className={`${day === date ? "selected" : ""} ${date === today() ? "today" : ""}`}
                   onClick={() => setDay(date)}
                   aria-label={`${date}: ${ds.length} эмч, ${ns} сувилагч`}
+                  aria-current={date === today() ? "date" : undefined}
                   aria-pressed={day === date}
                 >
                   <strong>{i + 1}</strong>
@@ -284,7 +306,9 @@ export default function RosterCalendar() {
             <h3>Чөлөө, хаалт</h3>
             {doctor.leaves.map((l) => (
               <p key={l.id}>
-                {l.date} · {l.startTime}–{l.endTime} · {l.reason}
+                {l.date} · {leaveKindNames[l.kind || "BLOCKED_RANGE"]} ·{" "}
+                {l.startTime}–{l.endTime} · {l.reason} ·{" "}
+                {leaveStatusNames[l.status || "APPROVED"]}
               </p>
             ))}
             {!doctor.leaves.length && <p>Энэ сард чөлөө бүртгэгдээгүй.</p>}
@@ -325,6 +349,21 @@ export default function RosterCalendar() {
             onSubmit={async (values) => {
               await api("/api/erp/nurse-shifts", "POST", values);
               setAdding(false);
+              setVersion((v) => v + 1);
+            }}
+          />
+        </Modal>
+      )}
+      {editingWeek && (
+        <Modal
+          title="Долоо хоногийн ажлын хуваарь"
+          onClose={() => setEditingWeek(false)}
+        >
+          <WeekScheduleEditor
+            doctors={data.doctors}
+            onCancel={() => setEditingWeek(false)}
+            onSaved={() => {
+              setEditingWeek(false);
               setVersion((v) => v + 1);
             }}
           />

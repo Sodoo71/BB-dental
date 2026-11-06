@@ -2,54 +2,10 @@
 
 import { useState } from "react";
 import PublicClinic from "./public-clinic";
+import Hero from "./home/Hero";
 import { ClinicLogo } from "./clinic-branding";
 
-type IconName =
-  | "phone"
-  | "pin"
-  | "search"
-  | "arrow"
-  | "left"
-  | "right"
-  | "tooth"
-  | "calendar"
-  | "person";
-function Icon({ name }: { name: IconName }) {
-  const paths: Record<IconName, React.ReactNode> = {
-    phone: (
-      <path d="M21 16v4a1 1 0 0 1-1 1C10 21 3 14 3 4a1 1 0 0 1 1-1h4l1 5-3 2a16 16 0 0 0 8 8l2-3Z" />
-    ),
-    pin: (
-      <>
-        <path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z" />
-        <circle cx="12" cy="10" r="3" />
-      </>
-    ),
-    search: (
-      <>
-        <circle cx="10.5" cy="10.5" r="7.5" />
-        <path d="m16 16 5 5" />
-      </>
-    ),
-    arrow: <path d="M5 19 19 5M5 5h14v14" />,
-    left: <path d="m15 5-7 7 7 7" />,
-    right: <path d="m9 5 7 7-7 7" />,
-    tooth: (
-      <path d="M12 5C5-1 1 6 5 13c2 4 1 9 4 9 2 0 0-8 3-8s1 8 3 8c3 0 2-5 4-9 4-7 0-14-7-8Z" />
-    ),
-    calendar: (
-      <>
-        <rect x="3" y="5" width="18" height="17" rx="3" />
-        <path d="M7 2v6m10-6v6M3 11h18m-13 5h2m4 0h2" />
-      </>
-    ),
-    person: (
-      <>
-        <circle cx="12" cy="7" r="4" />
-        <path d="M4 22v-3a8 8 0 0 1 16 0v3m-8-6v6m-3-3h6" />
-      </>
-    ),
-  };
+function Icon({ name }: { name: "phone" | "pin" }) {
   return (
     <svg
       width="24"
@@ -62,7 +18,14 @@ function Icon({ name }: { name: IconName }) {
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      {paths[name]}
+      {name === "phone" ? (
+        <path d="M21 16v4a1 1 0 0 1-1 1C10 21 3 14 3 4a1 1 0 0 1 1-1h4l1 5-3 2a16 16 0 0 0 8 8l2-3Z" />
+      ) : (
+        <>
+          <path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z" />
+          <circle cx="12" cy="10" r="3" />
+        </>
+      )}
     </svg>
   );
 }
@@ -82,56 +45,13 @@ function Brand({ name = "BB Dental Clinic" }: { name?: string }) {
     </a>
   );
 }
-const cards = [
-  {
-    eyebrow: "BB DENTAL CLINIC",
-    title: "Таны инээмсэглэл, бидний халамж",
-    icon: "tooth",
-    href: "#booking",
-  },
-  {
-    eyebrow: "МАНАЙ ҮЙЛЧИЛГЭЭ",
-    title: "Эрүүл шүд, итгэлтэй инээмсэглэл",
-    icon: "tooth",
-    href: "#booking",
-  },
-  {
-    eyebrow: "МАНАЙ ЭМЧ НАР",
-    title: "Таны төлөө мэргэжлийн баг",
-    icon: "person",
-    href: "#booking",
-  },
-  {
-    eyebrow: "ОНЛАЙН ЦАГ ЗАХИАЛГА",
-    title: "Өөрт тохирох цагаа сонгоорой",
-    icon: "calendar",
-    href: "#booking",
-  },
-  {
-    eyebrow: "ХОЛБОО БАРИХ",
-    title: "Бид тантай үргэлж ойр",
-    icon: "phone",
-    href: "#contact",
-  },
-] as const;
-
 export default function HomePage() {
-  const [active, setActive] = useState(0);
   const [clinic, setClinic] = useState<Record<string, string>>({});
   const contactPhone = clinic.phone || "9596-3531";
   const tel = `tel:+976${contactPhone.replace(/\D/g, "").replace(/^976/, "")}`;
   const [menuOpen, setMenuOpen] = useState(false);
-  function showCard(index: number) {
-    setActive(index);
-    setMenuOpen(false);
-    document
-      .getElementById(
-        index === 1 ? "services" : index === 2 ? "doctors" : "home",
-      )
-      ?.scrollIntoView({ behavior: "smooth" });
-  }
   return (
-    <>
+    <div className="public-home">
       <header className="site-header">
         <div className="header-inner">
           <Brand name={clinic.clinicName} />
@@ -149,8 +69,12 @@ export default function HomePage() {
             className={`main-nav ${menuOpen ? "is-open" : ""}`}
             aria-label="Үндсэн цэс"
           >
-            <button onClick={() => showCard(1)}>Үйлчилгээ</button>
-            <button onClick={() => showCard(2)}>Эмч нар</button>
+            <a href="#services" onClick={() => setMenuOpen(false)}>
+              Үйлчилгээ
+            </a>
+            <a href="#doctors" onClick={() => setMenuOpen(false)}>
+              Эмч нар
+            </a>
             <a href="#booking" onClick={() => setMenuOpen(false)}>
               Цаг захиалга
             </a>
@@ -176,105 +100,7 @@ export default function HomePage() {
         </div>
       </header>
       <main>
-        <section className="hero" id="home" aria-labelledby="hero-title">
-          <div className="hero-inner">
-            <div className="hero-copy">
-              <p className="eyebrow hero-eyebrow">
-                <span /> BB DENTAL CLINIC
-              </p>
-              <h1 id="hero-title">BB Dental</h1>
-              <p className="hero-caption">CLINIC & CARE</p>
-              <h2>
-                Эрүүл инээмсэглэл.
-                <br />
-                Танд зориулсан халамж.
-              </h2>
-              <p className="hero-description">
-                Шүдний эрүүл мэнддээ цаг гаргаарай. Үйлчилгээ, эмч болон өөрт
-                тохирох цагаа сонгон үзлэгийн захиалгаа хялбар бүртгүүлээрэй.
-              </p>
-              <div className="hero-actions">
-                <a className="button button-pill" href="#booking">
-                  Үзлэгийн цаг авах <Icon name="arrow" />
-                </a>
-                <a className="button button-outline" href="#services">
-                  Үйлчилгээ үзэх
-                </a>
-              </div>
-            </div>
-            <div
-              className="carousel"
-              aria-roledescription="carousel"
-              aria-label="Эмнэлгийн танилцуулга"
-            >
-              <div className="card-stack">
-                {cards.map((card, index) => {
-                  const offset = ((index - active + 7) % 5) - 2;
-                  return (
-                    <a
-                      key={card.eyebrow}
-                      href={card.href}
-                      className={`feature-card ${index === active ? "is-active" : ""}`}
-                      style={
-                        {
-                          transform: `translateX(calc(-50% + ${offset * 39}%)) scale(${1 - Math.abs(offset) * 0.105}) rotate(${offset * 2.6}deg)`,
-                          zIndex: 5 - Math.abs(offset),
-                        } as React.CSSProperties
-                      }
-                      tabIndex={index === active ? 0 : -1}
-                      aria-hidden={index !== active}
-                      onClick={(event) => {
-                        if (index !== active) {
-                          event.preventDefault();
-                          setActive(index);
-                        }
-                      }}
-                    >
-                      <div className="card-art">
-                        {index === 0 ? (
-                          <ClinicLogo
-                            alt="BB Dental Clinic"
-                            width={310}
-                            height={310}
-                            priority
-                            className="hero-logo"
-                          />
-                        ) : (
-                          <div className="icon-orbit">
-                            <Icon name={card.icon} />
-                            <span>BB Dental</span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="card-shade" />
-                      <div className="card-caption">
-                        <p>{card.eyebrow}</p>
-                        <h3>{card.title}</h3>
-                        <Icon name="arrow" />
-                      </div>
-                    </a>
-                  );
-                })}
-              </div>
-              <p className="carousel-hint">← ШИЛЖҮҮЛЭХ · ДАРЖ ДЭЛГЭРЭНГҮЙ →</p>
-              <div className="carousel-controls">
-                <button
-                  aria-label="Өмнөх карт"
-                  onClick={() => setActive((active + 4) % 5)}
-                >
-                  <Icon name="left" />
-                </button>
-                <span aria-live="polite">0{active + 1} / 05</span>
-                <button
-                  aria-label="Дараах карт"
-                  onClick={() => setActive((active + 1) % 5)}
-                >
-                  <Icon name="right" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
+        <Hero clinicName={clinic.clinicName} />
         <PublicClinic onClinic={setClinic} />
       </main>
       <footer className="site-footer" id="contact">
@@ -341,6 +167,6 @@ export default function HomePage() {
           </div>
         </div>
       </footer>
-    </>
+    </div>
   );
 }

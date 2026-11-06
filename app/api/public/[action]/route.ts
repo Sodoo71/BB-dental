@@ -1,4 +1,5 @@
 import { publicSettingKeys } from "@/lib/clinic-settings";
+import { earliestAvailability } from "@/lib/availability-suggestions";
 import { connection } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
@@ -20,6 +21,22 @@ export async function GET(req: Request, ctx: Ctx) {
     ensureDatabase();
     const { action } = await ctx.params;
     const q = new URL(req.url).searchParams;
+    if (action === "earliest") {
+      const data = z
+        .object({
+          serviceId: z.string().uuid(),
+          doctorId: z.string().uuid().optional(),
+          from: dateSchema.optional(),
+        })
+        .parse(Object.fromEntries(q));
+      return json({
+        items: await earliestAvailability(
+          data.serviceId,
+          data.doctorId,
+          data.from,
+        ),
+      });
+    }
     if (action === "catalog")
       return json({
         clinic: Object.fromEntries(
@@ -44,10 +61,16 @@ export async function GET(req: Request, ctx: Ctx) {
             price: true,
             doctorIds: true,
           },
-          orderBy: [{ category: "asc" }, { name: "asc" }],
+          orderBy: [
+            { sortOrder: "asc" },
+            { category: "asc" },
+            { name: "asc" },
+            { id: "asc" },
+          ],
         }),
         doctors: await db.doctor.findMany({
           where: { active: true },
+          orderBy: [{ sortOrder: "asc" }, { name: "asc" }, { id: "asc" }],
           select: {
             id: true,
             name: true,

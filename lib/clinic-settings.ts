@@ -20,9 +20,15 @@ export const publicSettingKeys = [
 export const editableSettingKeys = [
   ...publicSettingKeys,
   "reportTitle",
+  "autoApproveDoctors",
 ] as const;
 export function settingValue(key: string, value: string) {
   let result = z.string().max(5000).parse(value).trim();
+  if (key === "autoApproveDoctors" && !["true", "false"].includes(result))
+    throw new ApiError(
+      400,
+      "Бүртгэлийн бодлогод true эсвэл false утга оруулна уу.",
+    );
   if (key === "email" && result)
     result = z.email("Имэйл буруу байна.").parse(result);
   if (["facebookUrl", "instagramUrl"].includes(key) && result)

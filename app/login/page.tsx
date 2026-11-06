@@ -1,13 +1,18 @@
 "use client";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PasswordInput from "../components/password-input";
-import { ClinicLogo } from "../components/clinic-branding";
-import { useState, type FormEvent } from "react";
+import AuthStory, { AuthMobileBrand } from "../components/auth-story";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ArrowLeft, ArrowRight, LockKeyhole, Phone } from "lucide-react";
-import "../erp/erp.css";
 export default function LoginPage() {
+  const router = useRouter();
+  const errorRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (error) errorRef.current?.focus();
+  }, [error]);
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
@@ -21,7 +26,8 @@ export default function LoginPage() {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error);
-      window.location.assign("/erp");
+      router.push("/erp");
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Холболтын алдаа.");
     } finally {
@@ -30,29 +36,9 @@ export default function LoginPage() {
   }
   return (
     <main className="login-page">
-      <div className="login-story">
-        <ClinicLogo
-          alt="BB Dental"
-          width={86}
-          height={86}
-        />
-        <span className="login-eyebrow">BB DENTAL · CLINIC WORKSPACE</span>
-        <h1>
-          Эрүүл инээмсэглэлийн
-          <br />
-          ард, нэгдсэн баг.
-        </h1>
-        <p>
-          Өвчтөн, эмчилгээ, цаг товлол болон санхүүгээ нэг ойлгомжтой орчноос
-          удирдаарай.
-        </p>
-        <div className="login-role-pills">
-          <span>Эмч</span>
-          <span>Ресепшн</span>
-          <span>Админ</span>
-        </div>
-      </div>
+      <AuthStory />
       <div className="login-form-side">
+        <AuthMobileBrand />
         <Link href="/" className="back-link">
           <ArrowLeft size={17} /> Нүүр хуудас
         </Link>
@@ -63,11 +49,12 @@ export default function LoginPage() {
           <p className="erp-kicker">АЖИЛТНЫ НЭВТРЭЛТ</p>
           <h2>Тавтай морилно уу</h2>
           <p>Бүртгэлтэй утас, нууц үгээ оруулна уу.</p>
-          <label>
+          <label htmlFor="login-phone">
             Утасны дугаар
             <div className="login-input">
               <Phone size={18} />
               <input
+                id="login-phone"
                 name="phone"
                 type="tel"
                 inputMode="tel"
@@ -78,11 +65,12 @@ export default function LoginPage() {
               />
             </div>
           </label>
-          <label>
+          <label htmlFor="login-password">
             Нууц үг
             <div className="login-input">
               <LockKeyhole size={18} />
               <PasswordInput
+                id="login-password"
                 name="password"
                 autoComplete="current-password"
                 required
@@ -92,7 +80,12 @@ export default function LoginPage() {
             </div>
           </label>
           {error && (
-            <div role="alert" className="erp-alert">
+            <div
+              role="alert"
+              className="erp-alert"
+              tabIndex={-1}
+              ref={errorRef}
+            >
               {error}
             </div>
           )}

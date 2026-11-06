@@ -1,19 +1,22 @@
 "use client";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { ClinicLogo } from "./clinic-branding";
+import AuthStory, { AuthMobileBrand } from "./auth-story";
 import { ArrowLeft, ArrowRight, Check, LockKeyhole } from "lucide-react";
 import PasswordInput from "./password-input";
 import { api } from "../erp/ui";
-import "../erp/erp.css";
 export default function AuthForm({
   mode,
 }: {
   mode: "register" | "forgot" | "reset";
 }) {
+  const errorRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
   const [resetChannel, setResetChannel] = useState("telegram");
   const [error, setError] = useState("");
+  useEffect(() => {
+    if (error) errorRef.current?.focus();
+  }, [error]);
   const [success, setSuccess] = useState("");
   const title =
     mode === "register"
@@ -52,26 +55,9 @@ export default function AuthForm({
   }
   return (
     <main className="login-page">
-      <div className="login-story">
-        <ClinicLogo
-          width={86}
-          height={86}
-          alt="BB Dental"
-        />
-        <span className="login-eyebrow">BB DENTAL · CLINIC WORKSPACE</span>
-        <h1>
-          Нэг баг.
-          <br />
-          Нэгдсэн ажлын орчин.
-        </h1>
-        <p>Эмч, ресепшн, админы ажлыг нэг дор холбоно.</p>
-        <div className="login-role-pills">
-          <span>Эмч</span>
-          <span>Ресепшн</span>
-          <span>Админ</span>
-        </div>
-      </div>
+      <AuthStory />
       <div className="login-form-side">
+        <AuthMobileBrand />
         <Link className="back-link" href="/login">
           <ArrowLeft size={17} />
           Нэвтрэх хэсэг
@@ -87,7 +73,7 @@ export default function AuthForm({
           <h2>{title}</h2>
           <p>
             {mode === "register"
-              ? "Анхны бүртгэл админ эрхтэй. Дараагийн бүртгэлийг админ хянана."
+              ? "Бүртгэлийн эрх эмнэлгийн одоогийн зөвшөөрлийн тохиргоогоор идэвхжинэ."
               : mode === "forgot"
                 ? resetChannel === "telegram"
                   ? "Бүртгэлтэй утсаа оруулна уу. Сэргээх холбоос таны бүртгэлтэй Telegram руу очно."
@@ -105,10 +91,11 @@ export default function AuthForm({
             <>
               {mode === "register" && (
                 <>
-                  <label>
+                  <label htmlFor="auth-name">
                     Овог нэр
                     <div className="login-input">
                       <input
+                        id="auth-name"
                         name="name"
                         required
                         maxLength={200}
@@ -116,10 +103,11 @@ export default function AuthForm({
                       />
                     </div>
                   </label>
-                  <label>
+                  <label htmlFor="auth-phone">
                     Утасны дугаар
                     <div className="login-input">
                       <input
+                        id="auth-phone"
                         name="phone"
                         type="tel"
                         required
@@ -132,10 +120,11 @@ export default function AuthForm({
                 </>
               )}
               {mode === "forgot" && (
-                <label>
+                <label htmlFor="auth-channel">
                   Сэргээх арга
                   <div className="login-input">
                     <select
+                      id="auth-channel"
                       name="channel"
                       aria-label="Сэргээх арга"
                       value={resetChannel}
@@ -152,10 +141,11 @@ export default function AuthForm({
               )}
               {mode === "forgot" && resetChannel === "telegram" && (
                 <>
-                  <label>
+                  <label htmlFor="auth-phone">
                     Бүртгэлтэй утас
                     <div className="login-input">
                       <input
+                        id="auth-phone"
                         name="phone"
                         type="tel"
                         required
@@ -173,10 +163,11 @@ export default function AuthForm({
               )}
               {(mode === "register" ||
                 (mode === "forgot" && resetChannel === "email")) && (
-                <label>
+                <label htmlFor="auth-email">
                   Имэйл
                   <div className="login-input">
                     <input
+                      id="auth-email"
                       name="email"
                       type="email"
                       required
@@ -189,10 +180,14 @@ export default function AuthForm({
               )}
               {mode === "register" && (
                 <>
-                  <label>
+                  <label htmlFor="auth-requestedRole">
                     Хүсэж буй эрх
                     <div className="login-input">
-                      <select name="requestedRole" defaultValue="DOCTOR">
+                      <select
+                        id="auth-requestedRole"
+                        name="requestedRole"
+                        defaultValue="DOCTOR"
+                      >
                         <option value="DOCTOR">Эмч</option>
                         <option value="RECEPTION">Ресепшн</option>
                       </select>
@@ -202,6 +197,7 @@ export default function AuthForm({
                     Telegram ID <small>(заавал биш)</small>
                     <div className="login-input">
                       <input
+                        id="auth-telegramChatId"
                         name="telegramChatId"
                         inputMode="numeric"
                         maxLength={20}
@@ -217,10 +213,11 @@ export default function AuthForm({
               )}
               {mode !== "forgot" && (
                 <>
-                  <label>
+                  <label htmlFor="auth-password">
                     Нууц үг
                     <div className="login-input">
                       <PasswordInput
+                        id="auth-password"
                         name="password"
                         required
                         minLength={8}
@@ -230,10 +227,11 @@ export default function AuthForm({
                       />
                     </div>
                   </label>
-                  <label>
+                  <label htmlFor="auth-passwordConfirmation">
                     Нууц үг давтах
                     <div className="login-input">
                       <PasswordInput
+                        id="auth-passwordConfirmation"
                         name="passwordConfirmation"
                         visibilityLabel="Давтан нууц үг"
                         required
@@ -246,7 +244,12 @@ export default function AuthForm({
                 </>
               )}
               {error && (
-                <div className="erp-alert" role="alert">
+                <div
+                  className="erp-alert"
+                  role="alert"
+                  tabIndex={-1}
+                  ref={errorRef}
+                >
                   {error}
                 </div>
               )}

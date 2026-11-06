@@ -1,14 +1,21 @@
 "use client";
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useMessage } from "./ui";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowDownToLine,
   ArrowUpRight,
   CalendarDays,
+  BellRing,
   Check,
-  ChevronLeft,
-  ChevronRight,
   CreditCard,
   Download,
   FileText,
@@ -22,18 +29,25 @@ import {
   TrendingUp,
   Users,
   Wallet,
-  KeyRound,
 } from "lucide-react";
-import { useUser } from "./shell";
+import { canVisitSection, useUser } from "./shell";
+import {
+  Feedback,
+  LoadingSkeleton,
+  Pagination,
+  useResource,
+  useModalGuard,
+} from "./ui";
+import { adultRows, babyRows } from "../components/dentition";
 import Employees from "./employees";
 import Profile from "./profile";
 import BrandLoader from "../components/brand-loader";
-import { useClinicBranding } from "../components/clinic-branding";
 import RoleHome from "./role-home";
 import RosterCalendar from "./roster-calendar";
+import ScheduleForm from "./schedule-form";
+import DoctorDetail from "./doctor-detail";
 import SettingsPanel from "./settings-panel";
-import { employeeFields } from "./employee-fields";
-import ImageUpload from "../components/image-upload";
+import { leaveKindNames, leaveStatusNames } from "@/lib/work-schedule";
 import {
   api,
   Badge,
@@ -51,7 +65,6 @@ import {
   statusNames,
   today,
   clinicTimestamp,
-  validTeeth,
 } from "@/lib/domain";
 
 type Options = { services: Entity[]; doctors: Entity[] };
@@ -168,7 +181,6 @@ function fieldsFor(
   module: string,
   options: Options,
   doctorId?: string,
-  editing = false,
 ): Field[] {
   const doctor: Field = {
     ...required("doctorId", "Эмч", "select"),
@@ -184,6 +196,15 @@ function fieldsFor(
   switch (module) {
     case "services":
       return [
+        {
+          key: "sortOrder",
+          label: "Харагдах эрэмбэ",
+          type: "number",
+          min: 0,
+          max: 100000,
+          default: 0,
+          hint: "Бага тоотой үйлчилгээ эхэнд харагдана.",
+        },
         required("name", "Үйлчилгээний нэр"),
         required("category", "Ангилал"),
         { ...required("price", "Үнэ (₮)", "number"), min: 0, default: 0 },
@@ -230,6 +251,15 @@ function fieldsFor(
       ];
     case "doctors":
       return [
+        {
+          key: "sortOrder",
+          label: "Харагдах эрэмбэ",
+          type: "number",
+          min: 0,
+          max: 100000,
+          default: 0,
+          hint: "Бага тоотой эмч эхэнд харагдана.",
+        },
         required("name", "Эмчийн нэр"),
         required("specialty", "Мэргэжил"),
         {
@@ -241,32 +271,6 @@ function fieldsFor(
         { key: "telegramChatId", label: "Telegram Chat ID" },
         { key: "bio", label: "Танилцуулга", type: "textarea" },
         { key: "active", label: "Идэвхтэй", type: "checkbox" },
-      ];
-    case "users":
-      return employeeFields(editing);
-    case "approval":
-      return [
-        {
-          key: "role",
-          label: "Олгох эрх",
-          type: "select",
-          required: true,
-          options: Object.entries(roleNames).map(([value, label]) => ({
-            value,
-            label,
-          })),
-        },
-        {
-          key: "status",
-          label: "Хяналтын шийдвэр",
-          type: "select",
-          required: true,
-          default: "APPROVED",
-          options: [
-            { value: "APPROVED", label: "Зөвшөөрч идэвхжүүлэх" },
-            { value: "REJECTED", label: "Татгалзах" },
-          ],
-        },
       ];
     case "schedules":
       return [
@@ -287,6 +291,18 @@ function fieldsFor(
     case "leaves":
       return [
         doctor,
+        {
+          key: "kind",
+          label: "Чөлөө / өөрчлөлтийн төрөл",
+          type: "select",
+          required: true,
+          default: "BLOCKED_RANGE",
+          options: Object.entries(leaveKindNames).map(([value, label]) => ({
+            value,
+            label,
+          })),
+          hint: "Бүтэн өдрийн чөлөө нь бүх өдрийг хаана. Тусгай цаг нь зөвхөн сонгосон өдрийн ажиллах цагийг солино. Эмчийн хүсэлтийг админ батална.",
+        },
         { ...required("date", "Өдөр", "date"), default: today() },
         { ...required("startTime", "Эхлэх цаг", "time"), default: "00:00" },
         { ...required("endTime", "Дуусах цаг", "time"), default: "23:59" },
@@ -391,20 +407,21 @@ function fieldsFor(
 
 export function ErpWorkspace() {
   const { section } = useParams<{ section?: string[] }>();
-  const module = section?.[0] || "dashboard";
+  const sectionName = section?.[0] || "dashboard";
   // All sections share a catch-all route. Follow the current router params,
   // and give each section its own filters, forms and pending data requests.
-  return <WorkspaceSection key={module} module={module} />;
+  return <WorkspaceSection key={sectionName} module={sectionName} />;
 }
 
 function WorkspaceSection({ module }: { module: string }) {
+  const user = useUser();
+  if (!canVisitSection(user.role, module))
+    return <Feedback>Энэ хэсэгт хандах эрхгүй байна.</Feedback>;
   if (module === "profile") return <Profile />;
   if (module === "users") return <Employees />;
   if (module === "settings") return <SettingsPanel />;
   return (
     <>
-      {module === "dashboard" && <RoleHome />}
-      {(module === "schedules" || module === "calendar") && <RosterCalendar />}
       <Suspense fallback={<BrandLoader />}>
         <StandardWorkspace module={module} />
       </Suspense>
@@ -412,7 +429,12 @@ function WorkspaceSection({ module }: { module: string }) {
   );
 }
 function StandardWorkspace({ module }: { module: string }) {
-  const { setLogoUrl } = useClinicBranding();
+  const query = useSearchParams();
+  return (
+    <WorkspaceData key={`${module}:${query.get("q") || ""}`} module={module} />
+  );
+}
+function WorkspaceData({ module }: { module: string }) {
   const user = useUser();
   const urlParams = useSearchParams();
   const [search, setSearch] = useState(urlParams.get("q") || "");
@@ -427,35 +449,61 @@ function StandardWorkspace({ module }: { module: string }) {
   const [status, setStatus] = useState("");
   const [reportService, setReportService] = useState("");
   const [items, setItems] = useState<Entity[]>([]);
-  const [total, setTotal] = useState(0);
+  const [total, setTotal] = useState<number | undefined>();
   const [data, setData] = useState<Dashboard | null>(null);
   const [options, setOptions] = useState<Options>({
     services: [],
     doctors: [],
   });
   const [error, setError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [optionsError, setOptionsError] = useState("");
+  const [optionsLoading, setOptionsLoading] = useState(true);
+  const request = useRef<AbortController | null>(null);
   const [loading, setLoading] = useState(true);
   const [version, setVersion] = useState(0);
-  const [toast, setToast] = useState("");
-  const [resetSendingId, setResetSendingId] = useState<string | null>(null);
+  const [toast, setToast] = useMessage();
+  const [pendingRowId, setPendingRowId] = useState<string | null>(null);
+  const [reminderSendingId, setReminderSendingId] = useState<string | null>(
+    null,
+  );
   const [form, setForm] = useState<{
     resource: string;
     item?: Entity;
     initial?: Record<string, unknown>;
   } | null>(null);
-  const [patient, setPatient] = useState<Entity | null>(null);
+  const [confirmation, setConfirmation] = useState<{
+    item: Entity;
+    kind: "delete" | "void";
+  } | null>(null);
+  const [patientId, setPatientId] = useState<string | null>(null);
+  const {
+    data: patient,
+    error: patientError,
+    retry: retryPatient,
+  } = useResource<Entity>(patientId ? `/api/erp/patients/${patientId}` : null);
   const [document, setDocument] = useState<Entity | null>(null);
+  const [doctorDetailId, setDoctorDetailId] = useState<string | null>(null);
   useEffect(() => {
-    setSearch(urlParams.get("q") || "");
-    setPage(1);
-    setPatient(null);
-    setForm(null);
-    setStatus("");
-  }, [module, urlParams]);
+    if (!["schedules", "leaves", "calendar"].includes(module)) return;
+    const refresh = () => setVersion((v) => v + 1);
+    window.addEventListener("bb-roster-update", refresh);
+    return () => window.removeEventListener("bb-roster-update", refresh);
+  }, [module]);
   useEffect(() => {
-    api<Options>("/api/erp/options")
-      .then(setOptions)
-      .catch(() => {});
+    const controller = new AbortController();
+    api<Options>("/api/erp/options", "GET", undefined, controller.signal)
+      .then((value) => {
+        setOptions(value);
+        setOptionsError("");
+      })
+      .catch((e) => {
+        if (!controller.signal.aborted) setOptionsError(e.message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setOptionsLoading(false);
+      });
+    return () => controller.abort();
   }, [version]);
   const params = useMemo(() => {
     const q = new URLSearchParams({
@@ -502,6 +550,9 @@ function StandardWorkspace({ module }: { module: string }) {
     reportService,
   ]);
   const load = useCallback(async () => {
+    request.current?.abort();
+    const controller = new AbortController();
+    request.current = controller;
     setLoading(true);
     setError("");
     try {
@@ -509,29 +560,32 @@ function StandardWorkspace({ module }: { module: string }) {
         { items?: Entity[]; total?: number } & Dashboard
       >(
         `/api/erp/${module === "calendar" ? "appointments" : module}?${params}`,
+        "GET",
+        undefined,
+        controller.signal,
       );
+      if (controller.signal.aborted) return;
       if (module === "dashboard" || module === "reports") setData(response);
       else {
         setItems(response.items || []);
-        setTotal(response.total || response.items?.length || 0);
+        setTotal(response.total);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Алдаа гарлаа.");
+      if (!controller.signal.aborted)
+        setError(e instanceof Error ? e.message : "Алдаа гарлаа.");
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
   }, [module, params]);
   useEffect(() => {
     const timer = setTimeout(() => {
       void load();
     }, 200);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      request.current?.abort();
+    };
   }, [load, version]);
-  useEffect(() => {
-    if (!toast) return;
-    const timeout = setTimeout(() => setToast(""), 3500);
-    return () => clearTimeout(timeout);
-  }, [toast]);
   const canCreate =
     user.role === "ADMIN"
       ? !["dashboard", "reports", "settings", "audit"].includes(module)
@@ -579,35 +633,39 @@ function StandardWorkspace({ module }: { module: string }) {
     setVersion((v) => v + 1);
     setToast("Амжилттай хадгаллаа.");
   };
-  async function remove(item: Entity) {
-    if (
-      !window.confirm(
-        `${item.name || item.title || "Бүртгэл"}-ийг ${["services", "doctors", "patients", "inventory"].includes(module) ? "идэвхгүй болгох" : "устгах"} уу?`,
-      )
-    )
-      return;
-    try {
-      await api(`/api/erp/${module}/${item.id}`, "DELETE");
-      setVersion((v) => v + 1);
-      setToast("Шинэчлэгдлээ.");
-    } catch (e) {
-      setError((e as Error).message);
-    }
+  function remove(item: Entity) {
+    setConfirmation({ item, kind: "delete" });
   }
   async function changeStatus(item: Entity, value: string) {
+    if (pendingRowId) return;
+    setPendingRowId(item.id);
+    setActionError("");
     try {
       await api(`/api/erp/appointments/${item.id}`, "PATCH", { status: value });
       setVersion((v) => v + 1);
     } catch (e) {
-      setError((e as Error).message);
+      setActionError((e as Error).message);
+    } finally {
+      setPendingRowId(null);
     }
   }
-  async function showPatient(id: string) {
+  async function reviewLeave(item: Entity, status: "APPROVED" | "REJECTED") {
+    if (pendingRowId) return;
+    setPendingRowId(item.id);
+    setActionError("");
     try {
-      setPatient(await api<Entity>(`/api/erp/patients/${id}`));
+      await api(`/api/erp/leave-review/${item.id}`, "POST", { status });
+      setToast(
+        status === "APPROVED" ? "Хүсэлт батлагдлаа." : "Хүсэлтэд татгалзлаа.",
+      );
     } catch (e) {
-      setError((e as Error).message);
+      setActionError((e as Error).message);
+    } finally {
+      setPendingRowId(null);
     }
+  }
+  function showPatient(id: string) {
+    setPatientId(id);
   }
   const create = () =>
     setForm({
@@ -630,6 +688,14 @@ function StandardWorkspace({ module }: { module: string }) {
     </>
   );
   const title = titles[module];
+  const removalLabel = [
+    "services",
+    "doctors",
+    "patients",
+    "inventory",
+  ].includes(module)
+    ? "Идэвхгүй болгох"
+    : "Устгах";
   return (
     <>
       <div className="workspace-heading">
@@ -652,7 +718,11 @@ function StandardWorkspace({ module }: { module: string }) {
           {module === "reports"
             ? exports
             : canCreate && (
-                <button className="erp-primary" onClick={create}>
+                <button
+                  className="erp-primary"
+                  disabled={optionsLoading || !!optionsError}
+                  onClick={create}
+                >
                   <Plus size={18} />
                   {["appointments", "calendar"].includes(module)
                     ? "Цаг товлох"
@@ -661,6 +731,8 @@ function StandardWorkspace({ module }: { module: string }) {
               )}
         </div>
       </div>
+      {module === "dashboard" && <RoleHome />}
+      {(module === "schedules" || module === "calendar") && <RosterCalendar />}
       {module === "dashboard" && (
         <div className="greeting-strip">
           <span>
@@ -811,6 +883,19 @@ function StandardWorkspace({ module }: { module: string }) {
           </select>
         )}
       </div>
+      {optionsError && (
+        <Feedback retry={() => setVersion((v) => v + 1)}>
+          Сонголтын мэдээлэл: {optionsError}
+        </Feedback>
+      )}
+      {actionError && (
+        <Feedback>
+          {actionError}
+          <button type="button" onClick={() => setActionError("")}>
+            Хаах
+          </button>
+        </Feedback>
+      )}
       {toast && (
         <div className="erp-toast" role="status">
           <Check size={17} />
@@ -826,75 +911,13 @@ function StandardWorkspace({ module }: { module: string }) {
         </div>
       )}
       {loading ? (
-        <BrandLoader />
+        <LoadingSkeleton />
       ) : !error && (module === "dashboard" || module === "reports") && data ? (
         <DashboardView
           data={data}
           admin={user.role === "ADMIN"}
           reports={module === "reports"}
         />
-      ) : !error && module === "settings" ? (
-        <div className="settings-grid">
-          <div className="erp-panel setting-card">
-            <h3>Эмнэлгийн лого · Веб ба PDF</h3>
-            <ImageUpload
-              value={items.find((i) => i.key === "logoUrl")?.value || ""}
-              purpose="logo"
-              onChange={async (value) => {
-                try {
-                  await api("/api/erp/settings/logoUrl", "PATCH", { value });
-                  setLogoUrl(value);
-                  setItems((current) => [
-                    ...current.filter((i) => i.key !== "logoUrl"),
-                    { id: "logoUrl", key: "logoUrl", value },
-                  ]);
-                  setToast("Лого хадгалагдлаа.");
-                } catch (e) {
-                  setError((e as Error).message);
-                }
-              }}
-            />
-          </div>
-          {["clinicName", "phone", "address", "hours", "reportTitle"].map(
-            (key) => (
-              <div className="erp-panel setting-card" key={key}>
-                <h3>
-                  {
-                    {
-                      clinicName: "Эмнэлгийн нэр",
-                      phone: "Утас",
-                      address: "Хаяг",
-                      hours: "Ажиллах цаг",
-                      reportTitle: "Тайлангийн гарчиг",
-                    }[key]
-                  }
-                </h3>
-                <form
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    const value = String(
-                      new FormData(e.currentTarget).get("value"),
-                    );
-                    try {
-                      await api(`/api/erp/settings/${key}`, "PATCH", { value });
-                      setToast("Тохиргоо хадгалагдлаа.");
-                    } catch (e) {
-                      setError((e as Error).message);
-                    }
-                  }}
-                >
-                  <input
-                    name="value"
-                    aria-label={key}
-                    defaultValue={items.find((i) => i.key === key)?.value || ""}
-                    required
-                  />
-                  <button className="erp-secondary">Хадгалах</button>
-                </form>
-              </div>
-            ),
-          )}
-        </div>
       ) : !error && module === "calendar" ? (
         <CalendarView
           items={items}
@@ -907,19 +930,32 @@ function StandardWorkspace({ module }: { module: string }) {
           <div className="erp-panel data-panel">
             <div className="data-panel-header">
               <h2>{title.title}</h2>
-              <span>{total} бүртгэл</span>
+              <span>
+                {total !== undefined
+                  ? `${total} бүртгэл`
+                  : `${items.length} бүртгэл энэ хуудсанд`}
+              </span>
             </div>
             {items.length === 0 ? (
               <Empty />
             ) : (
-              <div className="erp-table-wrap">
+              <div
+                className="erp-table-wrap"
+                role="region"
+                aria-label="Бүртгэлийн хүснэгт · хажуу тийш гүйлгэх"
+                tabIndex={0}
+              >
                 <table className="erp-table">
                   <thead>
                     <tr>
                       {columns(module).map((c) => (
-                        <th key={c}>{c}</th>
+                        <th scope="col" key={c}>
+                          {c}
+                        </th>
                       ))}
-                      <th className="actions-heading">Үйлдэл</th>
+                      <th scope="col" className="actions-heading">
+                        Үйлдэл
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -929,11 +965,20 @@ function StandardWorkspace({ module }: { module: string }) {
                           <td key={i}>{cell}</td>
                         ))}
                         <td>
-                          <div className="row-actions">
+                          <div
+                            className="row-actions"
+                            role="group"
+                            aria-label={`${item.name || item.patient?.name || item.id} · үйлдлүүд`}
+                            aria-busy={pendingRowId === item.id || undefined}
+                          >
                             {["appointments"].includes(module) && (
                               <>
                                 <select
-                                  aria-label="Төлөв өөрчлөх"
+                                  disabled={!!pendingRowId}
+                                  aria-busy={
+                                    pendingRowId === item.id || undefined
+                                  }
+                                  aria-label={`Төлөв өөрчлөх · ${item.name || item.patient?.name || item.title || item.id}`}
                                   value={item.status}
                                   onChange={(e) =>
                                     changeStatus(item, e.target.value)
@@ -950,7 +995,7 @@ function StandardWorkspace({ module }: { module: string }) {
                                 {user.role !== "DOCTOR" && (
                                   <button
                                     title="Давтан цаг"
-                                    aria-label="Давтан цаг"
+                                    aria-label={`Давтан цаг · ${item.name || item.patient?.name || item.title || item.id}`}
                                     onClick={() =>
                                       setForm({
                                         resource: "appointments",
@@ -975,7 +1020,7 @@ function StandardWorkspace({ module }: { module: string }) {
                                 <>
                                   <button
                                     title="Цаг шилжүүлэх"
-                                    aria-label="Цаг шилжүүлэх"
+                                    aria-label={`Цаг шилжүүлэх · ${item.name || item.patient?.name || item.title || item.id}`}
                                     onClick={() =>
                                       setForm({
                                         resource: "reschedule",
@@ -995,7 +1040,7 @@ function StandardWorkspace({ module }: { module: string }) {
                                   </button>
                                   <button
                                     title="Төлбөр бүртгэх"
-                                    aria-label="Төлбөр бүртгэх"
+                                    aria-label={`Төлбөр бүртгэх · ${item.name || item.patient?.name || item.title || item.id}`}
                                     onClick={() =>
                                       setForm({
                                         resource: "payments",
@@ -1016,7 +1061,7 @@ function StandardWorkspace({ module }: { module: string }) {
                               user.role !== "RECEPTION" && (
                                 <button
                                   title="Эмчилгээ бүртгэх"
-                                  aria-label="Эмчилгээ бүртгэх"
+                                  aria-label={`Эмчилгээ бүртгэх · ${item.name || item.patient?.name || item.title || item.id}`}
                                   onClick={() =>
                                     setForm({
                                       resource: "treatments",
@@ -1037,6 +1082,7 @@ function StandardWorkspace({ module }: { module: string }) {
                               <>
                                 <button
                                   title="Карт харах"
+                                  aria-label={`Карт харах · ${item.name || item.patient?.name || item.title || item.id}`}
                                   onClick={() => showPatient(item.id)}
                                 >
                                   <FileText size={17} />
@@ -1044,6 +1090,7 @@ function StandardWorkspace({ module }: { module: string }) {
                                 {user.role !== "DOCTOR" && (
                                   <button
                                     title="Цаг товлох"
+                                    aria-label={`Цаг товлох · ${item.name || item.patient?.name || item.title || item.id}`}
                                     onClick={() =>
                                       setForm({
                                         resource: "appointments",
@@ -1064,6 +1111,7 @@ function StandardWorkspace({ module }: { module: string }) {
                               <>
                                 <button
                                   title="Баримт харах"
+                                  aria-label={`Баримт харах · ${item.name || item.patient?.name || item.title || item.id}`}
                                   onClick={() => setDocument(item)}
                                 >
                                   <FileText size={17} />
@@ -1080,6 +1128,7 @@ function StandardWorkspace({ module }: { module: string }) {
                               user.role === "ADMIN" && (
                                 <button
                                   title="Барааны хөдөлгөөн"
+                                  aria-label={`Барааны хөдөлгөөн · ${item.name || item.patient?.name || item.title || item.id}`}
                                   onClick={() =>
                                     setForm({
                                       resource: "movements",
@@ -1095,82 +1144,19 @@ function StandardWorkspace({ module }: { module: string }) {
                               !item.voidedAt && (
                                 <button
                                   title="Төлбөр хүчингүй болгох"
-                                  onClick={async () => {
-                                    const reason = window.prompt(
-                                      "Хүчингүй болгох шалтгаан (3+ тэмдэгт):",
-                                    );
-                                    if (reason) {
-                                      try {
-                                        await api(
-                                          `/api/erp/payments/${item.id}`,
-                                          "PATCH",
-                                          { reason },
-                                        );
-                                        setVersion((v) => v + 1);
-                                      } catch (e) {
-                                        setError((e as Error).message);
-                                      }
-                                    }
-                                  }}
+                                  aria-label={`Төлбөр хүчингүй болгох · ${item.patient?.name || item.id}`}
+                                  onClick={() =>
+                                    setConfirmation({ item, kind: "void" })
+                                  }
                                 >
                                   <Trash2 size={17} />
-                                </button>
-                              )}
-                            {module === "users" && (
-                              <button
-                                title="Нууц үг сэргээх холбоосыг Telegram руу илгээх"
-                                aria-label="Telegram руу сэргээх холбоос илгээх"
-                                disabled={
-                                  resetSendingId !== null ||
-                                  !item.active ||
-                                  item.approvalStatus !== "APPROVED" ||
-                                  !item.telegramChatId ||
-                                  !/^[1-9]\d{0,18}$/.test(item.telegramChatId)
-                                }
-                                onClick={async () => {
-                                  setResetSendingId(item.id);
-                                  setError("");
-                                  try {
-                                    const result = await api<{
-                                      message: string;
-                                    }>(
-                                      `/api/erp/user-password-reset/${item.id}`,
-                                      "POST",
-                                      {},
-                                    );
-                                    setToast(result.message);
-                                  } catch (e) {
-                                    setError((e as Error).message);
-                                  } finally {
-                                    setResetSendingId(null);
-                                  }
-                                }}
-                              >
-                                <KeyRound size={17} />
-                                {resetSendingId === item.id && "Илгээж байна…"}
-                              </button>
-                            )}
-                            {module === "users" &&
-                              item.approvalStatus === "PENDING" && (
-                                <button
-                                  title="Бүртгэл хянах"
-                                  className="review-registration"
-                                  onClick={() =>
-                                    setForm({
-                                      resource: "approval",
-                                      initial: { id: item.id, role: item.role },
-                                    })
-                                  }
-                                >
-                                  <Check size={17} />
-                                  Хянах
                                 </button>
                               )}
                             {module === "doctors" &&
                               user.role !== "RECEPTION" && (
                                 <button
                                   title="Telegram турших"
-                                  aria-label="Telegram турших"
+                                  aria-label={`Telegram турших · ${item.name || item.patient?.name || item.title || item.id}`}
                                   onClick={async () => {
                                     try {
                                       await api(
@@ -1180,34 +1166,112 @@ function StandardWorkspace({ module }: { module: string }) {
                                       );
                                       setToast("Telegram мэдэгдэл илгээгдлээ.");
                                     } catch (e) {
-                                      setError((e as Error).message);
+                                      setActionError((e as Error).message);
                                     }
                                   }}
                                 >
                                   <ArrowUpRight size={17} />
                                 </button>
                               )}
-                            {canEdit && (
+                            {module === "appointments" &&
+                              user.role !== "RECEPTION" &&
+                              item.date! >= today() &&
+                              ["PENDING", "CONFIRMED", "ARRIVED"].includes(
+                                item.status || "",
+                              ) && (
+                                <button
+                                  title="Эмчид Telegram сануулга илгээх"
+                                  aria-label={`Эмчид Telegram сануулга илгээх · ${item.name || item.patient?.name || item.title || item.id}`}
+                                  disabled={reminderSendingId !== null}
+                                  onClick={async () => {
+                                    setReminderSendingId(item.id);
+                                    try {
+                                      await api(
+                                        `/api/erp/appointment-reminder/${item.id}`,
+                                        "POST",
+                                        {},
+                                      );
+                                      setToast("Эмчид сануулга илгээгдлээ.");
+                                    } catch (e) {
+                                      setActionError((e as Error).message);
+                                    } finally {
+                                      setReminderSendingId(null);
+                                    }
+                                  }}
+                                >
+                                  <BellRing size={16} />
+                                </button>
+                              )}
+                            {module === "doctors" && user.role === "ADMIN" && (
                               <button
-                                title="Засах"
-                                aria-label="Засах"
-                                onClick={() =>
-                                  setForm({ resource: module, item })
-                                }
+                                title="Эмчийн дэлгэрэнгүй"
+                                aria-label={`Эмчийн дэлгэрэнгүй · ${item.name || item.patient?.name || item.title || item.id}`}
+                                onClick={() => setDoctorDetailId(item.id)}
                               >
-                                <Pencil size={16} />
+                                <ArrowUpRight size={16} />
                               </button>
                             )}
-                            {canDelete && (
-                              <button
-                                className="danger-action"
-                                title="Устгах / идэвхгүй болгох"
-                                aria-label="Устгах / идэвхгүй болгох"
-                                onClick={() => remove(item)}
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            )}
+                            {canEdit &&
+                              !(
+                                module === "leaves" &&
+                                user.role === "DOCTOR" &&
+                                item.status === "APPROVED"
+                              ) && (
+                                <button
+                                  title="Засах"
+                                  aria-label={`Засах · ${item.name || item.patient?.name || item.title || item.id}`}
+                                  onClick={() =>
+                                    setForm({ resource: module, item })
+                                  }
+                                >
+                                  <Pencil size={16} />
+                                </button>
+                              )}
+                            {module === "leaves" &&
+                              user.role === "ADMIN" &&
+                              item.status === "PENDING" && (
+                                <>
+                                  <button
+                                    className="erp-secondary"
+                                    disabled={!!pendingRowId}
+                                    aria-busy={
+                                      pendingRowId === item.id || undefined
+                                    }
+                                    onClick={() =>
+                                      reviewLeave(item, "APPROVED")
+                                    }
+                                  >
+                                    Батлах
+                                  </button>
+                                  <button
+                                    className="erp-secondary"
+                                    disabled={!!pendingRowId}
+                                    aria-busy={
+                                      pendingRowId === item.id || undefined
+                                    }
+                                    onClick={() =>
+                                      reviewLeave(item, "REJECTED")
+                                    }
+                                  >
+                                    Татгалзах
+                                  </button>
+                                </>
+                              )}
+                            {canDelete &&
+                              !(
+                                module === "leaves" &&
+                                user.role === "DOCTOR" &&
+                                item.status === "APPROVED"
+                              ) && (
+                                <button
+                                  className="danger-action"
+                                  title="Устгах / идэвхгүй болгох"
+                                  aria-label={`Устгах / идэвхгүй болгох · ${item.name || item.patient?.name || item.title || item.id}`}
+                                  onClick={() => remove(item)}
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              )}
                           </div>
                         </td>
                       </tr>
@@ -1216,38 +1280,93 @@ function StandardWorkspace({ module }: { module: string }) {
                 </table>
               </div>
             )}
-            <div className="table-pagination">
-              <span>{page}-р хуудас · Нэг хуудсанд 50</span>
-              <div>
-                <button
-                  disabled={page === 1}
-                  onClick={() => setPage((p) => p - 1)}
-                  aria-label="Өмнөх хуудас"
-                >
-                  <ChevronLeft size={17} />
-                </button>
-                <button
-                  disabled={items.length < 50}
-                  onClick={() => setPage((p) => p + 1)}
-                  aria-label="Дараах хуудас"
-                >
-                  <ChevronRight size={17} />
-                </button>
-              </div>
-            </div>
+            <Pagination
+              page={page}
+              count={items.length}
+              total={total}
+              onPage={setPage}
+              busy={loading}
+            />
           </div>
         )
+      )}
+      {confirmation && (
+        <Modal
+          title={
+            confirmation.kind === "void"
+              ? "Төлбөр хүчингүй болгох"
+              : removalLabel
+          }
+          onClose={() => setConfirmation(null)}
+        >
+          <p>
+            {confirmation.item.name ||
+              confirmation.item.patient?.name ||
+              confirmation.item.title ||
+              "Бүртгэл"}{" "}
+            · {confirmation.kind === "void" ? "Хүчингүй болгох" : removalLabel}{" "}
+            үйлдлийг баталгаажуулна уу.
+          </p>
+          <EntityForm
+            destructive
+            fields={
+              confirmation.kind === "void"
+                ? [
+                    {
+                      key: "reason",
+                      label: "Хүчингүй болгох шалтгаан",
+                      required: true,
+                      minLength: 3,
+                      maxLength: 500,
+                    },
+                  ]
+                : []
+            }
+            onCancel={() => setConfirmation(null)}
+            submitLabel={
+              confirmation.kind === "void" ? "Хүчингүй болгох" : removalLabel
+            }
+            onSubmit={async (values) => {
+              if (confirmation.kind === "void")
+                await api(
+                  `/api/erp/payments/${confirmation.item.id}`,
+                  "PATCH",
+                  { reason: values.reason },
+                );
+              else
+                await api(
+                  `/api/erp/${module}/${confirmation.item.id}`,
+                  "DELETE",
+                );
+              setConfirmation(null);
+              setVersion((v) => v + 1);
+              setToast("Шинэчлэгдлээ.");
+            }}
+          />
+        </Modal>
+      )}
+      {doctorDetailId && (
+        <Modal
+          title="Эмчийн дэлгэрэнгүй"
+          onClose={() => setDoctorDetailId(null)}
+        >
+          <DoctorDetail id={doctorDetailId} />
+        </Modal>
       )}
       {form && (
         <Modal
           title={
-            form.item
-              ? "Мэдээлэл засах"
-              : form.resource === "appointments"
-                ? "Үзлэгийн цаг товлох"
-                : form.resource === "movements"
-                  ? "Барааны хөдөлгөөн"
-                  : "Шинэ бүртгэл"
+            form.resource === "schedules"
+              ? form.item
+                ? "Ажлын хуваарь засах"
+                : "Ажлын хуваарь нэмэх"
+              : form.item
+                ? "Мэдээлэл засах"
+                : form.resource === "appointments"
+                  ? "Үзлэгийн цаг товлох"
+                  : form.resource === "movements"
+                    ? "Барааны хөдөлгөөн"
+                    : "Шинэ бүртгэл"
           }
           onClose={() => setForm(null)}
         >
@@ -1263,14 +1382,16 @@ function StandardWorkspace({ module }: { module: string }) {
               onCancel={() => setForm(null)}
               onSaved={saved}
             />
+          ) : form.resource === "schedules" ? (
+            <ScheduleForm
+              doctors={options.doctors}
+              initial={form.item}
+              onCancel={() => setForm(null)}
+              onSaved={saved}
+            />
           ) : (
             <EntityForm
-              fields={fieldsFor(
-                form.resource,
-                options,
-                user.doctorId,
-                Boolean(form.item),
-              )}
+              fields={fieldsFor(form.resource, options, user.doctorId)}
               initial={
                 (form.item || form.initial) as
                   Record<string, unknown> | undefined
@@ -1278,21 +1399,6 @@ function StandardWorkspace({ module }: { module: string }) {
               onCancel={() => setForm(null)}
               onSubmit={async (values) => {
                 const payload = { ...form.initial, ...values };
-                if (
-                  form.resource === "users" &&
-                  payload.password &&
-                  payload.password !== payload.passwordConfirmation
-                )
-                  throw new Error("Давтан нууц үг таарахгүй байна.");
-                if (form.resource === "approval") {
-                  await api(
-                    `/api/erp/user-approval/${form.initial?.id}`,
-                    "POST",
-                    payload,
-                  );
-                  saved();
-                  return;
-                }
                 if (form.resource === "payments")
                   payload.idempotencyKey ||= crypto.randomUUID();
                 if (form.resource === "movements")
@@ -1310,39 +1416,46 @@ function StandardWorkspace({ module }: { module: string }) {
           )}
         </Modal>
       )}
-      {patient && (
+      {patientId && (
         <Modal
           title="Өвчтөний мэдээллийн карт"
-          onClose={() => setPatient(null)}
+          onClose={() => setPatientId(null)}
         >
-          <PatientCard
-            patient={patient}
-            onRepeat={(a) => {
-              setPatient(null);
-              setForm({
-                resource: "appointments",
-                initial: {
-                  patientId: patient.id,
-                  name: patient.name,
-                  phone: patient.phone,
-                  doctorId: a.doctorId,
-                  serviceId: a.serviceId,
-                  repeatOfId: a.id,
-                },
-              });
-            }}
-            onTreatment={(tooth) => {
-              setPatient(null);
-              setForm({
-                resource: "treatments",
-                initial: {
-                  patientId: patient.id,
-                  tooth,
-                  doctorId: user.doctorId,
-                },
-              });
-            }}
-          />
+          {patientError ? (
+            <Feedback retry={retryPatient}>{patientError}</Feedback>
+          ) : !patient ? (
+            <LoadingSkeleton />
+          ) : (
+            <PatientCard
+              key={patient.id}
+              patient={patient}
+              onRepeat={(a) => {
+                setPatientId(null);
+                setForm({
+                  resource: "appointments",
+                  initial: {
+                    patientId: patient.id,
+                    name: patient.name,
+                    phone: patient.phone,
+                    doctorId: a.doctorId,
+                    serviceId: a.serviceId,
+                    repeatOfId: a.id,
+                  },
+                });
+              }}
+              onTreatment={(tooth) => {
+                setPatientId(null);
+                setForm({
+                  resource: "treatments",
+                  initial: {
+                    patientId: patient.id,
+                    tooth,
+                    doctorId: user.doctorId,
+                  },
+                });
+              }}
+            />
+          )}
         </Modal>
       )}
       {document && (
@@ -1378,12 +1491,10 @@ function columns(module: string): string[] {
       return ["Үйлчилгээ", "Ангилал", "Үнэ", "Хугацаа", "Төлөв"];
     case "doctors":
       return ["Эмч", "Мэргэжил", "Данс", "Төлөв"];
-    case "users":
-      return ["Ажилтан", "Холбоо барих", "Эрх", "Бүртгэлийн хяналт", "Төлөв"];
     case "schedules":
       return ["Эмч", "Гараг", "Эхлэх", "Дуусах"];
     case "leaves":
-      return ["Эмч", "Огноо", "Цаг", "Шалтгаан"];
+      return ["Эмч", "Огноо", "Төрөл / цаг", "Шалтгаан", "Хяналт"];
     case "treatments":
       return ["Өвчтөн", "Огноо", "Эмч / Үйлчилгээ", "Шүд / Онош", "Дүн"];
     case "payments":
@@ -1469,26 +1580,6 @@ function cells(
         i.user?.phone || "Данс холбоогүй",
         active,
       ];
-    case "users":
-      return [
-        <strong key="name">{i.name}</strong>,
-        <span key="contact">
-          {i.phone}
-          <small>{i.email || "Имэйл бүртгэлгүй"}</small>
-        </span>,
-        <Badge key="role" value={i.role || ""} />,
-        <span
-          key="approval"
-          className={`erp-badge badge-${i.approvalStatus === "PENDING" ? "pending" : i.approvalStatus === "REJECTED" ? "cancelled" : "completed"}`}
-        >
-          {i.approvalStatus === "PENDING"
-            ? "Зөвшөөрөл хүлээж байна"
-            : i.approvalStatus === "REJECTED"
-              ? "Татгалзсан"
-              : "Зөвшөөрсөн"}
-        </span>,
-        active,
-      ];
     case "schedules":
       return [
         i.doctor?.name,
@@ -1497,7 +1588,13 @@ function cells(
         i.endTime,
       ];
     case "leaves":
-      return [i.doctor?.name, i.date, `${i.startTime}–${i.endTime}`, i.reason];
+      return [
+        i.doctor?.name,
+        i.date,
+        `${leaveKindNames[i.kind || "BLOCKED_RANGE"]} · ${i.startTime}–${i.endTime}`,
+        i.reason,
+        leaveStatusNames[i.status || "APPROVED"],
+      ];
     case "treatments":
       return [
         person,
@@ -1560,11 +1657,11 @@ function cells(
             REFERRAL: "Илгээх бичиг",
           } as Record<string, string>
         )[i.type || ""] || i.type,
-        i.createdAt?.slice(0, 10),
+        i.createdAt ? clinicTimestamp(i.createdAt).slice(0, 10) : "",
       ];
     case "audit":
       return [
-        i.createdAt?.replace("T", " ").slice(0, 19),
+        i.createdAt ? clinicTimestamp(i.createdAt) : "",
         i.action,
         i.entity,
         i.entityId,
@@ -1588,9 +1685,7 @@ function AppointmentForm({
   onCancel: () => void;
   onSaved: () => void;
 }) {
-  const [slots, setSlots] = useState<string[]>([]);
-  const [slotError, setSlotError] = useState("");
-  const [doctorId, setDoctorId] = useState(
+  const [selectedDoctorId, setDoctorId] = useState(
     String(initial?.doctorId || options.doctors[0]?.id || ""),
   );
   const [serviceId, setServiceId] = useState(
@@ -1603,30 +1698,21 @@ function AppointmentForm({
       !selectedService?.doctorIds?.length ||
       selectedService.doctorIds.includes(d.id),
   );
-  useEffect(() => {
-    if (!eligibleDoctors.some((d) => d.id === doctorId))
-      setDoctorId(eligibleDoctors[0]?.id || "");
-  }, [serviceId, doctorId, options.doctors, options.services]);
-  useEffect(() => {
-    setSlots([]);
-    if (!doctorId || !serviceId || !date) return;
-    let alive = true;
-    api<{ slots: string[] }>(
-      `/api/erp/availability?${new URLSearchParams({ doctorId, serviceId, date, ...(rescheduleId ? { excludeId: rescheduleId } : {}) })}`,
-    )
-      .then((r) => {
-        if (alive) {
-          setSlots(r.slots);
-          setSlotError("");
-        }
-      })
-      .catch((e) => {
-        if (alive) setSlotError(e.message);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [doctorId, serviceId, date, rescheduleId]);
+  const doctorId = eligibleDoctors.some((d) => d.id === selectedDoctorId)
+    ? selectedDoctorId
+    : eligibleDoctors[0]?.id || "";
+  const {
+    data: availability,
+    error: slotError,
+    loading: slotsLoading,
+    retry,
+  } = useResource<{ slots: string[] }>(
+    doctorId && serviceId && date
+      ? `/api/erp/availability?${new URLSearchParams({ doctorId, serviceId, date, ...(rescheduleId ? { excludeId: rescheduleId } : {}) })}`
+      : null,
+  );
+  const slots = availability?.slots || [];
+  useModalGuard(false, { doctorId, serviceId, date });
   return (
     <>
       <div className="appointment-availability">
@@ -1663,14 +1749,16 @@ function AppointmentForm({
           />
         </div>
         <p>
-          {slotError ||
-            (slots.length
-              ? slots.join(" · ")
-              : "Энэ өдөр боломжит цаг байхгүй байна.")}
+          {slotsLoading
+            ? "Боломжит цаг ачаалж байна…"
+            : slotError ||
+              (slots.length
+                ? slots.join(" · ")
+                : "Энэ өдөр боломжит цаг байхгүй байна.")}
         </p>
+        {slotError && <Feedback retry={retry}>{slotError}</Feedback>}
       </div>
       <EntityForm
-        key={`${doctorId}-${serviceId}-${date}`}
         fields={[
           ...(initial?.patientId
             ? []
@@ -1700,6 +1788,8 @@ function AppointmentForm({
         onCancel={onCancel}
         submitLabel="Цаг баталгаажуулах"
         onSubmit={async (values) => {
+          if (slotsLoading || !slots.includes(String(values.startTime)))
+            throw new Error("Одоогийн боломжит цагаас сонгоно уу.");
           let payload: Record<string, unknown> = {
             ...initial,
             ...values,
@@ -1742,18 +1832,11 @@ function PatientCard({
   const [transfers, setTransfers] = useState(patient.transfers || []);
   const [noteText, setNoteText] = useState("");
   const [noteBusy, setNoteBusy] = useState(false);
+  useModalGuard(noteBusy, noteText);
   const [cardError, setCardError] = useState("");
-  const [cardMessage, setCardMessage] = useState("");
+  const [cardMessage, setCardMessage] = useMessage();
   const [transferDoctors, setTransferDoctors] = useState<Entity[]>([]);
   const [transferOpen, setTransferOpen] = useState(false);
-  const adultRows = [
-    [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28],
-    [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38],
-  ];
-  const babyRows = [
-    [55, 54, 53, 52, 51, 61, 62, 63, 64, 65],
-    [85, 84, 83, 82, 81, 71, 72, 73, 74, 75],
-  ];
   const [dentition, setDentition] = useState("adult");
   const rows = dentition === "adult" ? adultRows : babyRows;
   return (
@@ -1980,6 +2063,7 @@ function PatientCard({
                     : ""
                 }
                 title={`Шүд ${tooth}`}
+                aria-label={`Шүд ${tooth}`}
                 disabled={user.role === "RECEPTION"}
                 onClick={() => onTreatment(tooth)}
               >
@@ -2247,32 +2331,41 @@ function DashboardView({
               <p>Эмчилгээний дүн болон тухайн захиалгад холбогдсон төлбөр</p>
             </div>
           </div>
-          <div className="erp-table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Үйлчилгээ</th>
-                  <th>Захиалга</th>
-                  <th>Дууссан</th>
-                  <th>Эмчилгээ</th>
-                  <th>Эмчилгээний дүн</th>
-                  <th>Хүлээн авсан төлбөр</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.byService?.map((s) => (
-                  <tr key={s.id}>
-                    <td>{s.name}</td>
-                    <td>{s.count}</td>
-                    <td>{s.completed}</td>
-                    <td>{s.treatments}</td>
-                    <td>{money(s.charges)}</td>
-                    <td>{money(s.revenue)}</td>
+          {data.byService?.length ? (
+            <div
+              className="erp-table-wrap"
+              role="region"
+              aria-label="Бүртгэлийн хүснэгт · хажуу тийш гүйлгэх"
+              tabIndex={0}
+            >
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Үйлчилгээ</th>
+                    <th scope="col">Захиалга</th>
+                    <th scope="col">Дууссан</th>
+                    <th scope="col">Эмчилгээ</th>
+                    <th scope="col">Эмчилгээний дүн</th>
+                    <th scope="col">Хүлээн авсан төлбөр</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {data.byService?.map((s) => (
+                    <tr key={s.id}>
+                      <td>{s.name}</td>
+                      <td>{s.count}</td>
+                      <td>{s.completed}</td>
+                      <td>{s.treatments}</td>
+                      <td>{money(s.charges)}</td>
+                      <td>{money(s.revenue)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <Empty text="Үйлчилгээгээр харуулах тайлангийн мэдээлэл байхгүй." />
+          )}
           <small>
             Захиалгад холбоогүй шууд төлбөрийг үйлчилгээнд хуваарилахгүй.
             Үйлчилгээгээр шүүхэд нийтлэг зардлыг оруулахгүй.

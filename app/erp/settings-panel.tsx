@@ -1,7 +1,8 @@
 "use client";
+import { useMessage } from "./ui";
 import BrandLoader from "../components/brand-loader";
 import { useClinicBranding } from "../components/clinic-branding";
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import {
   Check,
   Save,
@@ -18,7 +19,8 @@ import {
 } from "lucide-react";
 import ImageUpload from "../components/image-upload";
 import PasswordInput from "../components/password-input";
-import { api, type Entity } from "./ui";
+import SystemPanel from "./system-panel";
+import { api, Feedback, useResource, type Entity } from "./ui";
 import { useUser } from "./shell";
 const defaults: Record<string, string> = {
   clinicName: "BB Dental Clinic",
@@ -51,30 +53,33 @@ type TelegramStatus = {
   username: string;
 };
 export default function SettingsPanel() {
+  const actor = useUser();
+  const {
+    data: settings,
+    error,
+    loading,
+    retry,
+  } = useResource<{ items: Entity[] }>("/api/erp/settings");
+  if (actor.role !== "ADMIN")
+    return <Feedback>Тохиргооны админ эрх шаардлагатай.</Feedback>;
+  if (loading) return <BrandLoader />;
+  if (error || !settings)
+    return (
+      <Feedback retry={retry}>{error || "Тохиргоо ачаалж чадсангүй."}</Feedback>
+    );
+  return <SettingsEditor settings={settings} />;
+}
+function SettingsEditor({ settings }: { settings: { items: Entity[] } }) {
   const { setLogoUrl } = useClinicBranding();
   const actor = useUser();
   const [tab, setTab] = useState("clinic"),
-    [values, setValues] = useState(defaults),
-    [loading, setLoading] = useState(true),
+    [values, setValues] = useState(() => ({
+      ...defaults,
+      ...Object.fromEntries(settings.items.map((i) => [i.key!, i.value || ""])),
+    })),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
-    [message, setMessage] = useState("");
-  useEffect(() => {
-    api<{ items: Entity[] }>("/api/erp/settings")
-      .then((r) =>
-        setValues({
-          ...defaults,
-          ...Object.fromEntries(r.items.map((i) => [i.key!, i.value || ""])),
-        }),
-      )
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, []);
-  useEffect(() => {
-    if (!message) return;
-    const t = setTimeout(() => setMessage(""), 4000);
-    return () => clearTimeout(t);
-  }, [message]);
+    [message, setMessage] = useMessage();
   const field = (key: string, label: string, multiline = false) => (
     <label key={key}>
       <span>{label}</span>
@@ -102,7 +107,9 @@ export default function SettingsPanel() {
     setBusy(true);
     setError("");
     try {
-      await api("/api/erp/settings/clinic", "PATCH", values);
+      const clinicValues = { ...values };
+      delete clinicValues.autoApproveDoctors;
+      await api("/api/erp/settings/clinic", "PATCH", clinicValues);
       setLogoUrl(values.logoUrl);
       setMessage("Эмнэлэг болон footer-ийн мэдээлэл хадгалагдлаа.");
     } catch (e) {
@@ -131,6 +138,7 @@ export default function SettingsPanel() {
           ["clinic", "Эмнэлэг ба footer", Globe],
           ["branding", "Лого ба тайлан", ImageIcon],
           ["telegram", "Telegram", Send],
+          ["system", "Систем ба бүртгэл", ShieldCheck],
         ].map(([key, label, Icon]) => {
           const I = Icon as typeof Globe;
           return (
@@ -159,10 +167,10 @@ export default function SettingsPanel() {
           {message}
         </div>
       )}
-      {loading ? (
-        <BrandLoader />
-      ) : tab === "telegram" ? (
+      {tab === "telegram" ? (
         <TelegramPanel onMessage={setMessage} />
+      ) : tab === "system" ? (
+        <SystemPanel />
       ) : (
         <form className="settings-editor" onSubmit={save}>
           {tab === "branding" ? (
@@ -287,36 +295,39 @@ function TelegramPanel({
 }: {
   onMessage: (message: string) => void;
 }) {
-  const [status, setStatus] = useState<TelegramStatus | null>(null),
+  const { data, error, loading, retry } = useResource<TelegramStatus>(
+    "/api/erp/telegram-settings",
+  );
+  if (loading) return <BrandLoader />;
+  if (error || !data)
+    return (
+      <Feedback retry={retry}>
+        {error || "Telegram тохиргоо ачаалж чадсангүй."}
+      </Feedback>
+    );
+  return <TelegramEditor initial={data} onMessage={onMessage} />;
+}
+function TelegramEditor({
+  initial,
+  onMessage,
+}: {
+  initial: TelegramStatus;
+  onMessage: (message: string) => void;
+}) {
+  const [status, setStatus] = useState<TelegramStatus>(initial),
     [token, setToken] = useState(""),
     [busy, setBusy] = useState(""),
     [error, setError] = useState("");
   const [flags, setFlags] = useState({
-    booking: true,
-    transfer: true,
-    recovery: true,
+    booking: initial.booking,
+    transfer: initial.transfer,
+    recovery: initial.recovery,
   });
   const [webhook, setWebhook] = useState<{
     url: string;
     pending: number;
     lastError: string;
   } | null>(null);
-  async function load() {
-    try {
-      const result = await api<TelegramStatus>("/api/erp/telegram-settings");
-      setStatus(result);
-      setFlags({
-        booking: result.booking,
-        transfer: result.transfer,
-        recovery: result.recovery,
-      });
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
-  useEffect(() => {
-    void load();
-  }, []);
   async function action(name: string) {
     setBusy(name);
     setError("");

@@ -10,6 +10,7 @@ import {
 const text = z.string().trim().min(1).max(200);
 const note = z.string().max(10000).default("");
 export const serviceSchema = z.object({
+  sortOrder: z.coerce.number().int().min(0).max(100000).default(0),
   doctorIds: z.array(z.string().uuid()).max(200).default([]),
   name: text,
   category: text,
@@ -34,6 +35,7 @@ export const patientSchema = z.object({
   medicalHistory: note,
 });
 export const doctorSchema = z.object({
+  sortOrder: z.coerce.number().int().min(0).max(100000).default(0),
   name: text,
   specialty: text,
   bio: note,
@@ -131,9 +133,12 @@ export const leaveSchema = z
   .object({
     doctorId: z.string().uuid(),
     date: dateSchema,
-    startTime: timeSchema,
-    endTime: timeSchema,
+    startTime: timeSchema.default("00:00"),
+    endTime: timeSchema.default("23:59"),
     reason: text,
+    kind: z
+      .enum(["DAY_OFF", "BLOCKED_RANGE", "SCHEDULE_OVERRIDE"])
+      .default("BLOCKED_RANGE"),
   })
   .refine((v) => v.startTime < v.endTime, "Цагийн хязгаар буруу байна.");
 export const treatmentSchema = z.object({

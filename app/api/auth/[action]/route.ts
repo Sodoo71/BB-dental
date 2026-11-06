@@ -55,7 +55,9 @@ export async function POST(req: Request, ctx: Ctx) {
           approvalStatus: user.approvalStatus,
           message: user.first
             ? "Анхны бүртгэл админ эрхээр идэвхжлээ. Нэвтэрнэ үү."
-            : "Бүртгэл илгээгдлээ. Админ хянасны дараа идэвхжинэ.",
+            : user.approvalStatus === "APPROVED"
+              ? "Бүртгэл идэвхжлээ. Нэвтэрнэ үү."
+              : "Бүртгэл илгээгдлээ. Админ хянасны дараа идэвхжинэ.",
         },
         201,
       );

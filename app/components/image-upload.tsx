@@ -9,7 +9,7 @@ export default function ImageUpload({
   onBusyChange,
 }: {
   value: string;
-  onChange: (url: string) => void;
+  onChange: (url: string) => void | Promise<void>;
   purpose?: "doctors" | "services" | "logo";
   onBusyChange?: (busy: boolean) => void;
 }) {
@@ -72,7 +72,7 @@ export default function ImageUpload({
               const result = await res.json();
               if (!res.ok)
                 throw new Error(result.error || "Зураг илгээж чадсангүй.");
-              onChange(result.url);
+              await onChange(result.url);
             } catch (error) {
               setError((error as Error).message);
             } finally {
@@ -88,7 +88,19 @@ export default function ImageUpload({
             type="button"
             className="erp-secondary"
             disabled={busy}
-            onClick={() => onChange("")}
+            onClick={async () => {
+              setBusy(true);
+              onBusyChange?.(true);
+              setError("");
+              try {
+                await onChange("");
+              } catch (e) {
+                setError((e as Error).message);
+              } finally {
+                setBusy(false);
+                onBusyChange?.(false);
+              }
+            }}
           >
             <X size={14} />
             Зургийг арилгах

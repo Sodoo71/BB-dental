@@ -1,3 +1,10 @@
+import {
+  saveLeave,
+  saveWeek,
+  reviewLeave,
+  weekSchema,
+} from "@/lib/schedule-actions";
+import { ensureWorkCoverage } from "@/lib/work-schedule-server";
 import { createHash, randomBytes } from "node:crypto";
 import {
   telegramConfig,
@@ -96,6 +103,79 @@ export async function GET(req: Request, ctx: Ctx) {
           "Календарын хугацаа 31 өдрөөс хэтэрч болохгүй.",
         );
       date = { gte: from, lte: to };
+    }
+    if (resource === "doctor-detail") {
+      permit(user, ["ADMIN"]);
+      const doctorId = z.string().uuid().parse(id);
+      const page = z.coerce
+        .number()
+        .int()
+        .min(1)
+        .max(100000)
+        .parse(q.get("page") || 1);
+      const doctor = await db.doctor.findUniqueOrThrow({
+        where: { id: doctorId },
+        select: {
+          id: true,
+          name: true,
+          specialty: true,
+          bio: true,
+          imageUrl: true,
+          active: true,
+          schedules: { orderBy: { weekday: "asc" } },
+          leaves: {
+            where: { date: { gte: today() } },
+            orderBy: { date: "asc" },
+            take: 100,
+          },
+        },
+      });
+      const [total, completed, patients, appointments] = await Promise.all([
+        db.appointment.count({ where: { doctorId } }),
+        db.appointment.count({ where: { doctorId, status: "COMPLETED" } }),
+        db.patient.count({ where: { appointments: { some: { doctorId } } } }),
+        db.appointment.findMany({
+          where: { doctorId },
+          select: {
+            id: true,
+            date: true,
+            startTime: true,
+            status: true,
+            patient: { select: { name: true } },
+            service: { select: { name: true } },
+          },
+          orderBy: [{ date: "desc" }, { startTime: "desc" }, { id: "asc" }],
+          skip: (page - 1) * 50,
+          take: 50,
+        }),
+      ]);
+      return json({
+        doctor,
+        stats: { total, completed, patients },
+        appointments,
+      });
+    }
+    if (resource === "system-status") {
+      permit(user, ["ADMIN"]);
+      await rateLimit(`system-status:${user.id}`, 30, 3600);
+      const start = performance.now();
+      await db.$queryRaw`SELECT 1`;
+      const latencyMs = Math.round(performance.now() - start);
+      const [users, doctors, patients, appointments, services] =
+        await Promise.all([
+          db.user.count(),
+          db.doctor.count(),
+          db.patient.count(),
+          db.appointment.count(),
+          db.service.count(),
+        ]);
+      return json({
+        status: "HEALTHY",
+        latencyMs,
+        dbProvider: "PostgreSQL",
+        timestamp: new Date().toISOString(),
+        counts: { users, doctors, patients, appointments, services },
+      });
     }
     if (resource === "availability") {
       const data = z
@@ -537,7 +617,66 @@ export async function POST(req: Request, ctx: Ctx) {
     const user = await requireUser();
     const [resource, id] = (await ctx.params).path;
     const input = await body(req);
+    if (resource === "schedule-week") {
+      permit(user, ["ADMIN", "DOCTOR"]);
+      const data = weekSchema.parse(input);
+      ownDoctor(user, data.doctorId);
+      return json(await saveWeek(data, user.id));
+    }
+    if (resource === "leave-review") {
+      permit(user, ["ADMIN"]);
+      const data = z
+        .object({ status: z.enum(["APPROVED", "REJECTED"]) })
+        .parse(input);
+      if (!id) throw new ApiError(400, "Хүсэлт сонгоно уу.");
+      return json(await reviewLeave(id, data.status, user.id));
+    }
     let result: { id: string };
+    if (resource === "appointment-reminder") {
+      permit(user, ["ADMIN", "DOCTOR"]);
+      const appointmentId = z.string().uuid().parse(id);
+      const appointment = await db.appointment.findUnique({
+        where: { id: appointmentId },
+        include: {
+          patient: { select: { name: true, phone: true } },
+          doctor: { select: { name: true, telegramChatId: true } },
+          service: { select: { name: true } },
+        },
+      });
+      if (
+        !appointment ||
+        (user.role === "DOCTOR" && appointment.doctorId !== user.doctor?.id)
+      )
+        throw new ApiError(404, "Захиалга олдсонгүй.");
+      if (
+        appointment.date < today() ||
+        !["PENDING", "CONFIRMED", "ARRIVED"].includes(appointment.status)
+      )
+        throw new ApiError(
+          409,
+          "Зөвхөн хүлээгдэж буй үзлэгт сануулга илгээнэ.",
+        );
+      await rateLimit(`reminder:${appointment.id}`, 1, 60);
+      await rateLimit(`reminder:actor:${user.id}`, 30, 3600);
+      const sent = await notifyDoctor(
+        appointment.doctor.telegramChatId,
+        `🦷 ҮЗЛЭГИЙН САНУУЛГА\nЭмч: ${appointment.doctor.name}\nӨвчтөн: ${appointment.patient.name}\nУтас: ${appointment.patient.phone}\nҮйлчилгээ: ${appointment.service.name}\nӨдөр: ${appointment.date}\nЦаг: ${appointment.startTime}`,
+        undefined,
+        "booking",
+      );
+      if (!sent.ok)
+        throw new ApiError(
+          503,
+          "Сануулга хүрсэнгүй. Telegram тохиргоо, Chat ID болон мэдэгдэл идэвхтэй эсэхийг шалгана уу.",
+        );
+      await audit(
+        user,
+        "APPOINTMENT_REMINDER_SENT",
+        "appointments",
+        appointment.id,
+      );
+      return json({ ok: true });
+    }
     if (resource === "nurse-shifts") {
       permit(user, ["ADMIN"]);
       const data = z
@@ -976,26 +1115,7 @@ export async function POST(req: Request, ctx: Ctx) {
       });
     } else if (resource === "leaves") {
       permit(user, ["ADMIN", "DOCTOR"]);
-      const data = v.leaveSchema.parse(input);
-      ownDoctor(user, data.doctorId);
-      result = await db.$transaction(async (tx) => {
-        await doctorLock(tx, data.doctorId);
-        const conflicts = await tx.appointment.count({
-          where: {
-            doctorId: data.doctorId,
-            date: data.date,
-            startTime: { lt: data.endTime },
-            endTime: { gt: data.startTime },
-            status: { notIn: ["CANCELLED", "NO_SHOW"] },
-          },
-        });
-        if (conflicts)
-          throw new ApiError(
-            409,
-            "Захиалгатай давхцаж байна. Эхлээд цагийг шилжүүлнэ үү.",
-          );
-        return tx.leave.create({ data });
-      });
+      result = await saveLeave(input, user);
     } else if (resource === "treatments") {
       permit(user, ["ADMIN", "DOCTOR"]);
       const data = v.treatmentSchema.parse(input);
@@ -1228,26 +1348,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
       });
     } else if (resource === "leaves") {
       permit(user, ["ADMIN", "DOCTOR"]);
-      const data = v.leaveSchema.parse(input);
-      ownDoctor(user, data.doctorId);
-      await db.$transaction(async (tx) => {
-        const previous = await tx.leave.findUniqueOrThrow({ where: { id } });
-        if (previous.doctorId !== data.doctorId)
-          throw new ApiError(400, "Чөлөөний эмчийг солих боломжгүй.");
-        await doctorLock(tx, data.doctorId);
-        const conflict = await tx.appointment.count({
-          where: {
-            doctorId: data.doctorId,
-            date: data.date,
-            startTime: { lt: data.endTime },
-            endTime: { gt: data.startTime },
-            status: { notIn: ["CANCELLED", "NO_SHOW"] },
-          },
-        });
-        if (conflict)
-          throw new ApiError(409, "Чөлөө захиалгатай давхцаж байна.");
-        await tx.leave.update({ where: { id }, data });
-      });
+      await saveLeave(input, user, id);
     } else if (resource === "appointments") {
       const data = z
         .object({
@@ -1381,7 +1482,13 @@ export async function DELETE(req: Request, ctx: Ctx) {
               "Идэвхтэй захиалгатай хуваарийг устгах боломжгүй.",
             );
           await tx.schedule.delete({ where: { id } });
-        } else await tx.leave.delete({ where: { id } });
+        } else {
+          const leave = await tx.leave.findUniqueOrThrow({ where: { id } });
+          if (user.role === "DOCTOR" && leave.status === "APPROVED")
+            throw new ApiError(403, "Батлагдсан чөлөөг админ цуцална.");
+          await tx.leave.delete({ where: { id } });
+          await ensureWorkCoverage(tx, item.doctorId, [leave.date]);
+        }
       });
     } else {
       permit(user, ["ADMIN"]);

@@ -4,9 +4,12 @@ import Image, { type ImageProps } from "next/image";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 
 export const defaultLogoUrl = "/images/default-logo.png";
-const BrandingContext = createContext({
+const BrandingContext = createContext<{
+  logoUrl: string;
+  setLogoUrl: (value: string) => void;
+}>({
   logoUrl: defaultLogoUrl,
-  setLogoUrl: (_value: string) => {},
+  setLogoUrl: () => {},
 });
 
 export function useClinicBranding() {
@@ -57,12 +60,13 @@ export function ClinicBrandingProvider({
   );
 }
 
-export function ClinicLogo(props: Omit<ImageProps, "src">) {
+export function ClinicLogo({ alt, ...props }: Omit<ImageProps, "src">) {
   const { logoUrl } = useClinicBranding();
   const [failedUrl, setFailedUrl] = useState("");
   return (
     <Image
       {...props}
+      alt={alt}
       src={failedUrl === logoUrl ? defaultLogoUrl : logoUrl}
       unoptimized
       style={{ objectFit: "contain", ...props.style }}

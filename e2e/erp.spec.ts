@@ -460,6 +460,9 @@ test("sidebar navigation leaves reports and follows the URL through back and for
   await page.getByRole("button", { name: "Нэвтрэх", exact: true }).click();
   await expect(page).toHaveURL(/\/erp$/);
   const nav = page.getByRole("navigation", { name: "Ажлын цэс" });
+  await page.getByRole("button", { name: "Цэс хураах", exact: true }).click();
+  await expect(page.locator(".erp-sidebar")).toHaveCSS("width", "96px");
+  await page.getByRole("button", { name: "Цэс дэлгэх", exact: true }).click();
   for (const [label, path, heading] of [
     ["Тайлан", "/erp/reports", "Санхүү, үйл ажиллагааны тайлан"],
     ["Хяналтын самбар", "/erp", "Хяналтын самбар"],
@@ -493,6 +496,62 @@ test("sidebar navigation leaves reports and follows the URL through back and for
       exact: true,
     }),
   ).toBeVisible();
+});
+
+test("admin and doctor choose recurring work days from the schedule calendar", async ({
+  page,
+}) => {
+  let payload: Record<string, unknown> = {};
+  await page.route("**/api/erp/schedules", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    payload = route.request().postDataJSON();
+    await route.fulfill({ status: 200, json: { id: "calendar-form-check" } });
+  });
+  for (const phone of [phones.admin, phones.doctor]) {
+    await page.goto("/login");
+    await page.getByLabel("Утасны дугаар", { exact: true }).fill(phone);
+    await page.getByLabel("Нууц үг", { exact: true }).fill(password);
+    await page.getByRole("button", { name: "Нэвтрэх", exact: true }).click();
+    await expect(page).toHaveURL(/\/erp$/);
+    await page.goto("/erp/schedules");
+    await page
+      .getByRole("button", { name: "Шинээр нэмэх", exact: true })
+      .click();
+    const dialog = page.getByRole("dialog");
+    const doctorSelect = dialog.getByLabel("Эмч", { exact: true });
+    if (phone === phones.admin) await doctorSelect.selectOption(doctorId);
+    else {
+      await expect(doctorSelect).toHaveValue(doctorId);
+      await expect(doctorSelect).toBeDisabled();
+    }
+    await dialog
+      .getByLabel("Хуваарь сонгох сар", { exact: true })
+      .fill("2026-12");
+    await dialog
+      .getByRole("button", { name: "2026-12-07, Даваа", exact: true })
+      .click();
+    await expect(
+      dialog.getByRole("button", { name: "2026-12-14, Даваа", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(dialog.getByRole("status")).toContainText(
+      "Долоо хоног бүрийн Даваа",
+    );
+    await dialog.getByLabel("Эхлэх цаг", { exact: true }).fill("18:00");
+    await dialog.getByLabel("Дуусах цаг", { exact: true }).fill("10:00");
+    await dialog.getByRole("button", { name: "Хадгалах", exact: true }).click();
+    await expect(dialog.getByRole("alert")).toContainText(
+      "Эхлэх цаг дуусах цагаас өмнө байна.",
+    );
+    await dialog.getByLabel("Эхлэх цаг", { exact: true }).fill("09:00");
+    await dialog.getByRole("button", { name: "Хадгалах", exact: true }).click();
+    await expect(dialog).not.toBeVisible();
+    expect(payload).toEqual({
+      doctorId,
+      weekday: 1,
+      startTime: "09:00",
+      endTime: "10:00",
+    });
+  }
 });
 
 test("admin dashboard, patient card and responsive public UI", async ({
@@ -538,7 +597,7 @@ test("admin dashboard, patient card and responsive public UI", async ({
   });
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "BB Dental", exact: true }),
+    page.getByRole("heading", { name: /Эрүүл инээмсэглэл/ }),
   ).toBeVisible();
   await expect(
     page.getByText(`QA Үзлэг ${phoneBase}`, { exact: true }).first(),
@@ -844,7 +903,7 @@ test("admin uploads service images and a PDF logo from the UI", async ({
   const row = page
     .getByRole("row")
     .filter({ hasText: `QA Үзлэг ${phoneBase}` });
-  await row.getByRole("button", { name: "Засах", exact: true }).click();
+  await row.getByRole("button", { name: `Засах · QA Үзлэг ${phoneBase}`, exact: true }).click();
   await page.getByRole("dialog").locator('input[type="file"]').setInputFiles({
     name: "service.png",
     mimeType: "image/png",
@@ -1739,7 +1798,11 @@ test("self profile edits stay scoped and doctor changes reach the public catalog
     storageState: await self.storageState(),
   });
   const doctorPage = await context.newPage();
+  await doctorPage.route("https://res.cloudinary.com/**", (route) =>
+    route.fulfill({ contentType: "image/png", body: asset }),
+  );
   await doctorPage.goto(`${origin}/erp`);
+  await expect(doctorPage.locator(".clinic-card")).toHaveCount(0);
   await doctorPage
     .getByRole("link", { name: "Миний профайл засах", exact: true })
     .click();
@@ -1747,12 +1810,33 @@ test("self profile edits stay scoped and doctor changes reach the public catalog
   await doctorPage
     .getByLabel(/^Танилцуулга/)
     .fill("Browser-оос шинэчилсэн танилцуулга.");
+  await doctorPage.locator('input[type="file"]').setInputFiles({
+    name: "profile.png",
+    mimeType: "image/png",
+    buffer: asset,
+  });
+  await expect(
+    doctorPage.getByRole("img", {
+      name: "Оруулсан зургийн урьдчилсан харагдац",
+    }),
+  ).toBeVisible();
   await doctorPage
     .getByRole("button", { name: "Профайл хадгалах", exact: true })
     .click();
   await expect(doctorPage.getByRole("status")).toContainText(
     "Профайл шинэчлэгдлээ",
   );
+  const savedDoctor = await db.doctor.findUniqueOrThrow({
+    where: { id: current.doctor!.id },
+  });
+  expect(savedDoctor.imageUrl).toBeTruthy();
+  await expect(doctorPage.locator(".profile-avatar img")).toHaveAttribute(
+    "src",
+    savedDoctor.imageUrl,
+  );
+  await expect(
+    doctorPage.locator(".erp-user .user-avatar img"),
+  ).toHaveAttribute("src", savedDoctor.imageUrl);
   await doctorPage.screenshot({
     path: "test-results/doctor-profile.png",
     fullPage: true,

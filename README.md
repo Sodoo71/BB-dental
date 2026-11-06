@@ -2,7 +2,13 @@
 
 BB Dental эмнэлгийн нэг салбарын дотоод ERP болон үйлчлүүлэгчийн цаг захиалгын веб. Next.js 16.4, React 19, Prisma 7, Supabase PostgreSQL.
 
+## UI/UX загвар
+
+Нийтийн нүүр, нэвтрэх/бүртгэлийн хуудсууд болон ERP нь `bb-dental-v2` (`e264be7`) branch-ийн өнгө, Inter/Merriweather фонт, carousel, auth shell, ногоон sidebar болон картын загварыг ашиглана. Дизайныг `app/v2-theme.css`, `app/components/home/`, `app/components/auth-story.tsx` болон одоогийн ERP shell-д тохируулсан. Desktop дээр цэсийг хурааж/дэлгэж болно; утсан дээр drawer цэстэй. `main`-ийн route, API, эрх, өгөгдлийн загвар болон шинэ модулиудыг ашиглана; хуучин branch-ийн backend, migration-ийг хуулж оруулаагүй.
+
 ## Эхлүүлэх
+
+`bb-dental-v2`-ээс нэмсэн үйлдлүүд, одоо байгаа main боломжуудын зураглал болон шинэ migration: [V2 үйлдлүүд](docs/V2_FUNCTION_PARITY.md).
 
 1. `bun install`
 2. `.env.example`-ийн утгуудыг `.env`-д тохируулна. Одоо байгаа `.env`-ийг дарж хуулж болохгүй.

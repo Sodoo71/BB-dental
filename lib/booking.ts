@@ -3,9 +3,11 @@ import { telegramConfig, telegramCall, type TelegramConfig } from "./telegram";
 import { db } from "./db";
 import { Prisma } from "@/app/generated/prisma/client";
 import { ApiError } from "./http";
-import { clock, minutes, overlaps, today, nowTime } from "./domain";
+import { clock, minutes, today, nowTime } from "./domain";
 import { z } from "zod";
 import { dateSchema, timeSchema, phoneSchema } from "./domain";
+import { workIntervals } from "./work-schedule";
+import { availableTimes } from "./available-times";
 export const bookingSchema = z.object({
   patientId: z.string().uuid().optional(),
   name: z.string().trim().min(2).max(100),
@@ -54,30 +56,19 @@ export async function availability(
   if (
     !doctor?.active ||
     !service?.active ||
-    !schedule ||
     date < today() ||
     (service.doctorIds.length > 0 && !service.doctorIds.includes(doctorId))
   )
     return [];
-  const result: string[] = [];
-  for (
-    let start = minutes(schedule.startTime);
-    start + service.duration <= minutes(schedule.endTime);
-    start += 15
-  ) {
-    const s = clock(start),
-      e = clock(start + service.duration);
-    if (date === today() && s <= nowTime()) continue;
-    if (
-      [...leaves, ...appointments].some((a) =>
-        overlaps(s, e, a.startTime, a.endTime),
-      )
-    )
-      continue;
-    result.push(s);
-  }
-  return result;
+  return availableTimes(
+    date,
+    service.duration,
+    workIntervals(schedule, leaves),
+    appointments,
+    { date: today(), time: nowTime() },
+  );
 }
+
 export async function createBooking(
   data: z.infer<typeof bookingSchema>,
   actorId?: string,

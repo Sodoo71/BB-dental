@@ -1,0 +1,342 @@
+/* Theme-specific presentation only. Values live in styles/design-tokens.css. */
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+html[data-theme="dark"] body {
+  background: var(--background);
+  color: var(--ink);
+}
+html[data-theme="dark"] :is(.erp-shell, .login-page) {
+  background: var(--background);
+  color: var(--erp-text);
+}
+html[data-theme="dark"]
+  :is(
+    .erp-sidebar,
+    .erp-topbar,
+    .erp-panel,
+    .erp-modal,
+    .employee-card,
+    .employee-table,
+    .employee-table-head,
+    .employee-row,
+    .employee-dialog,
+    .settings-card,
+    .settings-panel,
+    .settings-tabs,
+    .entity-form,
+    .booking-panel,
+    .public-service-card,
+    .public-doctor-card,
+    .lookup-panel,
+    .login-form-side,
+    .registration-form,
+    .reset-form,
+    .patient-card,
+    .erp-table-wrap,
+    .employee-toolbar,
+    .employee-filters,
+    .employee-menu > div
+  ) {
+  background: var(--surface);
+  color: var(--ink);
+  border-color: var(--line);
+}
+html[data-theme="dark"] :is(input, select, textarea) {
+  background: #13232c;
+  color: var(--ink);
+  border-color: #3a535e;
+}
+html[data-theme="dark"]
+  :is(
+    .clinic-card,
+    .erp-global-search,
+    .erp-secondary,
+    .settings-preview,
+    .employee-stat,
+    .employee-status-tabs,
+    .employee-view-switch,
+    .employee-empty,
+    .booking-steps,
+    .public-booking-summary,
+    .public-category-tabs button,
+    .erp-empty,
+    .login-info-card
+  ) {
+  background: var(--soft-surface);
+  color: #bed4dc;
+  border-color: var(--line);
+}
+html[data-theme="dark"]
+  :is(
+    .erp-table th,
+    .erp-table td,
+    table th,
+    table td,
+    .method-summary,
+    .panel-title,
+    .employee-row
+  ) {
+  border-color: var(--line);
+}
+html[data-theme="dark"]
+  :is(
+    .erp-content,
+    .workspace-heading,
+    .employee-heading,
+    .settings-heading,
+    .panel-title,
+    .erp-user,
+    .erp-brand,
+    .erp-panel h2,
+    .erp-panel h3,
+    .settings-card h2,
+    .employee-card h3
+  ) {
+  color: var(--ink);
+}
+html[data-theme="dark"]
+  :is(
+    .nav-group a,
+    .erp-breadcrumb,
+    .erp-global-search input,
+    .employee-card p,
+    .settings-card p,
+    .workspace-heading p
+  ) {
+  color: #a5becb;
+}
+html[data-theme="dark"] .nav-group a.active {
+  background: #1c494c;
+  color: #8cddd3;
+}
+html[data-theme="dark"] :is(.erp-badge, .employee-role) {
+  color: var(--ink);
+  background: var(--soft-surface);
+  border-color: var(--line);
+}
+html[data-theme="dark"]
+  :is(
+    .home-hero,
+    .hero-section,
+    .public-services,
+    .public-doctors,
+    .booking-section,
+    .lookup-section
+  ) {
+  background: #10272d;
+  color: var(--ink);
+}
+html[data-theme="dark"]
+  :is(.home-header, .site-header, .booking-panel-content, .booking-body) {
+  background: var(--surface);
+  color: var(--ink);
+}
+html[data-theme="dark"]
+  :is(
+    .section-heading h2,
+    .booking-panel h3,
+    .public-service-card h3,
+    .public-doctor-card h3,
+    .login-form-side h1
+  ) {
+  color: #c7eee7;
+}
+html[data-theme="dark"]
+  :is(
+    .booking-service-list button,
+    .public-time-slots button,
+    .category-field select,
+    .search-field
+  ) {
+  border-color: #304f59;
+  color: #c1dcdf;
+  background: var(--surface);
+}
+html[data-theme="dark"]
+  :is(
+    .employee-menu[open],
+    .employee-menu-popover,
+    .erp-popover,
+    .erp-modal .modal-header,
+    .patient-card-header
+  ) {
+  background: var(--soft-surface);
+  color: var(--ink);
+}
+html[data-theme="dark"]
+  :is(.roster-person, .roster-month button, .fdi-controls button) {
+  color: #c7dcdf;
+}
+html[data-theme="dark"] .erp-panel svg :is(text) {
+  fill: #b9cdd4;
+}
+html[data-theme="dark"]
+  :is(.main-nav, .hero-description, .hero-subtitle, .brand-caption) {
+  color: #a9c3ce;
+}
+html[data-theme="dark"]
+  :is(
+    .settings-section,
+    .settings-navigation,
+    .employee-overview,
+    .employee-tools,
+    .employee-tabs,
+    .employee-list-header,
+    .employee-list-row,
+    .telegram-bot-card,
+    .calendar-day,
+    .summary-card,
+    .settings-save-bar
+  ) {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--ink);
+}
+html[data-theme="dark"]
+  :is(
+    .settings-fields input,
+    .settings-fields textarea,
+    .employee-search,
+    .employee-summary-card,
+    .employee-tab.selected,
+    .employee-state,
+    .calendar-event
+  ) {
+  background: var(--soft-surface);
+  border-color: var(--line);
+  color: #bdd8de;
+}
+html[data-theme="dark"]
+  :is(
+    .settings-section h2,
+    .settings-fields label,
+    .employee-page-heading h1,
+    .employee-name,
+    .employee-card h3,
+    .settings-save-bar > span,
+    .telegram-identity strong
+  ) {
+  color: var(--ink);
+}
+html[data-theme="dark"] .phone-link {
+  background: var(--soft-surface);
+  color: #d3e6ec;
+}
+html[data-theme="dark"] .public-services {
+  background: #11232b;
+}
+html[data-theme="dark"] .brand-loader {
+  background: linear-gradient(120deg, #173b3e, #195052);
+}
+html[data-theme="dark"] .role-welcome {
+  background: linear-gradient(115deg, #173b3b, #213542);
+  border-color: #31544f;
+}
+html[data-theme="dark"] .role-welcome h2 {
+  color: #cbebe1;
+}
+html[data-theme="dark"] .role-welcome :is(p, span) {
+  color: #9dc6bc;
+}
+html[data-theme="dark"]
+  :is(
+    .metric-card > strong,
+    .income-totals strong,
+    .method-summary .money-value,
+    .money-value,
+    .erp-table td strong,
+    .team-overview-title strong,
+    .team-stats b,
+    .employee-card-name,
+    .patient-title h2
+  ) {
+  color: #dcecf1;
+}
+html[data-theme="dark"]
+  :is(
+    .erp-table td,
+    .form-grid label,
+    .form-grid > .field-wide > span,
+    .employee-search input,
+    .employee-role-filter select
+  ) {
+  color: #b2c9d3;
+}
+html[data-theme="dark"]
+  :is(
+    .erp-table th,
+    .report-note,
+    .category-tag,
+    .employee-view-switch,
+    .employee-status-filter,
+    .telegram-tip,
+    .telegram-webhook-status,
+    .patient-internal-notes
+  ) {
+  background: var(--soft-surface);
+  border-color: var(--line);
+  color: #b3c9d3;
+}
+html[data-theme="dark"] .erp-table tbody tr:hover {
+  background: #203941;
+}
+html[data-theme="dark"] :is(.nav-group a.active, .nav-group a.active:hover) {
+  background: #204448;
+  color: #8bddcf;
+}
+html[data-theme="dark"] .team-overview {
+  background: linear-gradient(120deg, #173b3b, #223644);
+  border-color: #31544f;
+}
+html[data-theme="dark"] .team-stats span {
+  color: #a2c3bd;
+}
+html[data-theme="dark"]
+  :is(
+    .employee-view-switch button[aria-pressed="true"],
+    .employee-tab.selected
+  ) {
+  background: #31544f;
+  color: #b6eee2;
+}
+html[data-theme="dark"]
+  :is(
+    .erp-table th,
+    .erp-table td,
+    .modal-header,
+    .form-footer,
+    .table-pagination
+  ) {
+  border-color: var(--line);
+}
+html[data-theme="dark"]
+  :is(
+    .form-grid input:not([type="checkbox"]),
+    .form-grid select,
+    .form-grid textarea,
+    .appointment-availability select,
+    .appointment-availability input
+  ) {
+  background: #13232c;
+  color: var(--ink);
+  border-color: #3a535e;
+}
+html[data-theme="dark"] :is(.form-grid > div.field-wide) {
+  color: #b2c9d3;
+  font-size: 12px;
+}
+html[data-theme="dark"] .erp-shell .erp-sidebar {
+  background: #005659;
+}
+html[data-theme="dark"] .erp-shell .nav-group a {
+  color: #cfefeb;
+}
+html[data-theme="dark"] .erp-shell .nav-group a.active {
+  background: #ffffff14;
+  color: #fff;
+}
+html[data-theme="dark"] .login-story {
+  background: #005659;
+}

@@ -1,6 +1,7 @@
 "use client";
+import { useMessage } from "./ui";
 import BrandLoader from "../components/brand-loader";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Users,
   Plus,
@@ -22,8 +23,17 @@ import {
   List,
 } from "lucide-react";
 import { roleNames, type Role } from "@/lib/domain";
+import { useRouter } from "next/navigation";
 import { useUser } from "./shell";
-import { api, EntityForm, Modal, type Entity, type Field } from "./ui";
+import {
+  api,
+  EntityForm,
+  Modal,
+  useResource,
+  Feedback,
+  type Entity,
+  type Field,
+} from "./ui";
 import { employeeFields } from "./employee-fields";
 const roles = Object.entries(roleNames).map(([value, label]) => ({
   value,
@@ -31,10 +41,19 @@ const roles = Object.entries(roleNames).map(([value, label]) => ({
 }));
 export default function Employees() {
   const actor = useUser();
-  const [items, setItems] = useState<Entity[]>([]),
-    [loading, setLoading] = useState(true),
-    [error, setError] = useState(""),
-    [message, setMessage] = useState("");
+  const router = useRouter();
+  const {
+    data,
+    error: loadError,
+    loading,
+    retry,
+  } = useResource<{ items: Entity[] }>("/api/erp/users");
+  const items = data?.items || [];
+  const load = async () => {
+    retry();
+  };
+  const [error, setError] = useState(""),
+    [message, setMessage] = useMessage();
   const [search, setSearch] = useState(""),
     [role, setRole] = useState(""),
     [filter, setFilter] = useState("all"),
@@ -45,26 +64,6 @@ export default function Employees() {
   } | null>(null);
   const [link, setLink] = useState(""),
     [busy, setBusy] = useState("");
-  async function load() {
-    setLoading(true);
-    try {
-      const result = await api<{ items: Entity[] }>("/api/erp/users");
-      setItems(result.items);
-      setError("");
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  }
-  useEffect(() => {
-    void load();
-  }, []);
-  useEffect(() => {
-    if (!message) return;
-    const t = setTimeout(() => setMessage(""), 4500);
-    return () => clearTimeout(t);
-  }, [message]);
   const pending = items.filter((u) => u.approvalStatus === "PENDING").length,
     active = items.filter((u) => u.active).length;
   const filtered = items.filter(
@@ -256,6 +255,7 @@ export default function Employees() {
           </button>
         ))}
       </div>
+      {loadError && <Feedback retry={retry}>{loadError}</Feedback>}
       {error && (
         <div className="erp-alert" role="alert">
           {error}
@@ -302,7 +302,19 @@ export default function Employees() {
                           ? "Идэвхтэй"
                           : "Идэвхгүй"}
                   </span>
-                  <details className="employee-menu">
+                  <details
+                    className="employee-menu"
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        e.currentTarget.open = false;
+                        e.currentTarget.querySelector("summary")?.focus();
+                      }
+                    }}
+                    onBlur={(e) => {
+                      if (!e.currentTarget.contains(e.relatedTarget))
+                        e.currentTarget.open = false;
+                    }}
+                  >
                     <summary aria-label={`${user.name} нэмэлт үйлдэл`}>
                       <MoreHorizontal size={21} />
                     </summary>
@@ -324,7 +336,7 @@ export default function Employees() {
                         Мэдэгдэл турших
                       </button>
                       <button
-                        aria-label="Telegram руу сэргээх холбоос илгээх"
+                        aria-label={`Telegram руу сэргээх холбоос илгээх · ${user.name}`}
                         disabled={
                           !!busy ||
                           !user.active ||
@@ -366,7 +378,7 @@ export default function Employees() {
                 <div className="employee-card-actions">
                   <button
                     className="erp-secondary"
-                    aria-label="Засах"
+                    aria-label={`Засах · ${user.name}`}
                     onClick={() => setModal({ mode: "edit", user })}
                   >
                     <Pencil size={14} />
@@ -457,7 +469,8 @@ export default function Employees() {
               else await api("/api/erp/users", "POST", values);
               setModal(null);
               if (target?.id === actor.id) {
-                window.location.assign("/login");
+                router.push("/login");
+                router.refresh();
                 return;
               }
               await load();

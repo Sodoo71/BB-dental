@@ -1,4 +1,5 @@
 "use client";
+import { adultRows, babyRows } from "./dentition";
 import { useState } from "react";
 export default function ToothPicker({
   value,
@@ -8,14 +9,14 @@ export default function ToothPicker({
   onChange: (v: string) => void;
 }) {
   const [primary, setPrimary] = useState(Number(value) >= 51);
-  const top = primary
-    ? [55, 54, 53, 52, 51, 61, 62, 63, 64, 65]
-    : [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
-  const bottom = primary
-    ? [85, 84, 83, 82, 81, 71, 72, 73, 74, 75]
-    : [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
+  const [top, bottom] = primary ? babyRows : adultRows;
   return (
-    <div className="fdi-picker" role="group" aria-label="Шүдний FDI зураг">
+    <div
+      className="fdi-picker"
+      role="group"
+      aria-label="Шүдний FDI зураг · хажуу тийш гүйлгэх"
+      tabIndex={0}
+    >
       <div className="fdi-controls">
         <button
           type="button"

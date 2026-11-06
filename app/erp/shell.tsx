@@ -1,7 +1,15 @@
 "use client";
-import { createContext, useContext, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import Link from "next/link";
 import { ClinicLogo } from "../components/clinic-branding";
+import UserAvatar from "../components/user-avatar";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
@@ -17,12 +25,13 @@ import {
   LogOut,
   Search,
   Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
   X,
   ChevronRight,
   Clock3,
   ClipboardList,
   ShieldCheck,
-  CircleHelp,
   ArrowUpRight,
   BadgeDollarSign,
 } from "lucide-react";
@@ -33,6 +42,7 @@ export type SessionUser = {
   phone: string;
   role: Role;
   doctorId?: string;
+  imageUrl?: string;
 };
 const UserContext = createContext<SessionUser | null>(null);
 export function useUser() {
@@ -165,6 +175,17 @@ const navigation = [
     ],
   },
 ];
+export function canVisitSection(role: Role, section: string) {
+  return navigation
+    .flatMap((group) => group.items)
+    .some((item) => item.id === section && item.roles.includes(role));
+}
+const mobileQuery = "(max-width: 900px)";
+function subscribeMobile(callback: () => void) {
+  const media = window.matchMedia(mobileQuery);
+  media.addEventListener("change", callback);
+  return () => media.removeEventListener("change", callback);
+}
 export function ErpShell({
   user,
   children,
@@ -175,36 +196,113 @@ export function ErpShell({
   const pathname = usePathname();
   const router = useRouter();
   const active = pathname.split("/")[2] || "dashboard";
+  const activeTitle = navigation
+    .flatMap((g) => g.items)
+    .find((i) => i.id === active)?.label;
+  useEffect(() => {
+    document.title = `${activeTitle || "Ажлын орчин"} · BB Dental`;
+  }, [activeTitle]);
   const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const [search, setSearch] = useState("");
+  const mobile = useSyncExternalStore(
+    subscribeMobile,
+    () => window.matchMedia(mobileQuery).matches,
+    () => false,
+  );
+  const drawerOpen = mobile && open;
+  const sidebarRef = useRef<HTMLElement>(null);
+  const menuRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const sidebar = sidebarRef.current;
+    const previous = document.activeElement as HTMLElement | null;
+    const focusable = () =>
+      Array.from(
+        sidebar?.querySelectorAll<HTMLElement>(
+          'a[href], button:not(:disabled), [tabindex="0"]',
+        ) || [],
+      );
+    focusable()[0]?.focus();
+    const theme = document.querySelector<HTMLElement>(".theme-switcher");
+    const previousInert = theme?.inert;
+    if (theme) theme.inert = true;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setOpen(false);
+      }
+      if (event.key !== "Tab") return;
+      const list = focusable();
+      const first = list[0];
+      const last = list.at(-1);
+      if (
+        event.shiftKey &&
+        (document.activeElement === first ||
+          !sidebar?.contains(document.activeElement))
+      ) {
+        event.preventDefault();
+        last?.focus();
+      }
+      if (
+        !event.shiftKey &&
+        (document.activeElement === last ||
+          !sidebar?.contains(document.activeElement))
+      ) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+      if (theme) theme.inert = previousInert || false;
+      if (previous?.isConnected) previous.focus();
+    };
+  }, [drawerOpen]);
   return (
     <UserContext.Provider value={user}>
-      <div className="erp-shell">
-        {open && (
+      <div className={`erp-shell${collapsed ? " sidebar-collapsed" : ""}`}>
+        <a href="#erp-main-content" className="skip-link" inert={drawerOpen}>
+          Үндсэн агуулга руу очих
+        </a>
+        {drawerOpen && (
           <button
             className="sidebar-shade"
+            tabIndex={-1}
             aria-label="Цэс хаах"
             onClick={() => setOpen(false)}
           />
         )}
-        <aside className={`erp-sidebar ${open ? "open" : ""}`}>
+        <aside
+          ref={sidebarRef}
+          className={`erp-sidebar ${drawerOpen ? "open" : ""}`}
+          inert={mobile && !drawerOpen}
+          role={drawerOpen ? "dialog" : undefined}
+          aria-modal={drawerOpen || undefined}
+          aria-label="Ажлын цэс"
+        >
+          {drawerOpen && (
+            <button
+              type="button"
+              className="erp-secondary"
+              aria-label="Цэс хаах"
+              onClick={() => setOpen(false)}
+            >
+              <X size={20} />
+              Цэс хаах
+            </button>
+          )}
           <Link href="/erp" className="erp-brand">
             <ClinicLogo alt="" width={39} height={39} />
             <span>
               BB Dental<small>CLINIC WORKSPACE</small>
             </span>
           </Link>
-          <div className="clinic-card">
-            <div className="clinic-avatar">
-              <ClinicLogo alt="" width={34} height={34} />
-            </div>
-            <span>
-              <strong>BB Dental Clinic</strong>
-              <small>Эмнэлгийн удирдлага</small>
-            </span>
-            <ChevronRight size={15} />
-          </div>
-          <nav aria-label="Ажлын цэс">
+          <nav id="erp-navigation" aria-label="Ажлын цэс">
             {navigation.map((group) => {
               const items = group.items.filter((i) =>
                 i.roles.includes(user.role),
@@ -217,12 +315,14 @@ export function ErpShell({
                       <Link
                         key={i.id}
                         href={i.id === "dashboard" ? "/erp" : `/erp/${i.id}`}
+                        aria-label={i.label}
+                        title={collapsed ? i.label : undefined}
                         aria-current={active === i.id ? "page" : undefined}
                         className={active === i.id ? "active" : ""}
                         onClick={() => setOpen(false)}
                       >
                         <i.icon size={19} />
-                        {i.label}
+                        <span className="nav-label">{i.label}</span>
                         {active === i.id && <span className="nav-active-dot" />}
                       </Link>
                     ))}
@@ -232,19 +332,42 @@ export function ErpShell({
             })}
           </nav>
           <div className="sidebar-bottom">
+            <div className="sidebar-user">
+              <span className="user-avatar">
+                <UserAvatar imageUrl={user.imageUrl} name={user.name} />
+              </span>
+              <span>
+                <strong>{user.name}</strong>
+                <small>{roleNames[user.role]}</small>
+              </span>
+            </div>
             <Link href="/" target="_blank">
               Эмнэлгийн вебсайт <ArrowUpRight size={16} />
             </Link>
-            <span>
-              <CircleHelp size={16} /> Дотоод ажлын орчин
-            </span>
           </div>
         </aside>
-        <div className="erp-main">
+        <div className="erp-main" inert={drawerOpen}>
           <header className="erp-topbar">
             <button
+              className="erp-collapse-menu"
+              type="button"
+              aria-label={collapsed ? "Цэс дэлгэх" : "Цэс хураах"}
+              aria-expanded={!collapsed}
+              aria-controls="erp-navigation"
+              onClick={() => setCollapsed((value) => !value)}
+            >
+              {collapsed ? (
+                <PanelLeftOpen size={19} />
+              ) : (
+                <PanelLeftClose size={19} />
+              )}
+            </button>
+            <button
               className="erp-mobile-menu"
-              aria-label="Цэс нээх"
+              ref={menuRef}
+              aria-label={drawerOpen ? "Цэс хаах" : "Цэс нээх"}
+              aria-expanded={drawerOpen}
+              aria-controls="erp-navigation"
               onClick={() => setOpen(!open)}
             >
               {open ? <X /> : <Menu />}
@@ -283,7 +406,7 @@ export function ErpShell({
                   aria-label="Миний профайл засах"
                   title="Миний профайл"
                 >
-                  {user.name.slice(0, 1)}
+                  <UserAvatar imageUrl={user.imageUrl} name={user.name} />
                 </Link>
               ) : (
                 <span className="user-avatar">{user.name.slice(0, 1)}</span>
@@ -297,14 +420,17 @@ export function ErpShell({
                 title="Гарах"
                 onClick={async () => {
                   await fetch("/api/auth/logout", { method: "POST" });
-                  window.location.assign("/login");
+                  router.push("/login");
+                  router.refresh();
                 }}
               >
                 <LogOut size={18} />
               </button>
             </div>
           </header>
-          <div className="erp-content">{children}</div>
+          <main id="erp-main-content" className="erp-content" tabIndex={-1}>
+            {children}
+          </main>
         </div>
       </div>
     </UserContext.Provider>
