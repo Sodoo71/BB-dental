@@ -15,6 +15,16 @@ Production: `APP_URL=https://...` тохируулна → `bun run db:migrate` 
 
 Supabase холболтгүй үед үндсэн нүүр хуудас, нэвтрэх форм харагдана. Өгөгдөл шаарддаг API нь тохиргоо хийгдээгүйг 503 төлөвөөр мэдэгдэнэ. Зохиомол эсвэл localStorage-д хадгалсан өгөгдөлд автоматаар шилжихгүй.
 
+## Cloudflare Workers deploy
+
+`wrangler.jsonc` дахь Worker-ийн `name` болон `WORKER_SELF_REFERENCE.service` хоёулаа `bb-dental` байна. Worker-ийн нэрийг соливол хоёуланг нь зэрэг шинэчилнэ. `package.json` дахь `bbdentalv2` нь npm төслийн нэр бөгөөд Worker-ийн нэрээс тусдаа.
+
+Cloudflare Workers Builds дээр одоогийн `bun run build` build command, `npx wrangler deploy` deploy command-ийг ашиглаж болно. Wrangler-ийн build hook нь `bun run build:cloudflare` ажиллуулж `.open-next/worker.js` болон assets-ийг бэлдэнэ. Давхар Next.js build хийхээс зайлсхийх бол Dashboard-ийн Build command-ийг хоосон үлдээгээд Deploy command-ийг `bun run deploy` болгоно. Локал шалгалт: `bun run build:cloudflare`; нийтлэх: `bun run deploy`.
+
+Runtime утгуудыг `bb-dental` Worker-ийн **Settings → Variables and Secrets** хэсэгт тохируулна. `keep_vars: true` нь Dashboard-д оруулсан хувьсагчдыг deploy үед хадгална. `DATABASE_URL`, `CLOUDINARY_URL`, `TELEGRAM_BOT_TOKEN` болон бусад нууц утгыг **Secret** төрлөөр хадгалж, репод оруулахгүй. Логт ил гарсан түлхүүрүүдийг сольж, шинэ утгаар шинэчилнэ. Build variables болон Worker-ийн runtime secrets нь тусдаа тохиргоо.
+
+Энэ тохиргоо нэмэлт R2 bucket шаардахгүй. ISR эсвэл shared incremental cache шаардлагатай бол OpenNext-ийн R2 cache-ийг тусад нь тохируулна: https://opennext.js.org/cloudflare/caching.
+
 ## Эрх
 
 | Модуль | Админ | Эмч | Ресепшн |
