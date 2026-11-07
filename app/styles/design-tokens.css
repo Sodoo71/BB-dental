@@ -1,20 +1,20 @@
-/* Extracted from the existing BB Dental v2 presentation. */
+/* Shared BB Dental identity: white, deep teal and restrained mint accents. */
 :root {
   color-scheme: light;
-  --brand: #007779;
-  --brand-dark: #005f62;
-  --accent: #85ded3;
+  --brand: #007b80;
+  --brand-dark: #034b50;
+  --accent: #a6f3e5;
   --teal: var(--brand);
   --deep: var(--brand-dark);
-  --ink: #183d3e;
-  --muted: #5c7778;
-  --background: #f6fbfa;
+  --ink: #073e43;
+  --muted: #587174;
+  --background: #f8fbfa;
   --foreground: var(--ink);
   --surface: #fff;
-  --soft-surface: #f1f9f6;
-  --line: #dcebea;
+  --soft-surface: #edf7f4;
+  --line: #dbe8e5;
   --font-body: "Inter", system-ui, sans-serif;
-  --font-heading: "Merriweather", Georgia, serif;
+  --font-heading: "Inter", system-ui, sans-serif;
   --font-sans: var(--font-body);
   --font-serif: var(--font-heading);
   --text-xs: 12px;
@@ -32,8 +32,8 @@
   --space-6: 24px;
   --space-8: 32px;
   --space-12: 48px;
-  --radius-control: 10px;
-  --radius-card: 16px;
+  --radius-control: 12px;
+  --radius-card: 20px;
   --radius-pill: 999px;
   --shadow-card: 0 2px 8px #00777904;
   --shadow-dialog: 0 25px 100px #073a4633;

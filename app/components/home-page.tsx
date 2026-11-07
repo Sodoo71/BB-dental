@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import PublicClinic from "./public-clinic";
+import HomeCatalog from "./home-catalog";
+import Link from "next/link";
 import Hero from "./home/Hero";
 import { ClinicLogo } from "./clinic-branding";
 
@@ -75,9 +76,9 @@ export default function HomePage() {
             <a href="#doctors" onClick={() => setMenuOpen(false)}>
               Эмч нар
             </a>
-            <a href="#booking" onClick={() => setMenuOpen(false)}>
+            <Link href="/booking" onClick={() => setMenuOpen(false)}>
               Цаг захиалга
-            </a>
+            </Link>
             <a href="#contact" onClick={() => setMenuOpen(false)}>
               Холбоо барих
             </a>
@@ -93,15 +94,15 @@ export default function HomePage() {
               <Icon name="phone" />
               <span>+976 {contactPhone}</span>
             </a>
-            <a href="#booking" className="button header-book">
+            <Link href="/booking" className="button header-book">
               Цаг авах
-            </a>
+            </Link>
           </div>
         </div>
       </header>
       <main>
         <Hero clinicName={clinic.clinicName} />
-        <PublicClinic onClinic={setClinic} />
+        <HomeCatalog onClinic={setClinic} />
       </main>
       <footer className="site-footer" id="contact">
         <div className="footer-inner">
@@ -142,9 +143,9 @@ export default function HomePage() {
             </div>
             <div>
               <h2>{clinic.footerBookingTitle || "Онлайн цаг захиалга"}</h2>
-              <a className="button footer-book" href="#booking">
+              <Link className="button footer-book" href="/booking">
                 {clinic.footerBookingLabel || "Одоо цаг авах"}
-              </a>
+              </Link>
             </div>
           </div>
           {(clinic.facebookUrl || clinic.instagramUrl) && (

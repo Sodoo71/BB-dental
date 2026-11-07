@@ -9,6 +9,7 @@ import "./styles/design-tokens.css";
 import "./globals.css";
 import "./erp/erp.css";
 import "./v2-theme.css";
+import "./styles/bloom.css";
 import ThemeToggle from "./components/theme-toggle";
 import { ClinicBrandingProvider } from "./components/clinic-branding";
 

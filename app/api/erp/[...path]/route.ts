@@ -1,5 +1,7 @@
+import { schedulePolicy, scheduleLockDays } from "@/lib/schedule-policy";
 import {
   saveLeave,
+  removeLeave,
   saveWeek,
   reviewLeave,
   weekSchema,
@@ -47,7 +49,7 @@ import {
   minutes,
 } from "@/lib/domain";
 import {
-  bookingSchema,
+  staffBookingSchema,
   createBooking,
   doctorLock,
   availability,
@@ -85,6 +87,8 @@ export async function GET(req: Request, ctx: Ctx) {
   return safe(async () => {
     const user = await requireUser();
     const [resource, id] = (await ctx.params).path;
+    if (user.role === "RECEPTION" && !["options", "availability", "appointments", "patients"].includes(resource))
+      throw new ApiError(403, "Ресепшний ажлын хэсгийг ашиглана уу.");
     const q = new URL(req.url).searchParams;
     const search = (q.get("q") || "").slice(0, 100);
     const page = Math.max(1, Math.min(10000, Number(q.get("page")) || 1));
@@ -209,32 +213,64 @@ export async function GET(req: Request, ctx: Ctx) {
         to = dateSchema.parse(q.get("to") || from);
       if (from > to || Date.parse(to) - Date.parse(from) > 31 * 86400000)
         throw new ApiError(400, "31 хоногийн хугацаа сонгоно уу.");
-      const scope =
-        user.role === "DOCTOR" ? { id: user.doctor?.id || "none" } : {};
-      return json({
-        doctors: await db.doctor.findMany({
-          where: { active: true, ...scope },
-          select: {
-            id: true,
-            name: true,
-            specialty: true,
-            schedules: true,
-            leaves: { where: { date: { gte: from, lte: to } } },
-            appointments: {
-              where: {
-                date: { gte: from, lte: to },
-                status: { notIn: ["CANCELLED", "NO_SHOW"] },
-              },
-              select: {
-                id: true,
-                date: true,
-                startTime: true,
-                endTime: true,
-                status: true,
-              },
+      const setting = await db.setting.findUnique({
+        where: { key: "scheduleLockDays" },
+      });
+      const doctors = await db.doctor.findMany({
+        where: { active: true },
+        orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+        select: {
+          id: true,
+          name: true,
+          specialty: true,
+          schedules: true,
+          leaves: {
+            where: {
+              date: { gte: from, lte: to },
+              ...(user.role === "DOCTOR"
+                ? {
+                    OR: [
+                      { status: "APPROVED" },
+                      { doctorId: user.doctor?.id || "none" },
+                    ],
+                  }
+                : {}),
             },
           },
-        }),
+          appointments: {
+            where: {
+              date: { gte: from, lte: to },
+              status: { notIn: ["CANCELLED", "NO_SHOW"] },
+              ...(user.role === "DOCTOR"
+                ? { doctorId: user.doctor?.id || "none" }
+                : {}),
+            },
+            select: {
+              id: true,
+              date: true,
+              startTime: true,
+              endTime: true,
+              status: true,
+            },
+          },
+        },
+      });
+      return json({
+        policy: schedulePolicy(scheduleLockDays(setting?.value), today()),
+        doctors: doctors.map((doctor) => ({
+          ...doctor,
+          leaves: doctor.leaves.map((leave) =>
+            user.role === "DOCTOR" && doctor.id !== user.doctor?.id
+              ? {
+                  ...leave,
+                  reason: "",
+                  reviewedById: null,
+                  reviewedAt: null,
+                  replacesId: null,
+                }
+              : leave,
+          ),
+        })),
         nurses: await db.nurseShift.findMany({
           where: { date: { gte: from, lte: to } },
           orderBy: [{ date: "asc" }, { startTime: "asc" }],
@@ -349,6 +385,13 @@ export async function GET(req: Request, ctx: Ctx) {
         }),
         total: await db.appointment.count({ where }),
       });
+    }
+    if (resource === "patients" && user.role === "RECEPTION") {
+      const select = { id: true, name: true, phone: true, birthDate: true, gender: true, guardianName: true, guardianPhone: true, address: true, allergies: true, active: true,
+        ...(id ? { appointments: { include: { doctor: { select: { name: true } }, service: { select: { name: true } } }, orderBy: { date: "desc" as const } }, payments: { orderBy: { createdAt: "desc" as const } } } : {}) };
+      if (id) return json(await db.patient.findUniqueOrThrow({ where: { id }, select }));
+      const where: Prisma.PatientWhereInput = { active: true, ...(search ? { OR: [{ name: { contains: search, mode: "insensitive" } }, { phone: { contains: search } }, { id: { contains: search } }] } : {}) };
+      return json({ items: await db.patient.findMany({ where, select, take: 50, skip, orderBy: { name: "asc" } }), total: await db.patient.count({ where }) });
     }
     if (resource === "patients") {
       if (id) {
@@ -467,6 +510,7 @@ export async function GET(req: Request, ctx: Ctx) {
           take: 200,
         }),
       });
+    if (resource === "treatments" && user.role === "RECEPTION") throw new ApiError(403, "Эмнэлзүйн мэдээлэлд хандах эрхгүй.");
     if (resource === "treatments")
       return json({
         items: await db.treatment.findMany({
@@ -616,9 +660,11 @@ export async function POST(req: Request, ctx: Ctx) {
     sameOrigin(req);
     const user = await requireUser();
     const [resource, id] = (await ctx.params).path;
+    if (user.role === "RECEPTION" && !["appointments", "reschedule", "patients"].includes(resource))
+      throw new ApiError(403, "Энэ үйлдлийг хийх эрхгүй.");
     const input = await body(req);
     if (resource === "schedule-week") {
-      permit(user, ["ADMIN", "DOCTOR"]);
+      permit(user, ["ADMIN"]);
       const data = weekSchema.parse(input);
       ownDoctor(user, data.doctorId);
       return json(await saveWeek(data, user.id));
@@ -980,8 +1026,10 @@ export async function POST(req: Request, ctx: Ctx) {
           serviceId: z.string().uuid(),
           date: dateSchema,
           startTime: timeSchema,
+          force: z.boolean().default(false),
         })
         .parse(input);
+      const { force, ...details } = data;
       const previous = await db.appointment.findUniqueOrThrow({
         where: { id },
       });
@@ -998,6 +1046,8 @@ export async function POST(req: Request, ctx: Ctx) {
             409,
             "Захиалга өөрчлөгдсөн байна. Дахин ачаална уу.",
           );
+        if (user.role === "RECEPTION" && await tx.queueEntry.findUnique({ where: { appointmentId: id } }))
+          throw new ApiError(409, "Ирсэн өвчтөний цагийг шилжүүлэхгүй. Давтан цаг үүсгэнэ үү.");
         if (["COMPLETED", "CANCELLED", "NO_SHOW"].includes(current.status))
           throw new ApiError(
             400,
@@ -1005,7 +1055,7 @@ export async function POST(req: Request, ctx: Ctx) {
           );
         if (
           !(
-            await availability(data.doctorId, data.serviceId, data.date, tx, id)
+            await availability(data.doctorId, data.serviceId, data.date, tx, id, data.startTime, force)
           ).includes(data.startTime)
         )
           throw new ApiError(
@@ -1015,24 +1065,27 @@ export async function POST(req: Request, ctx: Ctx) {
         const service = await tx.service.findUniqueOrThrow({
           where: { id: data.serviceId },
         });
-        return tx.appointment.update({
+        const appointment = await tx.appointment.update({
           where: { id },
           data: {
-            ...data,
+            ...details,
             endTime: clock(minutes(data.startTime) + service.duration),
             status: "CONFIRMED",
           },
           include: { doctor: true, service: true, patient: true },
         });
+        if (force) await tx.auditLog.create({ data: { actorId: user.id, action: "APPOINTMENT_SCHEDULE_OVERRIDE", entity: "appointments", entityId: id } });
+        return appointment;
       });
       await notifyBooking(moved);
       result = moved;
     } else if (resource === "appointments") {
       permit(user, staff);
-      result = await createBooking(bookingSchema.parse(input), user.id);
+      const data = staffBookingSchema.parse(input);
+      result = await createBooking(data, user.id, undefined, { allowScheduleOverride: data.force });
     } else if (resource === "patients") {
       permit(user, staff);
-      result = await db.patient.create({ data: v.patientSchema.parse(input) });
+      result = await db.patient.create({ data: user.role === "RECEPTION" ? v.patientSchema.omit({ medicalHistory: true, allergies: true }).parse(input) : v.patientSchema.parse(input) });
     } else if (resource === "services") {
       permit(user, ["ADMIN"]);
       const data = v.serviceSchema.parse(input);
@@ -1079,7 +1132,7 @@ export async function POST(req: Request, ctx: Ctx) {
         return u;
       });
     } else if (resource === "schedules") {
-      permit(user, ["ADMIN", "DOCTOR"]);
+      permit(user, ["ADMIN"]);
       const data = v.scheduleSchema.parse(input);
       ownDoctor(user, data.doctorId);
       result = await db.$transaction(async (tx) => {
@@ -1138,6 +1191,7 @@ export async function POST(req: Request, ctx: Ctx) {
       }
       result = await db.treatment.create({ data });
     } else if (resource === "payments") {
+      if (user.role === "RECEPTION") throw new ApiError(403, "Касс / POS хэсгээр нэхэмжлэхийн төлбөр бүртгэнэ үү.");
       permit(user, staff);
       const data = v.paymentSchema.parse(input);
       if (data.appointmentId) {
@@ -1201,6 +1255,8 @@ export async function PATCH(req: Request, ctx: Ctx) {
     sameOrigin(req);
     const user = await requireUser();
     const [resource, id] = (await ctx.params).path;
+    if (user.role === "RECEPTION" && !["appointments", "patients"].includes(resource))
+      throw new ApiError(403, "Энэ үйлдлийг хийх эрхгүй.");
     if (!id) throw new ApiError(400, "ID шаардлагатай.");
     const input = await body(req);
     if (resource === "services") {
@@ -1242,7 +1298,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
       permit(user, staff);
       await db.patient.update({
         where: { id },
-        data: v.patientSchema.parse(input),
+        data: user.role === "RECEPTION" ? v.patientSchema.omit({ medicalHistory: true, allergies: true }).parse(input) : v.patientSchema.parse(input),
       });
     } else if (resource === "inventory") {
       permit(user, ["ADMIN"]);
@@ -1315,7 +1371,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
         await tx.session.deleteMany({ where: { userId: id } });
       });
     } else if (resource === "schedules") {
-      permit(user, ["ADMIN", "DOCTOR"]);
+      permit(user, ["ADMIN"]);
       const data = v.scheduleSchema.parse(input);
       ownDoctor(user, data.doctorId);
       await db.$transaction(async (tx) => {
@@ -1370,6 +1426,10 @@ export async function PATCH(req: Request, ctx: Ctx) {
         });
         await doctorLock(tx, current.doctorId);
         const a = await tx.appointment.findUniqueOrThrow({ where: { id } });
+        if (user.role === "RECEPTION" && data.status !== a.status) {
+          const transitions: Record<string, string[]> = { PENDING: ["CONFIRMED", "CANCELLED", "NO_SHOW"], CONFIRMED: ["CANCELLED", "NO_SHOW"], ARRIVED: [], COMPLETED: [], CANCELLED: [], NO_SHOW: [] };
+          if (!transitions[a.status].includes(data.status)) throw new ApiError(409, "Захиалгын төлөв шилжих боломжгүй. Ирэлтийг check-in хэсгээр бүртгэнэ үү.");
+        }
         if (user.role === "DOCTOR" && a.doctorId !== user.doctor?.id)
           throw new ApiError(403, "Өөр эмчийн захиалгыг өөрчлөх эрхгүй.");
         if (
@@ -1438,7 +1498,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
         data: v.expenseSchema.parse(input),
       });
     } else throw new ApiError(404, "Модуль олдсонгүй.");
-    await audit(user, "UPDATE", resource, id);
+    await audit(user, user.role === "RECEPTION" && resource === "appointments" ? `APPOINTMENT_${String(input.status)}` : "UPDATE", resource, id);
     return json({ ok: true });
   });
 }
@@ -1446,6 +1506,7 @@ export async function DELETE(req: Request, ctx: Ctx) {
   return safe(async () => {
     sameOrigin(req);
     const user = await requireUser();
+    if (user.role === "RECEPTION") throw new ApiError(403, "Ресепшн бүртгэлийг устгах эрхгүй.");
     const [resource, id] = (await ctx.params).path;
     if (resource === "nurse-shifts") {
       permit(user, ["ADMIN"]);
@@ -1454,6 +1515,12 @@ export async function DELETE(req: Request, ctx: Ctx) {
       return json({ ok: true });
     }
     if (!id) throw new ApiError(400, "ID шаардлагатай.");
+    if (resource === "leaves") {
+      permit(user, ["ADMIN", "DOCTOR"]);
+      const result = await removeLeave(id, user);
+      await audit(user, "DELETE_REQUEST", "leaves", id);
+      return json(result);
+    }
     if (resource === "schedules" || resource === "leaves") {
       permit(user, ["ADMIN", "DOCTOR"]);
       await db.$transaction(async (tx) => {
@@ -1464,6 +1531,7 @@ export async function DELETE(req: Request, ctx: Ctx) {
         ownDoctor(user, item.doctorId);
         await doctorLock(tx, item.doctorId);
         if (resource === "schedules") {
+          permit(user, ["ADMIN"]);
           const weekday = (item as { weekday: number }).weekday;
           const appts = await tx.appointment.findMany({
             where: {
@@ -1482,12 +1550,6 @@ export async function DELETE(req: Request, ctx: Ctx) {
               "Идэвхтэй захиалгатай хуваарийг устгах боломжгүй.",
             );
           await tx.schedule.delete({ where: { id } });
-        } else {
-          const leave = await tx.leave.findUniqueOrThrow({ where: { id } });
-          if (user.role === "DOCTOR" && leave.status === "APPROVED")
-            throw new ApiError(403, "Батлагдсан чөлөөг админ цуцална.");
-          await tx.leave.delete({ where: { id } });
-          await ensureWorkCoverage(tx, item.doctorId, [leave.date]);
         }
       });
     } else {

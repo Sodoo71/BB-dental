@@ -35,6 +35,8 @@ export async function GET(
   return safe(async () => {
     const user = await requireUser();
     const { kind } = await ctx.params;
+    if (user.role === "RECEPTION")
+      throw new ApiError(403, "Ресепшний баримт, тайлангийн хэсгийг ашиглана уу.");
     const q = new URL(req.url).searchParams;
     if (kind === "data") {
       if (user.role !== "ADMIN")

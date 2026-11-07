@@ -38,6 +38,9 @@ export type Entity = {
   telegramChatId?: string;
   userId?: string;
   birthDate?: string;
+  contactName?: string;
+  guardianName?: string;
+  guardianPhone?: string;
   gender?: string;
   address?: string;
   allergies?: string;
@@ -55,6 +58,7 @@ export type Entity = {
   weekday?: number;
   kind?: string;
   reason?: string;
+  replacesId?: string | null;
   diagnosis?: string;
   procedure?: string;
   tooth?: number;
@@ -259,6 +263,7 @@ function PatientPicker({
         aria-describedby={describedBy}
         aria-invalid={invalid || undefined}
         value={value}
+        onInput={(e) => onChange(e.currentTarget.value)}
         onChange={(e) => onChange(e.target.value)}
       >
         <option value="">Өвчтөн сонгох</option>
@@ -275,21 +280,19 @@ function PatientPicker({
     </div>
   );
 }
-type FormGuard = { busy: boolean; dirty: boolean };
+type FormGuard = { busy: boolean };
 const ModalGuard = createContext<{
   update: (id: string, next: FormGuard | null) => void;
   requestClose: () => void;
 } | null>(null);
-export function useModalGuard(busy: boolean, snapshot: unknown) {
+export function useModalGuard(busy: boolean) {
   const id = useId();
   const context = useContext(ModalGuard);
   const update = context?.update;
-  const original = useRef(JSON.stringify(snapshot));
-  const serialized = JSON.stringify(snapshot);
   useEffect(() => {
-    update?.(id, { busy, dirty: serialized !== original.current });
+    update?.(id, { busy });
     return () => update?.(id, null);
-  }, [update, id, busy, serialized]);
+  }, [update, id, busy]);
   return context?.requestClose;
 }
 export function Modal({
@@ -305,7 +308,6 @@ export function Modal({
   const [guards, setGuards] = useState<Record<string, FormGuard>>({});
   const guard = {
     busy: Object.values(guards).some((g) => g.busy),
-    dirty: Object.values(guards).some((g) => g.dirty),
   };
   const update = useCallback(
     (id: string, next: FormGuard | null) =>
@@ -322,10 +324,6 @@ export function Modal({
   const requestClose = () => {
     if (guard.busy) {
       setDismiss("Хадгалж дуустал түр хүлээнэ үү.");
-      return;
-    }
-    if (guard.dirty) {
-      setDismiss("Хадгалаагүй өөрчлөлтийг орхих уу?");
       return;
     }
     onClose();
@@ -358,21 +356,9 @@ export function Modal({
           <X size={20} />
         </button>
       </div>
-      {dismiss && (
+      {dismiss && guard.busy && (
         <div className="modal-dismiss" role="alert">
           <p>{dismiss}</p>
-          <button
-            type="button"
-            className="erp-secondary"
-            onClick={() => setDismiss("")}
-          >
-            Үргэлжлүүлэн засах
-          </button>
-          {!guard.busy && (
-            <button type="button" className="erp-secondary" onClick={onClose}>
-              Өөрчлөлтийг орхих
-            </button>
-          )}
         </div>
       )}
       <ModalGuard.Provider value={{ update, requestClose }}>
@@ -514,6 +500,9 @@ export function EntityForm({
       ]),
     ),
   );
+  function setFieldValue(key: string, value: unknown) {
+    setValues((current) => ({ ...current, [key]: value }));
+  }
   const formId = useId();
   const guard = useContext(ModalGuard);
   const errorRef = useRef<HTMLDivElement>(null);
@@ -521,7 +510,7 @@ export function EntityForm({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
-  useModalGuard(busy || uploading, values);
+  useModalGuard(busy || uploading);
   useEffect(() => {
     if (error) errorRef.current?.focus();
   }, [error]);
@@ -565,10 +554,19 @@ export function EntityForm({
           [target.id]: target.validationMessage,
         }));
       }}
-      onInput={(e) => {
-        const target = e.target as HTMLInputElement;
-        if (target.validity?.valid)
-          setInvalid((old) => ({ ...old, [target.id]: "" }));
+      // Native selects emit input before change. Rerendering during input
+      // restores the old controlled value before their change handler reads it.
+      onChange={(e) => {
+        const target = e.target;
+        if (
+          (target instanceof HTMLInputElement ||
+            target instanceof HTMLSelectElement ||
+            target instanceof HTMLTextAreaElement) &&
+          target.validity.valid
+        ) {
+          const id = target.id;
+          setInvalid((old) => (old[id] ? { ...old, [id]: "" } : old));
+        }
       }}
     >
       <fieldset disabled={busy || uploading} className="form-fields">
@@ -614,7 +612,7 @@ export function EntityForm({
                 {f.type === "teeth" ? (
                   <ToothPicker
                     value={String(values[f.key] || "")}
-                    onChange={(v) => setValues({ ...values, [f.key]: v })}
+                    onChange={(v) => setFieldValue(f.key, v)}
                   />
                 ) : f.type === "multiselect" ? (
                   <div
@@ -648,9 +646,7 @@ export function EntityForm({
                     value={String(values[f.key] || "")}
                     purpose={f.imagePurpose}
                     onBusyChange={setUploading}
-                    onChange={(value) =>
-                      setValues({ ...values, [f.key]: value })
-                    }
+                    onChange={(value) => setFieldValue(f.key, value)}
                   />
                 ) : f.type === "patient" ? (
                   <PatientPicker
@@ -659,16 +655,15 @@ export function EntityForm({
                     describedBy={control["aria-describedby"]}
                     invalid={control["aria-invalid"]}
                     value={String(values[f.key] || "")}
-                    onChange={(v) => setValues({ ...values, [f.key]: v })}
+                    onChange={(v) => setFieldValue(f.key, v)}
                   />
                 ) : f.type === "select" ? (
                   <select
                     {...control}
                     required={f.required}
                     value={String(values[f.key])}
-                    onChange={(e) =>
-                      setValues({ ...values, [f.key]: e.target.value })
-                    }
+                    onInput={(e) => setFieldValue(f.key, e.currentTarget.value)}
+                    onChange={(e) => setFieldValue(f.key, e.target.value)}
                   >
                     <option value="">Сонгох</option>
                     {f.options?.map((o) => (
@@ -684,18 +679,14 @@ export function EntityForm({
                     required={f.required}
                     maxLength={f.maxLength ?? 30000}
                     value={String(values[f.key])}
-                    onChange={(e) =>
-                      setValues({ ...values, [f.key]: e.target.value })
-                    }
+                    onChange={(e) => setFieldValue(f.key, e.target.value)}
                   />
                 ) : f.type === "checkbox" ? (
                   <input
                     {...control}
                     type="checkbox"
                     checked={Boolean(values[f.key])}
-                    onChange={(e) =>
-                      setValues({ ...values, [f.key]: e.target.checked })
-                    }
+                    onChange={(e) => setFieldValue(f.key, e.target.checked)}
                   />
                 ) : f.type === "password" ? (
                   <PasswordInput
@@ -704,9 +695,7 @@ export function EntityForm({
                     minLength={8}
                     maxLength={72}
                     value={String(values[f.key] ?? "")}
-                    onChange={(e) =>
-                      setValues({ ...values, [f.key]: e.target.value })
-                    }
+                    onChange={(e) => setFieldValue(f.key, e.target.value)}
                     autoComplete="new-password"
                     visibilityLabel={f.label}
                   />
@@ -720,9 +709,7 @@ export function EntityForm({
                     minLength={f.minLength}
                     maxLength={f.maxLength ?? 1000}
                     value={String(values[f.key] ?? "")}
-                    onChange={(e) =>
-                      setValues({ ...values, [f.key]: e.target.value })
-                    }
+                    onChange={(e) => setFieldValue(f.key, e.target.value)}
                     autoComplete="off"
                   />
                 )}{" "}

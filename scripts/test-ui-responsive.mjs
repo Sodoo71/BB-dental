@@ -214,7 +214,7 @@ const root=createRoot(document.getElementById('audit-root'));window.__auditRole=
 const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Ulaanbaatar',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const doctor={id:'qa-doctor',name:'Содбилэг',specialty:'Шүдний эмч',schedules:Array.from({length:7},(_,weekday)=>({id:'s'+weekday,weekday,startTime:'09:00',endTime:'18:00'})),leaves:[],appointments:[]};
 const entity={id:'qa-record',name:'Аудитын бүртгэл',phone:'99112233',email:'audit@example.test',role:'DOCTOR',active:true,approvalStatus:'APPROVED',doctorId:'qa-doctor',patientId:'qa-patient',serviceId:'qa-service',date,startTime:'10:00',endTime:'10:30',weekday:1,kind:'BLOCKED_RANGE',status:'PENDING',amount:45000,price:45000,duration:30,quantity:5,minimum:2,sku:'QA-01',unit:'ширхэг',reason:'Аудитын шалтгаан',title:'Баримтын гарчиг',type:'CONSENT',createdAt:new Date().toISOString(),entity:'patients',entityId:'qa-patient',actorId:'qa-user',patient:{id:'qa-patient',name:'Аудитын өвчтөн',phone:'99112233'},doctor:{id:'qa-doctor',name:'Содбилэг'},service:{id:'qa-service',name:'Шүдний үзлэг'},notes:[],treatments:[],appointments:[],payments:[],transfers:[]};
-window.__auditRequests=[];window.fetch=async(input,init={})=>{const path=String(input);if(init.method==='PATCH'&&path.includes('/settings/logoUrl')&&window.__auditFailPersist){await new Promise(r=>setTimeout(r,700));return new Response(JSON.stringify({error:'Persistence failed fixture'}),{status:503});}window.__auditRequests.push({path,method:init.method||'GET',body:init.body});if(path.includes('q=slow'))await new Promise(r=>setTimeout(r,900));if(init.method&&init.method!=='GET'&&window.__auditDelaySave)await new Promise(r=>setTimeout(r,900));if(init.method&&init.method!=='GET'&&window.__auditMutationError)return new Response(JSON.stringify({error:'Mutation failed fixture'}),{status:503});if(window.__auditMode==='error')return new Response(JSON.stringify({error:'Аудитын туршилтын холболтын алдаа'}),{status:503});if(window.__auditMode==='loading')return new Promise(()=>{});const empty=window.__auditMode==='empty';const data=path==='/api/upload'?{url:'/images/default-logo.png'}:path.includes('/branding')?{logoUrl:''}:path.includes('/options')?{doctors:empty?[]:[doctor],services:empty?[]:[{id:'qa-service',name:'Шүдний үзлэг',price:45000,duration:30}]}:path.includes('/roster')?{doctors:empty?[]:[doctor],nurses:[]}:path.includes('/telegram-settings')?{configured:false,source:'none',booking:true,transfer:true,recovery:true,canStoreToken:false}:path.includes('/settings')?{items:[{key:'clinicName',value:'BB Dental Clinic'}]}:path==='/api/profile'?{...entity,id:'qa-user',name:'Аудитын ажилтан',doctor,role:window.__auditRole}:path.includes('/patients/')?entity:path.includes('/reports')||path.includes('/dashboard')?{revenue:45000,expense:0,net:45000,appointmentCount:1,patientCount:1,statuses:{PENDING:1},methods:{CASH:45000},byService:[],byDoctor:[],monthly:[]}:path.includes('/availability')?{slots:['10:00']}: {items:empty?[]:[path.includes('q=fast')?{...entity,name:'Fast search result'}:path.includes('q=slow')?{...entity,name:'Slow search result'}:window.__auditMode==='long'?{...entity,name:'УртНэр'.repeat(80),title:'УртБаримт'.repeat(80)}:entity],total:empty?0:1};return new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json'}})};
+window.__auditRequests=[];window.fetch=async(input,init={})=>{const path=String(input);if(init.method==='PATCH'&&path.includes('/settings/logoUrl')&&window.__auditFailPersist){await new Promise(r=>setTimeout(r,700));return new Response(JSON.stringify({error:'Persistence failed fixture'}),{status:503});}window.__auditRequests.push({path,method:init.method||'GET',body:init.body});if(path.includes('q=slow'))await new Promise(r=>setTimeout(r,900));if(init.method&&init.method!=='GET'&&window.__auditDelaySave)await new Promise(r=>setTimeout(r,900));if(init.method&&init.method!=='GET'&&window.__auditMutationError)return new Response(JSON.stringify({error:'Mutation failed fixture'}),{status:503});if(window.__auditMode==='error')return new Response(JSON.stringify({error:'Аудитын туршилтын холболтын алдаа'}),{status:503});if(window.__auditMode==='loading')return new Promise(()=>{});const empty=window.__auditMode==='empty';const data=path==='/api/upload'?{url:'/images/default-logo.png'}:path.includes('/branding')?{logoUrl:''}:path.includes('/options')?{doctors:empty?[]:[doctor],services:empty?[]:[{id:'qa-service',name:'Шүдний үзлэг',price:45000,duration:30}]}:path.includes('/roster')?(window.__auditTeam||{doctors:empty?[]:[doctor],nurses:[]}):path.includes('/telegram-settings')?{configured:false,source:'none',booking:true,transfer:true,recovery:true,canStoreToken:false}:path.includes('/settings')?{items:[{key:'clinicName',value:'BB Dental Clinic'}]}:path==='/api/profile'?{...entity,id:'qa-user',name:'Аудитын ажилтан',doctor,role:window.__auditRole}:path.includes('/patients/')?entity:path.includes('/reports')||path.includes('/dashboard')?{revenue:45000,expense:0,net:45000,appointmentCount:1,patientCount:1,statuses:{PENDING:1},methods:{CASH:45000},byService:[],byDoctor:[],monthly:[]}:path.includes('/availability')?{slots:['10:00']}: {items:empty?[]:[path.includes('q=fast')?{...entity,name:'Fast search result'}:path.includes('q=slow')?{...entity,name:'Slow search result'}:window.__auditMode==='long'?{...entity,name:'УртНэр'.repeat(80),title:'УртБаримт'.repeat(80)}:entity],total:empty?0:1};return new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json'}})};
 window.__auditMount=role=>{window.__auditRole=role;root.render(<ClinicBrandingProvider key={role}><ErpShell user={{id:'qa-user',name:'Аудитын ажилтан',phone:'99112233',role,doctorId:role==='DOCTOR'?'qa-doctor':undefined}}><ErpWorkspace/></ErpShell></ClinicBrandingProvider>)};window.__auditMount('ADMIN');`;
   const bundle = await build({
     stdin: { contents: entry, resolveDir: repo, loader: "tsx" },
@@ -254,6 +254,231 @@ window.__auditMount=role=>{window.__auditRole=role;root.render(<ClinicBrandingPr
   await p.goto(base + "/__ui-fixture");
   await p.addStyleTag({ content: css });
   await p.addScriptTag({ content: bundle.outputFiles[0].text });
+  if (slice === "schedule") {
+    const date = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Ulaanbaatar",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+    const future = new Date(Date.parse(`${date}T12:00:00Z`) + 8 * 86400000)
+      .toISOString()
+      .slice(0, 10);
+    const next = new Date(Date.parse(`${date}T12:00:00Z`) + 9 * 86400000)
+      .toISOString()
+      .slice(0, 10);
+    await p.evaluate(
+      ({ date, future, next }) => {
+        const schedules = Array.from({ length: 7 }, (_, weekday) => ({
+          id: "s" + weekday,
+          weekday,
+          startTime: "09:00",
+          endTime: "18:00",
+        }));
+        window.__auditTeam = {
+          doctors: [
+            {
+              id: "qa-doctor",
+              name: "Миний эмч",
+              specialty: "Шүдний эмч",
+              schedules,
+              leaves: [
+                {
+                  id: "official-day",
+                  doctorId: "qa-doctor",
+                  date: future,
+                  startTime: "09:00",
+                  endTime: "18:00",
+                  kind: "SCHEDULE_OVERRIDE",
+                  status: "APPROVED",
+                  reason: "Official day",
+                },
+                {
+                  id: "pending-day",
+                  doctorId: "qa-doctor",
+                  date: next,
+                  startTime: "14:00",
+                  endTime: "18:00",
+                  kind: "SCHEDULE_OVERRIDE",
+                  status: "PENDING",
+                  reason: "Proposed day",
+                },
+              ],
+              appointments: [],
+            },
+            {
+              id: "colleague",
+              name: "Хамт ажиллах эмч",
+              specialty: "Гажиг засал",
+              schedules,
+              leaves: [],
+              appointments: [],
+            },
+          ],
+          nurses: [date, future].map((date, index) => ({
+            id: "nurse-" + index,
+            name: "Хамт ажиллах сувилагч",
+            date,
+            startTime: "09:00",
+            endTime: "18:00",
+          })),
+        };
+        window.__auditNavigate("/erp/schedules");
+        window.__auditMount("DOCTOR");
+      },
+      { date, future, next },
+    );
+    await expect(
+      p.getByRole("heading", { name: "Ажлын хуваарь", exact: true }),
+    ).toBeVisible();
+    await expect(
+      p.getByRole("button", { name: "Ажиллах цаг засах", exact: true }),
+    ).toBeDisabled();
+    await expect(p.locator(".roster-day-detail")).toContainText(
+      "Хамт ажиллах эмч",
+    );
+    await expect(p.locator(".roster-day-detail")).toContainText(
+      "Хамт ажиллах сувилагч",
+    );
+    await p.getByLabel("Хуваарийн сар").fill(future.slice(0, 7));
+    await p
+      .getByRole("button", { name: new RegExp("^" + future + ":") })
+      .click();
+    await expect(
+      p.getByRole("button", { name: "Ажиллах цаг засах", exact: true }),
+    ).toBeEnabled();
+    await p
+      .getByRole("button", { name: "Ажиллах цаг засах", exact: true })
+      .click();
+    const dialog = p.getByRole("dialog");
+    await dialog
+      .getByRole("button", { name: "14:00–18:00", exact: true })
+      .click();
+    await dialog
+      .getByRole("button", { name: "Хүсэлт илгээх", exact: true })
+      .click();
+    await expect(dialog).toHaveCount(0);
+    const edit = await p.evaluate(() =>
+      window.__auditRequests.findLast(
+        (r) =>
+          r.method === "PATCH" && r.path === "/api/erp/leaves/official-day",
+      ),
+    );
+    if (JSON.parse(edit.body).startTime !== "14:00")
+      throw Error("Schedule edit did not preserve selected time");
+    await expect(p.locator(".schedule-own-day")).toContainText("09:00–18:00");
+    await p
+      .getByRole("button", { name: "Хуваарь цуцлах", exact: true })
+      .click();
+    await p
+      .getByRole("button", { name: "Цуцлах хүсэлт баталгаажуулах" })
+      .click();
+    await expect(p.getByRole("dialog")).toHaveCount(0);
+    if (
+      !(await p.evaluate(() =>
+        window.__auditRequests.some(
+          (r) =>
+            r.method === "DELETE" && r.path === "/api/erp/leaves/official-day",
+        ),
+      ))
+    )
+      throw Error("Cancellation request missing");
+    for (const role of ["DOCTOR", "ADMIN", "RECEPTION"]) {
+      await p.evaluate((role) => {
+        window.__auditMount(role);
+        window.__auditNavigate("/erp/schedules");
+      }, role);
+      if (role === "RECEPTION") {
+        await expect(
+          p.getByRole("button", { name: "Хуваарь үүсгэх", exact: true }),
+        ).toHaveCount(0);
+        await expect(p.locator(".schedule-row-actions button")).toHaveCount(0);
+      }
+      for (const theme of ["light", "dark"]) {
+        await p.evaluate(
+          (theme) => (document.documentElement.dataset.theme = theme),
+          theme,
+        );
+        for (const width of [375, 1440]) {
+          await p.setViewportSize({ width, height: 1000 });
+          await expect(p.locator(".roster-days button").first()).toBeVisible();
+          const m = await p.evaluate(measure);
+          if (m.overflow)
+            throw Error(`Schedule overflow at ${width}px for ${role}`);
+          await p.screenshot({
+            path: `${output}/schedule-${role}-${theme}-${width}.png`,
+            fullPage: true,
+          });
+        }
+      }
+    }
+    await p.evaluate(() => window.__auditMount("ADMIN"));
+    await p.getByLabel("Хамгаалах хоног").fill("14");
+    await p.getByRole("button", { name: "Хугацаа хадгалах" }).click();
+    if (
+      !(await p.evaluate(() =>
+        window.__auditRequests.some(
+          (r) =>
+            r.method === "PATCH" &&
+            r.path === "/api/erp/settings/scheduleLockDays" &&
+            JSON.parse(r.body).value === "14",
+        ),
+      ))
+    )
+      throw Error("Admin policy update missing");
+    await p.getByRole("button", { name: "Батлах", exact: true }).click();
+    if (
+      !(await p.evaluate(() =>
+        window.__auditRequests.some(
+          (r) => r.path === "/api/erp/leave-review/pending-day",
+        ),
+      ))
+    )
+      throw Error("Admin review missing");
+    for (const section of ["dashboard", "services", "patients", "settings"]) {
+      await p.evaluate(
+        (section) => window.__auditNavigate("/erp/" + section),
+        section,
+      );
+      await expect(p.locator(".erp-content h1")).toHaveCount(1);
+      if ((await p.evaluate(measure)).overflow)
+        throw Error("Theme overflow on " + section);
+    }
+    if (results.errors.length) throw Error(results.errors.join("\n"));
+    for (const route of ["/", "/login", "/register", "/booking"]) {
+      for (const width of [375, 1440]) {
+        await p.setViewportSize({ width, height: 1000 });
+        await p.goto(base + route);
+        await p
+          .locator(
+            route === "/"
+              ? "#home"
+              : route === "/booking"
+                ? "#booking"
+                : ".login-form",
+          )
+          .waitFor();
+        for (const theme of ["light", "dark"]) {
+          await p.evaluate(
+            (theme) => (document.documentElement.dataset.theme = theme),
+            theme,
+          );
+          const m = await p.evaluate(measure);
+          if (m.overflow)
+            throw Error(`Public theme overflow on ${route} at ${width}px`);
+          await p.screenshot({
+            path: `${output}/public-${route.replaceAll("/", "_")}-${theme}-${width}.png`,
+            fullPage: true,
+          });
+        }
+      }
+    }
+    console.log(
+      "PASS schedule: month/date selection, time presets, protected dates, pending edits/cancellation, coworkers/nurses, admin policy/review, three roles, light/dark, 375/1440px and representative ERP screens.",
+    );
+    await browser.close();
+    return;
+  }
   const modules = {
     ADMIN: [
       "dashboard",
@@ -622,21 +847,9 @@ window.__auditMount=role=>{window.__auditRole=role;root.render(<ClinicBrandingPr
     .getByRole("textbox", { name: "Үйлчилгээний нэр", exact: true })
     .fill("Хадгалаагүй үйлчилгээ");
   await p.getByRole("button", { name: "Хаах", exact: true }).click();
-  await expect(
-    p.getByText("Хадгалаагүй өөрчлөлтийг орхих уу?", { exact: true }),
-  ).toBeVisible();
-  await p
-    .getByRole("button", { name: "Үргэлжлүүлэн засах", exact: true })
-    .click();
-  await expect(
-    p.getByRole("textbox", { name: "Үйлчилгээний нэр", exact: true }),
-  ).toHaveValue("Хадгалаагүй үйлчилгээ");
-  await p.getByRole("button", { name: "Хаах", exact: true }).click();
-  await p
-    .getByRole("button", { name: "Өөрчлөлтийг орхих", exact: true })
-    .click();
+  await expect(p.getByRole("dialog")).toHaveCount(0);
   results.interactions.push(
-    "Dirty dialog dismissal keeps draft until explicit discard",
+    "Edited dialog closes immediately without discard confirmation",
   );
 
   await p.evaluate(() => window.__auditNavigate("/erp/schedules"));

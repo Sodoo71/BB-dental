@@ -21,6 +21,7 @@ export const editableSettingKeys = [
   ...publicSettingKeys,
   "reportTitle",
   "autoApproveDoctors",
+  "scheduleLockDays",
 ] as const;
 export function settingValue(key: string, value: string) {
   let result = z.string().max(5000).parse(value).trim();
@@ -29,6 +30,8 @@ export function settingValue(key: string, value: string) {
       400,
       "Бүртгэлийн бодлогод true эсвэл false утга оруулна уу.",
     );
+  if (key === "scheduleLockDays" && !/^(?:[0-9]|[1-8][0-9]|90)$/.test(result))
+    throw new ApiError(400, "Хуваарь хамгаалах хугацаа 0–90 хоног байна.");
   if (key === "email" && result)
     result = z.email("Имэйл буруу байна.").parse(result);
   if (["facebookUrl", "instagramUrl"].includes(key) && result)

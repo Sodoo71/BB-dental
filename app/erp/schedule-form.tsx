@@ -43,12 +43,7 @@ export default function ScheduleForm({
   const [endTime, setEndTime] = useState(initial?.endTime || "19:00");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const close = useModalGuard(busy, {
-    doctorId,
-    selectedDay,
-    startTime,
-    endTime,
-  });
+  const close = useModalGuard(busy);
   const first = new Date(`${month}-01T12:00:00Z`);
   const offset = (first.getUTCDay() + 6) % 7;
   const days = new Date(

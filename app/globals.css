@@ -2049,6 +2049,367 @@ html .login-form :is(input, select) {
 .public-home h3 {
   overflow-wrap: anywhere;
 }
-.footer-grid > *{
+.footer-grid > * {
   min-width: 0;
+}
+
+.availability-calendar {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid var(--border, #d9e3e5);
+  border-radius: 12px;
+}
+.availability-calendar-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.availability-calendar-heading button {
+  padding: 0.5rem;
+  border-radius: 8px;
+}
+.availability-calendar p {
+  font-size: 0.85rem;
+  margin: 0.75rem 0;
+}
+.availability-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 5px;
+  text-align: center;
+}
+.availability-calendar-grid > span {
+  font-size: 0.8rem;
+  padding: 0.4rem 0;
+}
+.availability-calendar-grid button {
+  min-height: 40px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+}
+.availability-calendar-grid button.available {
+  background: #e1f3ee;
+  color: #155347;
+  font-weight: 600;
+}
+.availability-calendar-grid button.selected:enabled {
+  background: #155347;
+  color: white;
+}
+.availability-calendar-grid button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.availability-calendar button:focus-visible {
+  outline: 2px solid #155347;
+  outline-offset: 2px;
+}
+
+/* A bounded service catalog shared by the home and booking pages. */
+.service-browser {
+  max-width: 1060px;
+  margin-inline: auto;
+  min-width: 0;
+}
+.service-browser-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.45fr);
+  gap: 12px;
+  align-items: stretch;
+}
+.service-browser-search {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 0 14px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--muted);
+}
+.service-browser-search input {
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  outline: none;
+  font: inherit;
+  font-size: 14px;
+}
+.service-browser-search:focus-within {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+.service-browser-category {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--muted);
+}
+.service-browser-category select {
+  min-width: 0;
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+}
+.service-browser-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 44px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.service-browser-meta button {
+  color: var(--brand);
+  min-height: 36px;
+  font-size: 12px;
+}
+.service-browser-results {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  scroll-margin-top: 90px;
+}
+.service-browser-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  text-align: left;
+  text-decoration: none;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+.service-browser-item:hover {
+  border-color: var(--brand);
+  background: var(--soft-surface);
+}
+.service-browser-item > svg {
+  flex-shrink: 0;
+  color: var(--brand);
+}
+.service-browser-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.service-browser-info small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.service-browser-info strong {
+  font-size: 15px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.service-browser-description {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  overflow: hidden;
+}
+.service-browser-price {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--brand);
+}
+.service-browser-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 18px;
+  margin-top: 18px;
+}
+.service-browser-pagination button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+}
+.service-browser-pagination button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.service-browser-pagination > span {
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.service-browser-empty {
+  text-align: center;
+  padding: 32px 12px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.home-booking-link {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+}
+.booking-page-header {
+  max-width: 1060px;
+  margin: auto;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.booking-page-brand,
+.booking-back-home {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--ink);
+}
+.booking-page-brand strong {
+  font-size: 16px;
+}
+.booking-back-home {
+  font-size: 13px;
+  min-height: 44px;
+  color: var(--muted);
+}
+.public-home.booking-page .booking-section {
+  padding: 24px 24px 40px;
+}
+.booking-page .section-heading h1 {
+  margin: 0 0 12px;
+  font-family: var(--font-heading);
+  color: var(--ink);
+  font-size: clamp(25px, 3vw, 34px);
+  line-height: 1.3;
+}
+.booking-page .booking-panel {
+  max-width: 960px;
+}
+.booking-page .booking-steps {
+  padding-block: 16px;
+}
+.booking-page .booking-steps li {
+  flex-direction: row;
+  justify-content: center;
+}
+.booking-page .booking-page-footer {
+  text-align: center;
+  padding: 20px 16px;
+  color: var(--muted);
+  font-size: 12px;
+}
+@media (max-width: 600px) {
+  .service-browser-filters {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .service-browser-category {
+    min-height: 42px;
+  }
+  .service-browser-category select {
+    min-height: 42px;
+  }
+  .service-browser-results {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .service-browser-item {
+    padding: 12px 14px;
+  }
+  .service-browser-info {
+    gap: 3px;
+  }
+  .service-browser-info strong {
+    font-size: 14px;
+  }
+  .service-browser-description {
+    display: none;
+  }
+  .booking-page-header {
+    padding: 10px 16px;
+    gap: 10px;
+  }
+  .booking-page-brand {
+    gap: 6px;
+  }
+  .booking-page-brand strong {
+    font-size: 13px;
+  }
+  .booking-back-home {
+    font-size: 12px;
+    gap: 4px;
+  }
+  .public-home.booking-page .booking-section {
+    padding: 16px 12px 28px;
+  }
+  .booking-page .booking-content {
+    padding: 20px 14px;
+  }
+  .booking-page .booking-steps {
+    padding: 12px 8px;
+  }
+  .booking-page .booking-steps li {
+    flex-direction: column;
+    gap: 6px;
+    font-size: 11px;
+  }
+  .booking-page .booking-steps li > span {
+    width: 28px;
+    height: 28px;
+  }
+  .booking-page .section-heading {
+    margin-bottom: 20px;
+  }
+  .booking-page .section-heading > p:last-child {
+    font-size: 13px;
+  }
+}
+.service-browser-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.service-browser-thumbnail {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  object-fit: cover;
+  border-radius: 8px;
 }

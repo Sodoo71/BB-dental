@@ -4,14 +4,19 @@ import { today, nowTime } from "./domain";
 import { availableTimes } from "./available-times";
 import { workIntervals } from "./work-schedule";
 
-export async function earliestAvailability(
+export async function calendarAvailability(
   serviceId: string,
   doctorId?: string,
   from = today(),
+  days = 31,
 ) {
   if (from < today())
     throw new ApiError(400, "Өнөөдрөөс хойших өдөр сонгоно уу.");
-  const until = new Date(Date.parse(`${from}T12:00:00Z`) + 30 * 86400000)
+  if (!Number.isInteger(days) || days < 1 || days > 31)
+    throw new ApiError(400, "1–31 хоногийн хүрээ сонгоно уу.");
+  const until = new Date(
+    Date.parse(`${from}T12:00:00Z`) + (days - 1) * 86400000,
+  )
     .toISOString()
     .slice(0, 10);
   const service = await db.service.findUnique({
@@ -55,7 +60,7 @@ export async function earliestAvailability(
     doctorName: string;
   }[] = [];
   const current = { date: today(), time: nowTime() };
-  for (let offset = 0; offset < 31; offset++) {
+  for (let offset = 0; offset < days; offset++) {
     const date = new Date(Date.parse(`${from}T12:00:00Z`) + offset * 86400000)
       .toISOString()
       .slice(0, 10);
@@ -90,8 +95,15 @@ export async function earliestAvailability(
           a.startTime.localeCompare(b.startTime) ||
           a.doctorName.localeCompare(b.doctorName),
       );
-    result.push(...day.slice(0, 6 - result.length));
-    if (result.length >= 6) break;
+    result.push(...day);
   }
   return result;
+}
+
+export async function earliestAvailability(
+  serviceId: string,
+  doctorId?: string,
+  from = today(),
+) {
+  return (await calendarAvailability(serviceId, doctorId, from)).slice(0, 6);
 }

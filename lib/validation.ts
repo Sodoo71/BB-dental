@@ -30,6 +30,8 @@ export const patientSchema = z.object({
   phone: phoneSchema,
   birthDate: z.union([dateSchema, z.literal("")]).default(""),
   gender: z.enum(["", "MALE", "FEMALE", "OTHER"]).default(""),
+  guardianName: z.string().trim().max(100).default(""),
+  guardianPhone: z.union([phoneSchema, z.literal("")]).default(""),
   address: note,
   allergies: note,
   medicalHistory: note,

@@ -60,10 +60,10 @@ try {
     db: prisma,
     databaseConfigured: () => true,
   }));
-  const { saveLeave, saveWeek, reviewLeave, weekSchema } =
+  const { saveLeave, saveWeek, reviewLeave, removeLeave, weekSchema } =
     await import("../lib/schedule-actions");
   const { availability } = await import("../lib/booking");
-  const { earliestAvailability } =
+  const { earliestAvailability, calendarAvailability } =
     await import("../lib/availability-suggestions");
   const { exportClinicData } = await import("../lib/data-export");
   const { registerAccount } = await import("../lib/accounts");
@@ -253,7 +253,83 @@ try {
     await availability(doctor.id, service.id, overrideDate, prisma),
     [],
   );
+  const beforeApproval = await calendarAvailability(
+    service.id,
+    doctor.id,
+    overrideDate,
+    1,
+  );
+  assert.deepEqual(
+    beforeApproval,
+    [],
+    "pending working day is disabled on the public calendar",
+  );
   await reviewLeave(override.id, "APPROVED", admin.id);
+  const afterApproval = await calendarAvailability(
+    service.id,
+    doctor.id,
+    overrideDate,
+    1,
+  );
+  assert.equal(afterApproval[0].date, overrideDate);
+  assert.equal(afterApproval[0].doctorId, doctor.id);
+  assert.equal(afterApproval[0].startTime, "14:00");
+  assert.deepEqual(
+    await calendarAvailability(service.id, other.id, overrideDate, 1),
+    [],
+    "selected doctor's calendar excludes other doctors",
+  );
+  await assert.rejects(
+    calendarAvailability(service.id, doctor.id, overrideDate, 32),
+    (e) => e.status === 400,
+  );
+  const conflictRequest = await saveLeave(
+    {
+      doctorId: doctor.id,
+      date,
+      kind: "SCHEDULE_OVERRIDE",
+      startTime: "14:00",
+      endTime: "16:00",
+      reason: "Conflicts with existing booking",
+    },
+    actor,
+  );
+  assert.equal(
+    conflictRequest.status,
+    "PENDING",
+    "doctor can submit a request for admin review",
+  );
+  await assert.rejects(
+    reviewLeave(conflictRequest.id, "APPROVED", admin.id),
+    (e) => e.status === 409,
+  );
+  await reviewLeave(conflictRequest.id, "REJECTED", admin.id);
+  const adminDay = await saveLeave(
+    {
+      doctorId: other.id,
+      date: overrideDate,
+      kind: "SCHEDULE_OVERRIDE",
+      startTime: "16:00",
+      endTime: "17:00",
+      reason: "Admin entered work day",
+    },
+    { id: admin.id, role: "ADMIN" },
+  );
+  assert.equal(adminDay.status, "APPROVED");
+  const generalService = await prisma.service.create({
+    data: {
+      name: "General visit",
+      category: "General",
+      price: 45000,
+      duration: 30,
+    },
+  });
+  assert.equal(
+    (
+      await calendarAvailability(generalService.id, other.id, overrideDate, 1)
+    )[0].startTime,
+    "16:00",
+  );
   assert.equal(
     (await availability(doctor.id, service.id, overrideDate, prisma))[0],
     "14:00",
@@ -293,7 +369,189 @@ try {
   ])
     assert.ok(!serialized.includes(secret));
   assert.equal(exported.appointments.length, 1);
-  assert.equal(exported.leaves.length, 4);
+  assert.equal(exported.leaves.length, 6);
+  // A proposed edit/cancellation must leave official hours bookable until review.
+  const changeDate = "2099-02-01";
+  const originalHours = await saveLeave(
+    {
+      doctorId: doctor.id,
+      date: changeDate,
+      kind: "SCHEDULE_OVERRIDE",
+      startTime: "09:00",
+      endTime: "18:00",
+      reason: "Official working day",
+    },
+    { id: admin.id, role: "ADMIN" },
+  );
+  const editRequest = await saveLeave(
+    {
+      doctorId: doctor.id,
+      date: changeDate,
+      kind: "SCHEDULE_OVERRIDE",
+      startTime: "14:00",
+      endTime: "16:00",
+      reason: "Proposed edit",
+    },
+    actor,
+    originalHours.id,
+  );
+  assert.equal(editRequest.status, "PENDING");
+  assert.equal(editRequest.replacesId, originalHours.id);
+  assert.ok(
+    (await availability(doctor.id, service.id, changeDate, prisma)).includes(
+      "09:00",
+    ),
+  );
+  await reviewLeave(editRequest.id, "REJECTED", admin.id);
+  assert.equal(
+    (await prisma.leave.findUniqueOrThrow({ where: { id: originalHours.id } }))
+      .status,
+    "APPROVED",
+  );
+  const acceptedEdit = await saveLeave(
+    {
+      doctorId: doctor.id,
+      date: changeDate,
+      kind: "SCHEDULE_OVERRIDE",
+      startTime: "14:00",
+      endTime: "16:00",
+      reason: "Accepted edit",
+    },
+    actor,
+    originalHours.id,
+  );
+  await reviewLeave(acceptedEdit.id, "APPROVED", admin.id);
+  assert.equal(
+    await prisma.leave.findUnique({ where: { id: originalHours.id } }),
+    null,
+  );
+  assert.equal(
+    (await availability(doctor.id, service.id, changeDate, prisma))[0],
+    "14:00",
+  );
+  const cancellation = await removeLeave(acceptedEdit.id, actor);
+  assert.equal(cancellation.status, "PENDING");
+  assert.ok(
+    (await availability(doctor.id, service.id, changeDate, prisma)).includes(
+      "14:00",
+    ),
+  );
+  const bookedChange = await prisma.appointment.create({
+    data: {
+      doctorId: doctor.id,
+      patientId: patient.id,
+      serviceId: service.id,
+      date: changeDate,
+      startTime: "14:00",
+      endTime: "14:30",
+      status: "CONFIRMED",
+    },
+  });
+  await assert.rejects(
+    reviewLeave(cancellation.id, "APPROVED", admin.id),
+    (e) => e.status === 409,
+  );
+  assert.equal(
+    (await prisma.leave.findUniqueOrThrow({ where: { id: acceptedEdit.id } }))
+      .status,
+    "APPROVED",
+    "failed cancellation restores original official record atomically",
+  );
+  assert.equal(
+    (await prisma.leave.findUniqueOrThrow({ where: { id: cancellation.id } }))
+      .status,
+    "PENDING",
+  );
+  await prisma.appointment.delete({ where: { id: bookedChange.id } });
+  await reviewLeave(cancellation.id, "APPROVED", admin.id);
+  assert.deepEqual(
+    await availability(doctor.id, service.id, changeDate, prisma),
+    [],
+  );
+  const { today } = await import("../lib/domain");
+  const shiftDay = (offset) =>
+    new Date(Date.parse(`${today()}T12:00:00Z`) + offset * 86400000)
+      .toISOString()
+      .slice(0, 10);
+  const protectedDay = await saveLeave(
+    {
+      doctorId: doctor.id,
+      date: shiftDay(7),
+      kind: "SCHEDULE_OVERRIDE",
+      startTime: "09:00",
+      endTime: "18:00",
+      reason: "Boundary protected day",
+    },
+    { id: admin.id, role: "ADMIN" },
+  );
+  await assert.rejects(
+    removeLeave(protectedDay.id, actor),
+    (e) => e.status === 403,
+  );
+  await assert.rejects(
+    saveLeave(
+      {
+        doctorId: doctor.id,
+        date: shiftDay(7),
+        kind: "SCHEDULE_OVERRIDE",
+        startTime: "10:00",
+        endTime: "17:00",
+        reason: "Cannot bypass by POST",
+      },
+      actor,
+    ),
+    (e) => e.status === 403,
+  );
+  await assert.rejects(
+    saveLeave(
+      {
+        doctorId: doctor.id,
+        date: shiftDay(7),
+        kind: "BLOCKED_RANGE",
+        startTime: "10:00",
+        endTime: "17:00",
+        reason: "Cannot bypass by blocking",
+      },
+      actor,
+    ),
+    (e) => e.status === 403,
+  );
+  const editableDay = await saveLeave(
+    {
+      doctorId: doctor.id,
+      date: shiftDay(8),
+      kind: "SCHEDULE_OVERRIDE",
+      startTime: "09:00",
+      endTime: "18:00",
+      reason: "Outside default protection",
+    },
+    { id: admin.id, role: "ADMIN" },
+  );
+  const outsideRequest = await saveLeave(
+    {
+      doctorId: doctor.id,
+      date: shiftDay(8),
+      kind: "SCHEDULE_OVERRIDE",
+      startTime: "10:00",
+      endTime: "17:00",
+      reason: "Outside protection",
+    },
+    actor,
+    editableDay.id,
+  );
+  assert.equal(outsideRequest.status, "PENDING");
+  await prisma.setting.upsert({
+    where: { key: "scheduleLockDays" },
+    create: { key: "scheduleLockDays", value: "14" },
+    update: { value: "14" },
+  });
+  await assert.rejects(
+    removeLeave(outsideRequest.id, actor),
+    (e) => e.status === 403,
+  );
+  await prisma.setting.delete({ where: { key: "scheduleLockDays" } });
+  await removeLeave(outsideRequest.id, actor);
+
   await prisma.setting.create({
     data: { key: "autoApproveDoctors", value: "true" },
   });
@@ -377,6 +635,100 @@ try {
     404,
   );
   activeActor = { ...staff, doctor: { id: doctor.id, imageUrl: "" } };
+  await prisma.leave.create({
+    data: {
+      doctorId: other.id,
+      date: overrideDate,
+      kind: "BLOCKED_RANGE",
+      status: "PENDING",
+      startTime: "12:00",
+      endTime: "13:00",
+      reason: "PRIVATE_OTHER_REQUEST",
+    },
+  });
+  await prisma.appointment.create({
+    data: {
+      doctorId: other.id,
+      patientId: patient.id,
+      serviceId: generalService.id,
+      date: overrideDate,
+      startTime: "16:00",
+      endTime: "16:30",
+    },
+  });
+  const rosterResponse = await erp.GET(
+    new Request(
+      `http://localhost/api/erp/roster?from=${overrideDate}&to=${overrideDate}`,
+    ),
+    { params: Promise.resolve({ path: ["roster"] }) },
+  );
+  const roster = await rosterResponse.json();
+  assert.equal(rosterResponse.status, 200);
+  const colleague = roster.doctors.find((d) => d.id === other.id);
+  assert.ok(colleague, "doctors can see coworkers on the calendar");
+  assert.equal(
+    colleague.appointments.length,
+    0,
+    "coworker bookings are private",
+  );
+  assert.ok(
+    colleague.leaves.every((l) => l.status === "APPROVED" && l.reason === ""),
+  );
+  assert.ok(!JSON.stringify(roster).includes("PRIVATE_OTHER_REQUEST"));
+  assert.equal(roster.policy.lockDays, 7);
+
+  assert.equal(
+    (await post(["schedule-week"], { doctorId: doctor.id, days })).status,
+    403,
+    "doctor cannot publish recurring hours without approval",
+  );
+  assert.equal(
+    (
+      await post(["schedules"], {
+        doctorId: doctor.id,
+        weekday: 1,
+        startTime: "09:00",
+        endTime: "18:00",
+      })
+    ).status,
+    403,
+  );
+  assert.equal(
+    (await post(["leave-review", conflictRequest.id], { status: "APPROVED" }))
+      .status,
+    403,
+  );
+  const weeklyRecord = await prisma.schedule.findFirstOrThrow({
+    where: { doctorId: doctor.id },
+  });
+  for (const method of ["PATCH", "DELETE"]) {
+    const response = await erp[method](
+      new Request(`http://localhost/api/erp/schedules/${weeklyRecord.id}`, {
+        method,
+        headers: {
+          Origin: "http://localhost",
+          "Content-Type": "application/json",
+        },
+        ...(method === "PATCH"
+          ? {
+              body: JSON.stringify({
+                doctorId: doctor.id,
+                weekday: weeklyRecord.weekday,
+                startTime: "09:00",
+                endTime: "18:00",
+              }),
+            }
+          : {}),
+      }),
+      { params: Promise.resolve({ path: ["schedules", weeklyRecord.id] }) },
+    );
+    assert.equal(
+      response.status,
+      403,
+      `doctor cannot ${method} official weekly schedule`,
+    );
+  }
+
   await prisma.setting.delete({ where: { key: "telegramBotTokenEncrypted" } });
   process.env.TELEGRAM_BOT_TOKEN = "qa-isolated-token";
   const previousFetch = globalThis.fetch;
@@ -404,6 +756,172 @@ try {
   );
   assert.equal(status.status, 200);
   assert.equal((await status.json()).status, "HEALTHY");
+  // Public demographics and guardian fields never expose the clinical record.
+  const cookieValues = new Map();
+  mock.module("next/headers", () => ({
+    cookies: async () => ({
+      get: (key) =>
+        cookieValues.has(key) ? { value: cookieValues.get(key) } : undefined,
+      set: (key, value) => cookieValues.set(key, value),
+    }),
+  }));
+  const publicApi = await import("../app/api/public/[action]/route");
+  const publicPost = (action, data) =>
+    publicApi.POST(
+      new Request(`http://localhost/api/public/${action}`, {
+        method: "POST",
+        headers: {
+          Origin: "http://localhost",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      }),
+      { params: Promise.resolve({ action }) },
+    );
+  await prisma.patient.update({
+    where: { id: patient.id },
+    data: {
+      allergies: "PRIVATE_ALLERGY",
+      medicalHistory: "PRIVATE_CLINICAL_HISTORY",
+      birthDate: "1990-01-01",
+      gender: "MALE",
+    },
+  });
+  const returning = await publicPost("returning-contact", {
+    phone: patient.phone,
+    previouslyVisited: true,
+  });
+  assert.equal(returning.status, 200);
+  const returningData = await returning.json();
+  assert.equal(returningData.contact.name, patient.name);
+  assert.deepEqual(Object.keys(returningData.contact).sort(), [
+    "birthDate",
+    "gender",
+    "guardianName",
+    "guardianPhone",
+    "name",
+  ]);
+  assert.ok(!JSON.stringify(returningData).includes("PRIVATE_"));
+  assert.deepEqual(
+    await (
+      await publicPost("returning-contact", {
+        phone: "99119999",
+        previouslyVisited: true,
+      })
+    ).json(),
+    { contact: null },
+  );
+  assert.equal(
+    (await publicPost("lookup", { phone: patient.phone, confirmed: true }))
+      .status,
+    403,
+    "a phone number alone cannot reveal appointment history",
+  );
+  const publicDay = "2099-04-02";
+  await saveLeave(
+    {
+      doctorId: other.id,
+      date: publicDay,
+      kind: "SCHEDULE_OVERRIDE",
+      startTime: "09:00",
+      endTime: "12:00",
+      reason: "Public booking fixture",
+    },
+    { id: admin.id, role: "ADMIN" },
+  );
+  const childBirth = `${Number(today().slice(0, 4)) - 10}-01-01`;
+  const childBooking = {
+    name: "Хүүхэд Тест",
+    phone: "99110009",
+    birthDate: childBirth,
+    gender: "FEMALE",
+    guardianName: "Асран хамгаалагч Тест",
+    guardianPhone: "88110009",
+    doctorId: other.id,
+    serviceId: generalService.id,
+    date: publicDay,
+    startTime: "09:00",
+    note: "PRIVATE_SYMPTOM",
+  };
+  const missingGuardian = await publicPost("booking", {
+    ...childBooking,
+    guardianName: "",
+    guardianPhone: "",
+  });
+  assert.equal(missingGuardian.status, 400);
+  const childBooked = await publicPost("booking", childBooking);
+  assert.equal(childBooked.status, 201, await childBooked.clone().text());
+  const bookingResult = await childBooked.json();
+  const savedBooking = await prisma.appointment.findUniqueOrThrow({
+    where: { id: bookingResult.id },
+    include: { patient: true },
+  });
+  assert.equal(savedBooking.birthDate, childBirth);
+  assert.equal(savedBooking.guardianPhone, "88110009");
+  assert.equal(savedBooking.patient.guardianName, "Асран хамгаалагч Тест");
+  assert.equal(savedBooking.note, "PRIVATE_SYMPTOM");
+  assert.ok(cookieValues.has("bb_booking_contact"));
+  await prisma.appointment.create({
+    data: {
+      patientId: savedBooking.patientId,
+      doctorId: other.id,
+      serviceId: generalService.id,
+      date: "2098-01-01",
+      startTime: "09:00",
+      endTime: "09:30",
+    },
+  });
+  const ownLookup = await publicPost("lookup", {
+    phone: childBooking.phone,
+    confirmed: true,
+  });
+  assert.equal(ownLookup.status, 200);
+  const ownHistory = await ownLookup.json();
+  assert.deepEqual(
+    ownHistory.appointments.map((a) => a.id),
+    [bookingResult.id],
+    "receipt session cannot reveal older clinical appointments",
+  );
+  assert.ok(!JSON.stringify(ownHistory).includes("PRIVATE_"));
+  assert.equal(
+    (await publicPost("lookup", { phone: patient.phone, confirmed: true }))
+      .status,
+    403,
+    "receipt session is bound to its phone number",
+  );
+  const mismatch = await publicPost("booking", {
+    ...childBooking,
+    name: "Өөр хүн",
+    startTime: "10:00",
+  });
+  assert.equal(
+    mismatch.status,
+    409,
+    "shared numbers cannot silently attach a different person to a clinical record",
+  );
+  const beforeSessions = await prisma.bookingContactSession.count();
+  const collision = await publicPost("booking", {
+    ...childBooking,
+    startTime: "09:00",
+  });
+  assert.equal(collision.status, 409);
+  assert.equal(
+    await prisma.bookingContactSession.count(),
+    beforeSessions,
+    "failed booking cannot create an orphan contact session",
+  );
+  await prisma.bookingContactSession.updateMany({
+    data: { expiresAt: new Date(0) },
+  });
+  assert.equal(
+    (await publicPost("lookup", { phone: childBooking.phone, confirmed: true }))
+      .status,
+    403,
+    "expired receipts cannot read appointment history",
+  );
+  console.log(
+    "PASS returning contact fields, unknown-number fallback, minor guardian validation/storage, private symptoms, receipt-bound history, identity mismatch and session rollback/expiry.",
+  );
   console.log(
     "PASS endpoint permissions for reception/doctor/admin, reminder ownership and throttling with mocked Telegram, and database diagnostics.",
   );

@@ -11,6 +11,11 @@ export default async function Page({
     (section && section.length > 1) ||
     ![
       "dashboard",
+      "visits",
+      "queue",
+      "transactions",
+      "receivables",
+      "notifications",
       "profile",
       "appointments",
       "calendar",

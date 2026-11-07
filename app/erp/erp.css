@@ -4348,3 +4348,16 @@ html .login-form .erp-primary {
 .patient-card h3 {
   overflow-wrap: anywhere;
 }
+
+.appointment-availability .appointment-manual-toggle {
+  display:flex;
+  align-items:center;
+  gap:9px;
+  margin:14px 0;
+}
+.appointment-availability .appointment-manual-toggle input {
+  width:18px;
+  min-height:18px;
+  accent-color:#0d9488;
+}
+.appointment-time-field { display:grid; gap:8px; margin-top:14px; }

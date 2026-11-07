@@ -1,4 +1,5 @@
 "use client";
+import ReceptionWorkspace from "./reception";
 import { useMessage } from "./ui";
 import {
   Suspense,
@@ -44,6 +45,7 @@ import Profile from "./profile";
 import BrandLoader from "../components/brand-loader";
 import RoleHome from "./role-home";
 import RosterCalendar from "./roster-calendar";
+import { patientAge } from "@/lib/patient-demographics";
 import ScheduleForm from "./schedule-form";
 import DoctorDetail from "./doctor-detail";
 import SettingsPanel from "./settings-panel";
@@ -125,8 +127,8 @@ const titles: Record<string, { title: string; subtitle: string }> = {
     subtitle: "Эмч бүрийн долоо хоногийн тогтмол ажлын цаг.",
   },
   leaves: {
-    title: "Чөлөө, цагийн хаалт",
-    subtitle: "Ажиллахгүй өдөр болон цагийн хязгаарыг тохируулах.",
+    title: "Хуваарийн хүсэлт, чөлөө",
+    subtitle: "Ажиллах өдөр, цаг болон чөлөөний хүсэлтийг админ батална.",
   },
   payments: {
     title: "Касс, төлбөр",
@@ -244,6 +246,12 @@ function fieldsFor(
             { value: "FEMALE", label: "Эмэгтэй" },
             { value: "OTHER", label: "Бусад" },
           ],
+        },
+        { key: "guardianName", label: "Асран хамгаалагчийн нэр" },
+        {
+          key: "guardianPhone",
+          label: "Асран хамгаалагчийн утас",
+          type: "tel",
         },
         { key: "address", label: "Хаяг", type: "textarea" },
         { key: "allergies", label: "Харшил", type: "textarea" },
@@ -417,6 +425,7 @@ function WorkspaceSection({ module }: { module: string }) {
   const user = useUser();
   if (!canVisitSection(user.role, module))
     return <Feedback>Энэ хэсэгт хандах эрхгүй байна.</Feedback>;
+  if (user.role === "RECEPTION") return <Suspense fallback={<BrandLoader />}><ReceptionWorkspace module={module} /></Suspense>;
   if (module === "profile") return <Profile />;
   if (module === "users") return <Employees />;
   if (module === "settings") return <SettingsPanel />;
@@ -597,7 +606,7 @@ function WorkspaceData({ module }: { module: string }) {
             "payments",
             "documents",
           ].includes(module)
-        : ["schedules", "leaves", "treatments", "documents"].includes(module);
+        : ["leaves", "treatments", "documents"].includes(module);
   const canEdit =
     user.role === "ADMIN"
       ? [
@@ -613,7 +622,7 @@ function WorkspaceData({ module }: { module: string }) {
         ].includes(module)
       : user.role === "RECEPTION"
         ? module === "patients"
-        : ["schedules", "leaves"].includes(module);
+        : ["leaves"].includes(module);
   const canDelete =
     user.role === "ADMIN"
       ? [
@@ -627,7 +636,7 @@ function WorkspaceData({ module }: { module: string }) {
           "schedules",
           "leaves",
         ].includes(module)
-      : user.role === "DOCTOR" && ["schedules", "leaves"].includes(module);
+      : user.role === "DOCTOR" && module === "leaves";
   const saved = () => {
     setForm(null);
     setVersion((v) => v + 1);
@@ -687,6 +696,19 @@ function WorkspaceData({ module }: { module: string }) {
       </a>
     </>
   );
+  if (module === "schedules")
+    return (
+      <>
+        <div className="workspace-heading">
+          <div>
+            <p className="erp-kicker">BB DENTAL · АЖЛЫН ОРЧИН</p>
+            <h1>Ажлын хуваарь</h1>
+            <p>Сарын календарь, хүсэлт болон хамт ажиллах баг.</p>
+          </div>
+        </div>
+        <RosterCalendar />
+      </>
+    );
   const title = titles[module];
   const removalLabel = [
     "services",
@@ -1523,7 +1545,11 @@ function cells(
     >
       <span className="patient-avatar">{i.patient.name?.slice(0, 1)}</span>
       <span>
-        <strong>{i.patient.name}</strong>
+        <strong>
+          {module === "appointments"
+            ? i.contactName || i.patient.name
+            : i.patient.name}
+        </strong>
         <small>{i.patient.phone}</small>
       </span>
     </button>
@@ -1538,7 +1564,17 @@ function cells(
   switch (module) {
     case "appointments":
       return [
-        person,
+        <span key="person">
+          {person}
+          {i.guardianName && (
+            <small>
+              Асран хамгаалагч: {i.guardianName} · {i.guardianPhone}
+            </small>
+          )}
+          {i.note && (
+            <small className="appointment-symptom">Зовиур: {i.note}</small>
+          )}
+        </span>,
         <span key="date">
           <strong>{i.date}</strong>
           <small>
@@ -1672,7 +1708,7 @@ function cells(
   }
 }
 
-function AppointmentForm({
+export function AppointmentForm({
   options,
   rescheduleId,
   initial,
@@ -1685,6 +1721,10 @@ function AppointmentForm({
   onCancel: () => void;
   onSaved: () => void;
 }) {
+  const user = useUser();
+  const canEnterTime = user.role === "ADMIN" || user.role === "RECEPTION";
+  const [manualTime, setManualTime] = useState(false);
+  const [selectedStartTime, setStartTime] = useState(String(initial?.startTime || ""));
   const [selectedDoctorId, setDoctorId] = useState(
     String(initial?.doctorId || options.doctors[0]?.id || ""),
   );
@@ -1712,7 +1752,7 @@ function AppointmentForm({
       : null,
   );
   const slots = availability?.slots || [];
-  useModalGuard(false, { doctorId, serviceId, date });
+  const startTime = manualTime || slots.includes(selectedStartTime) ? selectedStartTime : "";
   return (
     <>
       <div className="appointment-availability">
@@ -1721,7 +1761,7 @@ function AppointmentForm({
           <select
             aria-label="Боломжит цагийн эмч"
             value={doctorId}
-            onChange={(e) => setDoctorId(e.target.value)}
+            onChange={(e) => { setDoctorId(e.target.value); setStartTime(""); }}
           >
             {eligibleDoctors.map((d) => (
               <option key={d.id} value={d.id}>
@@ -1732,7 +1772,7 @@ function AppointmentForm({
           <select
             aria-label="Боломжит цагийн үйлчилгээ"
             value={serviceId}
-            onChange={(e) => setServiceId(e.target.value)}
+            onChange={(e) => { setServiceId(e.target.value); setStartTime(""); }}
           >
             {options.services.map((s) => (
               <option key={s.id} value={s.id}>
@@ -1745,7 +1785,7 @@ function AppointmentForm({
             type="date"
             value={date}
             min={today()}
-            onChange={(e) => setDate(e.target.value)}
+            onChange={(e) => { setDate(e.target.value); setStartTime(""); }}
           />
         </div>
         <p>
@@ -1757,6 +1797,11 @@ function AppointmentForm({
                 : "Энэ өдөр боломжит цаг байхгүй байна.")}
         </p>
         {slotError && <Feedback retry={retry}>{slotError}</Feedback>}
+        {canEnterTime && <label className="appointment-manual-toggle"><input type="checkbox" checked={manualTime} onChange={e => { setManualTime(e.target.checked); setStartTime(""); }} /> Утсаар авсан захиалга — цагийг гараар оруулах</label>}
+        <label className="appointment-time-field">Эхлэх цаг
+          {manualTime ? <input aria-label="Эхлэх цаг" type="time" step="60" value={startTime} onChange={e => setStartTime(e.target.value)} /> : <select aria-label="Эхлэх цаг" value={startTime} disabled={slotsLoading} onChange={e => setStartTime(e.target.value)}><option value="">{slotsLoading ? "Цаг ачаалж байна…" : "Цаг сонгох"}</option>{slots.map(s => <option key={s} value={s}>{s}</option>)}</select>}
+        </label>
+        {manualTime && <p>Тусгай цаг оноох: ердийн ажлын хуваарь, чөлөөний хязгаараас гадуур цаг товлож болно. Давхцал, үйлчилгээний хугацаа болон эмчийн идэвхтэй төлөвийг сервер шалгана.</p>}
       </div>
       <EntityForm
         fields={[
@@ -1775,24 +1820,21 @@ function AppointmentForm({
                   type: "tel" as const,
                 },
               ]),
-          {
-            key: "startTime",
-            label: "Эхлэх цаг",
-            type: "select",
-            required: true,
-            options: slots.map((s) => ({ value: s, label: s })),
-          },
           { key: "note", label: "Тэмдэглэл", type: "textarea" },
         ]}
         initial={initial}
         onCancel={onCancel}
         submitLabel="Цаг баталгаажуулах"
         onSubmit={async (values) => {
-          if (slotsLoading || !slots.includes(String(values.startTime)))
+          if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(startTime))
+            throw new Error("Эхлэх цагаа сонгох эсвэл гараар оруулна уу.");
+          if (!manualTime && (slotsLoading || !slots.includes(startTime)))
             throw new Error("Одоогийн боломжит цагаас сонгоно уу.");
           let payload: Record<string, unknown> = {
             ...initial,
             ...values,
+            startTime,
+            force: manualTime && canEnterTime,
             doctorId,
             serviceId,
             date,
@@ -1802,8 +1844,12 @@ function AppointmentForm({
               `/api/erp/patients/${payload.patientId}`,
             );
             payload = { ...payload, name: patient.name, phone: patient.phone };
-          } else if (!payload.name || !payload.phone)
-            throw new Error("Өвчтөн сонгох эсвэл нэр, утсыг оруулна уу.");
+          } else {
+            // An unselected optional patient picker is not a patient UUID.
+            delete payload.patientId;
+            if (!payload.name || !payload.phone)
+              throw new Error("Өвчтөн сонгох эсвэл нэр, утсыг оруулна уу.");
+          }
           await api(
             rescheduleId
               ? `/api/erp/reschedule/${rescheduleId}`
@@ -1832,7 +1878,7 @@ function PatientCard({
   const [transfers, setTransfers] = useState(patient.transfers || []);
   const [noteText, setNoteText] = useState("");
   const [noteBusy, setNoteBusy] = useState(false);
-  useModalGuard(noteBusy, noteText);
+  useModalGuard(noteBusy);
   const [cardError, setCardError] = useState("");
   const [cardMessage, setCardMessage] = useMessage();
   const [transferDoctors, setTransferDoctors] = useState<Entity[]>([]);
@@ -1849,6 +1895,9 @@ function PatientCard({
           <h3>{patient.name}</h3>
           <p>
             {patient.phone} · {patient.birthDate || "Төрсөн огноо бүртгэлгүй"}
+            {patientAge(patient.birthDate || "") !== null
+              ? ` · ${patientAge(patient.birthDate || "")} настай`
+              : ""}
           </p>
         </div>
         <a
@@ -1860,6 +1909,12 @@ function PatientCard({
         </a>
       </div>
       <div className="patient-info">
+        {patient.guardianName && (
+          <p>
+            <small>Асран хамгаалагч</small>
+            {patient.guardianName} · {patient.guardianPhone}
+          </p>
+        )}
         <p>
           <small>Хаяг</small>
           {patient.address || "Бүртгэлгүй"}
@@ -2095,6 +2150,17 @@ function PatientCard({
               <small>
                 {a.date} · {a.startTime} · {a.doctor?.name}
               </small>
+              {a.birthDate && (
+                <small>
+                  Төрсөн огноо: {a.birthDate} · {patientAge(a.birthDate)} настай
+                </small>
+              )}
+              {a.guardianName && (
+                <small>
+                  Асран хамгаалагч: {a.guardianName} · {a.guardianPhone}
+                </small>
+              )}
+              {a.note && <p>Зовиур: {a.note}</p>}
             </div>
             <Badge value={a.status || ""} />
             {user.role !== "DOCTOR" && (
@@ -2155,15 +2221,17 @@ function PatientCard({
   );
 }
 
-function CalendarView({
+export function CalendarView({
   items,
   date,
   mode,
   onPatient,
+  reception = false,
 }: {
   items: Entity[];
   date: string;
   mode: string;
+  reception?: boolean;
   onPatient: (id: string) => void;
 }) {
   const start = new Date(`${date}T12:00:00Z`);
@@ -2211,10 +2279,11 @@ function CalendarView({
                 <button
                   className={`calendar-event event-${a.status?.toLowerCase()}`}
                   key={a.id}
+                  style={reception ? { borderInlineStart: `4px solid ${["#0d9488", "#3b82f6", "#8b5cf6", "#d97706", "#db2777"][(a.doctorId || "").split("").reduce((n, c) => n + c.charCodeAt(0), 0) % 5]}` } : undefined}
                   onClick={() => onPatient(a.patientId!)}
                 >
                   <strong>
-                    {a.startTime} · {a.patient?.name}
+                    {a.startTime}{reception ? `–${a.endTime}` : ""} · {a.patient?.name}
                   </strong>
                   <span>{a.service?.name}</span>
                   <small>{a.doctor?.name}</small>

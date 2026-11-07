@@ -1,3 +1,9 @@
+import type { BookingContactPlan } from "./booking-contact-session";
+import {
+  bookingContactFields,
+  bookingContactSchema,
+  validateGuardian,
+} from "./patient-demographics";
 import { createHash } from "node:crypto";
 import { telegramConfig, telegramCall, type TelegramConfig } from "./telegram";
 import { db } from "./db";
@@ -5,13 +11,12 @@ import { Prisma } from "@/app/generated/prisma/client";
 import { ApiError } from "./http";
 import { clock, minutes, today, nowTime } from "./domain";
 import { z } from "zod";
-import { dateSchema, timeSchema, phoneSchema } from "./domain";
+import { dateSchema, timeSchema } from "./domain";
 import { workIntervals } from "./work-schedule";
 import { availableTimes } from "./available-times";
 export const bookingSchema = z.object({
   patientId: z.string().uuid().optional(),
-  name: z.string().trim().min(2).max(100),
-  phone: phoneSchema,
+  ...bookingContactFields,
   doctorId: z.string().uuid(),
   serviceId: z.string().uuid(),
   date: dateSchema,
@@ -19,6 +24,13 @@ export const bookingSchema = z.object({
   note: z.string().max(2000).default(""),
   repeatOfId: z.string().uuid().optional(),
 });
+export const staffBookingSchema = bookingSchema.extend({
+  force: z.boolean().default(false),
+});
+export const publicBookingSchema = bookingSchema
+  .omit({ patientId: true, repeatOfId: true })
+  .extend({ rememberContact: z.boolean().default(false) })
+  .superRefine(validateGuardian);
 export async function doctorLock(
   tx: Prisma.TransactionClient,
   doctorId: string,
@@ -31,6 +43,8 @@ export async function availability(
   date: string,
   client: Prisma.TransactionClient = db,
   excludeId?: string,
+  requestedTime?: string,
+  allowScheduleOverride = false,
 ) {
   // A transaction owns one pg connection; issue its statements sequentially.
   const doctor = await client.doctor.findUnique({ where: { id: doctorId } });
@@ -63,16 +77,25 @@ export async function availability(
   return availableTimes(
     date,
     service.duration,
-    workIntervals(schedule, leaves),
+    // Explicit, server-authorized staff bookings may override working/leave
+    // intervals. Active doctor/service, future time, duration and conflicts
+    // remain validated by the same slot engine under the doctor lock.
+    allowScheduleOverride
+      ? [{ startTime: "00:00", endTime: "23:59" }]
+      : workIntervals(schedule, leaves),
     appointments,
     { date: today(), time: nowTime() },
+    requestedTime,
   );
 }
 
 export async function createBooking(
   data: z.infer<typeof bookingSchema>,
   actorId?: string,
+  contactSession?: BookingContactPlan,
+  options: { allowScheduleOverride?: boolean } = {},
 ) {
+  const contact = bookingContactSchema.parse(data);
   const result = await db.$transaction(async (tx) => {
     await doctorLock(tx, data.doctorId);
     const slots = await availability(
@@ -80,6 +103,9 @@ export async function createBooking(
       data.serviceId,
       data.date,
       tx,
+      undefined,
+      actorId ? data.startTime : undefined,
+      Boolean(actorId && options.allowScheduleOverride),
     );
     // Every booking is checked again while holding the doctor lock.
     const service = await tx.service.findUniqueOrThrow({
@@ -91,12 +117,31 @@ export async function createBooking(
     if (data.patientId) {
       patient = await tx.patient.findUnique({ where: { id: data.patientId } });
       if (!patient?.active) throw new ApiError(404, "Өвчтөн олдсонгүй.");
-    } else
+    } else {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`patient:${contact.phone}`}))::text AS locked`;
+      const existing = await tx.patient.findUnique({
+        where: { phone: data.phone },
+      });
+      const normalizedName = (name: string) =>
+        name.trim().replace(/\s+/g, " ").toLocaleLowerCase();
+      if (
+        !actorId &&
+        existing &&
+        (normalizedName(existing.name) !== normalizedName(contact.name) ||
+          (existing.birthDate &&
+            contact.birthDate &&
+            existing.birthDate !== contact.birthDate))
+      )
+        throw new ApiError(
+          409,
+          "Нэр, төрсөн огноо бүртгэлтэй мэдээлэлтэй зөрж байна. Өөр өвчтөний дугаараар бүртгүүлэхгүйгээр эмнэлэгтэй холбогдоно уу.",
+        );
       patient = await tx.patient.upsert({
         where: { phone: data.phone },
-        create: { name: data.name, phone: data.phone },
+        create: contact,
         update: {},
       });
+    }
     if (!patient.active)
       throw new ApiError(400, "Өвчтөний бүртгэл идэвхгүй байна.");
     if (data.repeatOfId) {
@@ -106,8 +151,27 @@ export async function createBooking(
       if (!previous || previous.patientId !== patient.id)
         throw new ApiError(400, "Давтан захиалгын өвчтөн зөрж байна.");
     }
-    return tx.appointment.create({
+    const details = bookingContactSchema.parse({
+      ...contact,
+      birthDate: contact.birthDate || patient.birthDate,
+      gender: contact.gender || patient.gender,
+      guardianName: contact.guardianName || patient.guardianName,
+      guardianPhone: contact.guardianPhone || patient.guardianPhone,
+    });
+    const doctor = await tx.doctor.findUniqueOrThrow({
+      where: { id: data.doctorId },
+    });
+    let bookingContactId: string | undefined;
+    if (contactSession) {
+      const { id, ...values } = contactSession;
+      const session = id
+        ? await tx.bookingContactSession.update({ where: { id }, data: values })
+        : await tx.bookingContactSession.create({ data: values });
+      bookingContactId = session.id;
+    }
+    const appointment = await tx.appointment.create({
       data: {
+        bookingContactId,
         patientId: patient.id,
         doctorId: data.doctorId,
         serviceId: data.serviceId,
@@ -115,12 +179,27 @@ export async function createBooking(
         startTime: data.startTime,
         endTime: clock(minutes(data.startTime) + service.duration),
         note: data.note,
+        contactName: contact.name,
+        birthDate: details.birthDate,
+        gender: details.gender,
+        guardianName: details.guardianName,
+        guardianPhone: details.guardianPhone,
         repeatOfId: data.repeatOfId,
         createdById: actorId,
         status: actorId ? "CONFIRMED" : "PENDING",
       },
-      include: { doctor: true, service: true, patient: true },
     });
+    if (actorId && options.allowScheduleOverride) {
+      await tx.auditLog.create({
+        data: {
+          actorId,
+          action: "APPOINTMENT_SCHEDULE_OVERRIDE",
+          entity: "appointments",
+          entityId: appointment.id,
+        },
+      });
+    }
+    return { ...appointment, doctor, service, patient };
   });
   await notifyBooking(result);
   return result;
@@ -167,6 +246,7 @@ export function bookingMessage(a: {
   doctor: { name: string };
   patient: { name: string; phone: string };
   service: { name: string };
+  contactName?: string;
 }) {
   const day = new Intl.DateTimeFormat("mn-MN", {
     year: "numeric",
@@ -175,7 +255,7 @@ export function bookingMessage(a: {
     weekday: "long",
     timeZone: "Asia/Ulaanbaatar",
   }).format(new Date(`${a.date}T12:00:00+08:00`));
-  return `🦷 ШИНЭ ЦАГИЙН ЗАХИАЛГА\n👨‍⚕️ Эмч: ${a.doctor.name}\n👤 Үйлчлүүлэгч: ${a.patient.name}\n📞 Утас: ${a.patient.phone}\n🩺 Үйлчилгээ: ${a.service.name}\n📅 Өдөр: ${day}\n⏰ Цаг: ${a.startTime}\nДоорх товчоор шууд баталгаажуулах эсвэл цуцлах боломжтой:`;
+  return `🦷 ШИНЭ ЦАГИЙН ЗАХИАЛГА\n👨‍⚕️ Эмч: ${a.doctor.name}\n👤 Үйлчлүүлэгч: ${a.contactName || a.patient.name}\n📞 Утас: ${a.patient.phone}\n🩺 Үйлчилгээ: ${a.service.name}\n📅 Өдөр: ${day}\n⏰ Цаг: ${a.startTime}\nДоорх товчоор шууд баталгаажуулах эсвэл цуцлах боломжтой:`;
 }
 export function bookingActionTag(a: {
   date: string;

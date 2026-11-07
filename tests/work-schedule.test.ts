@@ -81,3 +81,49 @@ test("availability respects current time, whole appointment duration, lunch gaps
     [],
   );
 });
+
+test("staff manual times need not follow the suggestion grid but retain every availability constraint", () => {
+  const day = "2099-01-05";
+  const intervals = [
+    { startTime: "09:00", endTime: "12:00" },
+    { startTime: "13:00", endTime: "18:00" },
+  ];
+  const occupied = [{ startTime: "10:00", endTime: "10:30" }];
+  const now = { date: day, time: "08:00" };
+  assert.equal(
+    availableTimes(day, 30, intervals, occupied, now).includes("09:10"),
+    false,
+  );
+  assert.equal(
+    availableTimes(day, 30, intervals, occupied, now, "09:10").includes(
+      "09:10",
+    ),
+    true,
+  );
+  for (const time of [
+    "08:50",
+    "09:40",
+    "10:10",
+    "11:45",
+    "12:10",
+    "17:45",
+    "24:00",
+  ])
+    assert.equal(
+      availableTimes(day, 30, intervals, occupied, now, time).includes(time),
+      false,
+      time,
+    );
+  assert.equal(
+    availableTimes(
+      day,
+      30,
+      intervals,
+      occupied,
+      { date: day, time: "09:11" },
+      "09:10",
+    ).includes("09:10"),
+    false,
+  );
+  assert.deepEqual(availableTimes(day, 30, [], [], now, "09:10"), []);
+});

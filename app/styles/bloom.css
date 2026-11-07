@@ -1,0 +1,839 @@
+/* One visual identity across the public site, booking, authentication and ERP. */
+html h1,
+html h2,
+html h3 {
+  font-family: var(--font-heading);
+  letter-spacing: -0.035em;
+}
+html h1 {
+  font-weight: 500;
+}
+.public-home .button,
+.erp-shell .erp-primary,
+.login-page .erp-primary {
+  border-radius: 999px;
+}
+.public-home .main-nav {
+  border-radius: 999px;
+}
+.public-home .main-nav a {
+  border-radius: 999px;
+}
+.public-home .site-header {
+  border-bottom: 1px solid var(--line);
+  box-shadow: none;
+}
+.public-home .brand-name {
+  font-family: var(--font-body);
+  font-weight: 500;
+  letter-spacing: -0.05em;
+}
+.erp-shell .erp-sidebar {
+  background: var(--brand-dark);
+}
+.erp-shell .nav-group a.active {
+  background: #d9fff0;
+  color: #06484c;
+  box-shadow: none;
+  border-radius: 12px;
+}
+.erp-shell .nav-group a.active svg {
+  color: #06484c;
+}
+.erp-shell .nav-active-dot {
+  background: #007b80;
+}
+.erp-shell .erp-topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  box-shadow: none;
+}
+.erp-shell
+  :is(
+    .erp-panel,
+    .employee-card,
+    .settings-card,
+    .settings-section,
+    .erp-table-wrap,
+    .patient-card
+  ) {
+  border-color: var(--line);
+  border-radius: 20px;
+  box-shadow: none;
+}
+.erp-shell .erp-secondary {
+  border-radius: 12px;
+}
+.erp-shell :is(.workspace-heading h1, .employee-heading h1) {
+  font-weight: 500;
+}
+.public-home .section-heading h2,
+.booking-page .section-heading h1 {
+  font-weight: 500;
+}
+html[data-theme="dark"] .erp-shell .nav-group a.active {
+  background: #315d58;
+  color: #d6fff0;
+}
+html[data-theme="dark"] .erp-shell .nav-group a.active svg {
+  color: #d6fff0;
+}
+.bloom-hero {
+  max-width: 1440px;
+  margin: auto;
+  padding: 32px 40px 36px;
+}
+.bloom-hero-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--brand);
+  letter-spacing: 0.04em;
+}
+.bloom-wordmark {
+  font-size: clamp(68px, 12.9vw, 184px);
+  line-height: 1.1;
+  font-weight: 500;
+  letter-spacing: -0.075em;
+  color: var(--ink);
+  padding: 24px 0 30px;
+  white-space: nowrap;
+}
+.bloom-wordmark > span {
+  display: block;
+  font-size: 12px;
+  letter-spacing: 0.4em;
+  margin-top: 8px;
+}
+.bloom-hero-feature {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  min-height: 350px;
+  background: linear-gradient(110deg, #006970, #00a6a3);
+  border-radius: 24px;
+  padding: 38px 44px;
+  gap: 36px;
+  color: #fff;
+  overflow: hidden;
+}
+.bloom-hero-copy .eyebrow {
+  color: #c3fff1;
+  font-size: 11px;
+}
+.bloom-hero-copy h1 {
+  color: #fff;
+  font-size: clamp(28px, 3.4vw, 46px);
+  line-height: 1.16;
+  margin: 18px 0;
+  font-weight: 500;
+}
+.bloom-hero-copy > p:not(.eyebrow) {
+  color: #e2fffa;
+  max-width: 460px;
+  font-size: 14px;
+  line-height: 1.8;
+}
+.bloom-hero-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-top: 24px;
+  font-size: 13px;
+}
+.bloom-hero-actions a {
+  text-decoration: none;
+  color: #fff;
+}
+.bloom-hero-actions .bloom-book {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  min-height: 46px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: #d5fff0;
+  color: #044c50;
+}
+.bloom-hero-emblem {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 20px;
+  position: relative;
+}
+.bloom-hero-emblem::before {
+  content: "";
+  position: absolute;
+  width: 310px;
+  height: 310px;
+  border: 1px solid #ffffff40;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.bloom-hero-emblem img {
+  width: min(240px, 100%);
+  height: auto;
+  border-radius: 50%;
+  z-index: 1;
+}
+.bloom-hero-emblem > span {
+  font-size: 12px;
+  color: #e2fffa;
+  z-index: 1;
+}
+.bloom-hero-links {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 18px;
+}
+.bloom-hero-links > a {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 22px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  color: var(--brand);
+  text-decoration: none;
+  background: var(--surface);
+}
+.bloom-hero-links > a > svg:last-child {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.bloom-hero-links > a > span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.bloom-hero-links strong {
+  display: block;
+  font-size: 14px;
+  color: var(--ink);
+  margin-top: 3px;
+}
+/* The schedule is a month workspace, with personal hours and the day's team. */
+.schedule-hub {
+  padding: 28px;
+}
+.schedule-hub .roster-heading {
+  margin-bottom: 24px;
+  align-items: flex-start;
+}
+.schedule-hub .roster-heading h2 {
+  font-size: 26px;
+  font-weight: 500;
+}
+.schedule-heading-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.schedule-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.schedule-summary-grid > div {
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--soft-surface);
+}
+.schedule-summary-grid > div > span {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+.schedule-summary-grid strong {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 30px;
+  font-weight: 500;
+  margin-top: 12px;
+  color: var(--ink);
+}
+.schedule-summary-grid strong small {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.schedule-policy-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.schedule-policy-note > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.schedule-policy-editor {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding-block: 8px 20px;
+}
+.schedule-policy-editor label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+}
+.schedule-policy-editor input {
+  width: 72px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  padding: 8px;
+  border-radius: 8px;
+}
+.schedule-month-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 310px;
+  gap: 20px;
+  align-items: start;
+  scroll-margin-top: 90px;
+}
+.schedule-month-card {
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 20px;
+  min-width: 0;
+}
+.schedule-calendar-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.schedule-view-switch {
+  display: flex;
+  background: var(--soft-surface);
+  padding: 4px;
+  border-radius: 999px;
+}
+.schedule-view-switch button {
+  padding: 7px 12px;
+  font-size: 12px;
+  border-radius: 999px;
+  color: var(--muted);
+  min-height: 36px;
+}
+.schedule-view-switch button[aria-pressed="true"] {
+  background: var(--brand);
+  color: #fff;
+}
+.schedule-hub .roster-days {
+  gap: 5px;
+}
+.schedule-hub .roster-days button {
+  min-width: 0;
+  min-height: 86px;
+  padding: 9px 5px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+.schedule-hub .roster-days button > strong {
+  font-size: 15px;
+}
+.schedule-hub .roster-days button > span {
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+.schedule-hub .roster-days button > small {
+  font-size: 9px;
+}
+.schedule-hub .roster-days button.has-own-hours {
+  background: var(--soft-surface);
+  border-color: #add8cc;
+}
+.schedule-hub .roster-days button.selected {
+  background: var(--brand);
+  color: #fff;
+  border-color: var(--brand);
+}
+.schedule-hub .roster-days button.selected :is(span, small, strong) {
+  color: #fff;
+}
+.schedule-hub .roster-days button.past-day:not(.selected) {
+  opacity: 0.55;
+}
+.schedule-calendar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-top: 16px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.schedule-calendar-legend > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.schedule-calendar-legend i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.legend-work {
+  background: var(--brand);
+}
+.legend-request {
+  background: #bf8737;
+}
+.schedule-hub .roster-day-detail {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--soft-surface);
+  min-width: 0;
+}
+.schedule-hub .roster-day-detail > h3 {
+  font-size: 24px;
+  font-weight: 500;
+  margin: 8px 0 20px;
+}
+.schedule-own-day {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 16px;
+}
+.schedule-own-day > span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.schedule-own-day > strong {
+  font-size: 22px;
+  color: var(--brand);
+  font-weight: 500;
+}
+.schedule-own-day > small {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.schedule-day-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 24px;
+}
+.schedule-team-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+}
+.schedule-team-heading h4 {
+  margin: 0;
+  font-weight: 500;
+}
+.schedule-hub .roster-person {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+}
+.schedule-hub .roster-person > span:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+}
+.schedule-hub .roster-person strong {
+  font-size: 12px;
+}
+.schedule-hub .roster-person small {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+}
+.schedule-hub .roster-avatar {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  font-size: 12px;
+}
+.schedule-person-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.schedule-person-actions button {
+  padding: 5px;
+  color: var(--brand);
+}
+.schedule-bottom-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-top: 20px;
+}
+.schedule-request-card {
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 20px;
+  min-width: 0;
+}
+.schedule-request-card > h3 {
+  font-size: 18px;
+  font-weight: 500;
+  margin: 0 0 8px;
+}
+.schedule-request-card > h3 > span {
+  font-size: 12px;
+  border-radius: 50%;
+  padding: 4px 8px;
+  background: var(--soft-surface);
+}
+.schedule-request-card > p {
+  font-size: 12px;
+  color: var(--muted);
+}
+.schedule-scroll-list {
+  max-height: 360px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.schedule-request-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  padding: 14px 0;
+}
+.schedule-request-row strong {
+  font-size: 13px;
+}
+.schedule-request-row small {
+  display: block;
+  font-size: 11px;
+  margin-top: 4px;
+  color: var(--muted);
+}
+.schedule-row-actions {
+  display: flex;
+  gap: 8px;
+}
+.schedule-row-actions > button:not(.erp-primary):not(.erp-secondary) {
+  padding: 8px;
+  color: var(--brand);
+}
+.schedule-my-day {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  padding: 14px 0;
+  font-size: 12px;
+  color: var(--ink);
+}
+.schedule-my-day strong {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--brand);
+}
+.work-time-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+.work-time-presets button {
+  padding: 8px 12px;
+  min-height: 40px;
+  border-radius: 999px;
+  background: var(--soft-surface);
+  border: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--ink);
+}
+.work-time-presets button[aria-pressed="true"] {
+  background: var(--brand);
+  color: #fff;
+}
+@media (max-width: 1250px) {
+  .schedule-month-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .schedule-hub .roster-day-detail {
+    display: block;
+  }
+}
+@media (max-width: 700px) {
+  .bloom-hero {
+    padding: 24px 16px;
+  }
+  .bloom-hero-labels {
+    font-size: 8px;
+  }
+  .bloom-wordmark {
+    font-size: 13vw;
+    padding: 20px 0;
+  }
+  .bloom-hero-feature {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 26px 22px;
+    gap: 24px;
+    border-radius: 20px;
+  }
+  .bloom-hero-emblem {
+    display: none;
+  }
+  .bloom-hero-links {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+  .bloom-hero-links > a {
+    padding: 16px;
+  }
+  .schedule-hub {
+    padding: 16px;
+  }
+  .schedule-hub .roster-heading h2 {
+    font-size: 21px;
+  }
+  .schedule-summary-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .schedule-summary-grid > div {
+    padding: 12px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .schedule-summary-grid strong {
+    font-size: 23px;
+    margin-top: 0;
+  }
+  .schedule-summary-grid strong small {
+    display: none;
+  }
+  .schedule-month-card {
+    padding: 12px 6px;
+  }
+  .schedule-hub .roster-days {
+    gap: 3px;
+  }
+  .schedule-hub .roster-days button {
+    min-height: 72px;
+    padding: 7px 2px;
+    border-radius: 8px;
+  }
+  .schedule-hub .roster-days button > span {
+    font-size: 8px;
+  }
+  .schedule-hub .roster-days button > small {
+    font-size: 8px;
+  }
+  .schedule-bottom-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .schedule-calendar-toolbar {
+    padding-inline: 6px;
+  }
+  .schedule-hub .roster-month {
+    flex-wrap: nowrap;
+    gap: 2px;
+  }
+  .schedule-hub .roster-month input {
+    min-width: 0;
+    width: 140px;
+  }
+  .schedule-policy-editor {
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 700px) {
+  .schedule-hub .roster-days button {
+    min-height: 48px;
+    position: relative;
+    padding: 8px 2px;
+  }
+  .schedule-hub .roster-days button > strong {
+    font-size: 14px;
+  }
+  .schedule-hub .roster-days button > span,
+  .schedule-hub .roster-days button > small {
+    display: none;
+  }
+  .schedule-hub .roster-days button.has-request::after {
+    content: "";
+    position: absolute;
+    bottom: 5px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #bf8737;
+    left: calc(50% - 2px);
+  }
+  .schedule-scroll-list {
+    max-height: 240px;
+  }
+}
+.bloom-hero-copy .eyebrow {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 700px) {
+  .schedule-hub .roster-month input {
+    width: 160px;
+  }
+}
+.public-home .bloom-hero-emblem .hero-logo {
+  width: min(260px, 100%);
+  height: auto;
+  aspect-ratio: 1;
+}
+html[data-theme="dark"] .schedule-own-day > strong,
+html[data-theme="dark"] .schedule-my-day strong,
+html[data-theme="dark"] .schedule-person-actions button,
+html[data-theme="dark"]
+  .schedule-row-actions
+  > button:not(.erp-primary):not(.erp-secondary) {
+  color: var(--erp-accent);
+}
+html[data-theme="dark"] .service-browser-price {
+  color: var(--teal);
+}
+.booking-contact-intro {
+  color: var(--muted);
+  font-size: 14px;
+  margin-top: -8px;
+}
+.booking-contact-fields {
+  padding: 0;
+  border: 0;
+  margin: 0;
+  min-width: 0;
+}
+.booking-contact-fields > legend {
+  padding: 0;
+  margin-bottom: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.booking-visit-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+.booking-visit-choices button {
+  text-align: left;
+  min-height: 48px;
+  border-radius: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+}
+.booking-visit-choices button[aria-pressed="true"] {
+  background: var(--soft-surface);
+  border-color: var(--teal);
+  color: var(--teal);
+}
+.booking-contact-fields output {
+  color: var(--teal);
+  font-size: 12px;
+}
+.booking-contact-fields .public-booking-fields label {
+  display: block;
+  min-width: 0;
+}
+.booking-contact-fields .public-booking-fields input,
+.booking-contact-fields .public-booking-fields select {
+  display: block;
+  margin-top: 8px;
+  width: 100%;
+}
+.booking-contact-fields .public-booking-fields {
+  align-items: start;
+}
+.booking-guardian-fields {
+  margin: 22px 0;
+  padding: 18px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--soft-surface);
+}
+.booking-guardian-fields h4 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+.booking-guardian-fields > p {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0 0 16px;
+}
+.booking-symptom-field {
+  display: block;
+  color: var(--ink);
+  font-size: 14px;
+  margin-top: 22px;
+}
+.booking-symptom-field > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.booking-symptom-field textarea {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  resize: vertical;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--ink);
+  background: var(--surface);
+  font: inherit;
+}
+@media (max-width: 600px) {
+  .booking-visit-choices {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .booking-guardian-fields {
+    padding: 14px;
+  }
+}
+.appointment-symptom {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 280px;
+  white-space: normal;
+}

@@ -1,9 +1,22 @@
+import { cookies } from "next/headers";
+import {
+  BOOKING_CONTACT_COOKIE,
+  bookingContactSession,
+  prepareBookingContact,
+} from "@/lib/booking-contact-session";
 import { publicSettingKeys } from "@/lib/clinic-settings";
-import { earliestAvailability } from "@/lib/availability-suggestions";
+import {
+  calendarAvailability,
+  earliestAvailability,
+} from "@/lib/availability-suggestions";
 import { connection } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { bookingSchema, createBooking, availability } from "@/lib/booking";
+import {
+  publicBookingSchema,
+  createBooking,
+  availability,
+} from "@/lib/booking";
 import { rateLimit } from "@/lib/auth";
 import { dateSchema, phoneSchema, today } from "@/lib/domain";
 import {
@@ -21,6 +34,23 @@ export async function GET(req: Request, ctx: Ctx) {
     ensureDatabase();
     const { action } = await ctx.params;
     const q = new URL(req.url).searchParams;
+    if (action === "calendar") {
+      const data = z
+        .object({
+          serviceId: z.string().uuid(),
+          doctorId: z.string().uuid().optional(),
+          from: dateSchema,
+          days: z.coerce.number().int().min(1).max(31),
+        })
+        .parse(Object.fromEntries(q));
+      const items = await calendarAvailability(
+        data.serviceId,
+        data.doctorId,
+        data.from,
+        data.days,
+      );
+      return json({ dates: [...new Set(items.map((item) => item.date))] });
+    }
     if (action === "earliest") {
       const data = z
         .object({
@@ -125,12 +155,45 @@ export async function POST(req: Request, ctx: Ctx) {
     sameOrigin(req);
     ensureDatabase();
     const { action } = await ctx.params;
-    if (action === "booking") {
-      const data = bookingSchema
-        .omit({ patientId: true, repeatOfId: true })
+    if (action === "returning-contact") {
+      const data = z
+        .object({ phone: phoneSchema, previouslyVisited: z.literal(true) })
         .parse(await body(req));
+      const source =
+        req.headers.get("cf-connecting-ip") ||
+        req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+        "unknown";
+      await rateLimit(`returning-contact:source:${source}`, 20, 900);
+      await rateLimit(`returning-contact:phone:${data.phone}`, 5, 900);
+      const contact = await db.patient.findUnique({
+        where: { phone: data.phone, active: true },
+        select: {
+          name: true,
+          birthDate: true,
+          gender: true,
+          guardianName: true,
+          guardianPhone: true,
+        },
+      });
+      return json({ contact });
+    }
+    if (action === "booking") {
+      const data = publicBookingSchema.parse(await body(req));
       await rateLimit(`booking:${data.phone}`, 6, 3600);
-      const created = await createBooking(data);
+      const cookieStore = await cookies();
+      const contact = await prepareBookingContact(
+        data,
+        cookieStore.get(BOOKING_CONTACT_COOKIE)?.value,
+        data.rememberContact,
+      );
+      const created = await createBooking(data, undefined, contact.session);
+      cookieStore.set(BOOKING_CONTACT_COOKIE, contact.token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        path: "/api/public",
+        maxAge: contact.maxAge,
+      });
       return json(
         { id: created.id, date: created.date, startTime: created.startTime },
         201,
@@ -141,10 +204,19 @@ export async function POST(req: Request, ctx: Ctx) {
         .object({ phone: phoneSchema, confirmed: z.literal(true) })
         .parse(await body(req));
       await rateLimit(`lookup:${data.phone}`, 10, 900);
+      const session = await bookingContactSession(
+        (await cookies()).get(BOOKING_CONTACT_COOKIE)?.value,
+        data.phone,
+      );
+      if (!session)
+        throw new ApiError(
+          403,
+          "Захиалга хийсэн төхөөрөмжөөсөө шалгах эсвэл эмнэлэгтэй холбогдоно уу.",
+        );
       return json({
         appointments: await db.appointment.findMany({
           where: {
-            patient: { phone: data.phone },
+            bookingContactId: session.id,
             status: { not: "CANCELLED" },
           },
           select: {

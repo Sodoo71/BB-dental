@@ -112,8 +112,10 @@ model Leave {
   status       String    @default("APPROVED")
   reviewedById String?
   reviewedAt   DateTime?
+  replacesId   String?
 
   @@index([doctorId, date])
+  @@index([replacesId])
 }
 
 model Service {
@@ -139,6 +141,8 @@ model Patient {
   phone          String            @unique
   birthDate      String            @default("")
   gender         String            @default("")
+  guardianName   String            @default("")
+  guardianPhone  String            @default("")
   address        String            @default("")
   allergies      String            @default("")
   medicalHistory String            @default("")
@@ -147,6 +151,8 @@ model Patient {
   appointments   Appointment[]
   treatments     Treatment[]
   payments       Payment[]
+  invoices       Invoice[]
+  queueEntries   QueueEntry[]
   documents      Document[]
   notes          PatientNote[]
   transfers      PatientTransfer[]
@@ -165,6 +171,13 @@ model Appointment {
   endTime     String
   status      AppointmentStatus @default(PENDING)
   note        String            @default("")
+  contactName String            @default("")
+  birthDate   String            @default("")
+  gender      String            @default("")
+  guardianName String           @default("")
+  guardianPhone String          @default("")
+  bookingContactId String?
+  bookingContact BookingContactSession? @relation(fields: [bookingContactId], references: [id], onDelete: SetNull)
   repeatOfId  String?
   repeatOf    Appointment?      @relation("Repeat", fields: [repeatOfId], references: [id])
   repeats     Appointment[]     @relation("Repeat")
@@ -172,6 +185,8 @@ model Appointment {
   createdAt   DateTime          @default(now())
   treatments  Treatment[]
   payments    Payment[]
+  queueEntry  QueueEntry?
+  invoices    Invoice[]
 
   @@index([doctorId, date])
   @@index([patientId, date])
@@ -195,6 +210,7 @@ model Treatment {
   date          String
   amount        Int
   createdAt     DateTime     @default(now())
+  invoiceItem   InvoiceItem?
 
   @@index([patientId, date])
 }
@@ -210,6 +226,12 @@ model Payment {
   note           String        @default("")
   date           String
   createdById    String
+  invoiceId      String?
+  invoice        Invoice?      @relation(fields: [invoiceId], references: [id])
+  cashSessionId  String?
+  cashSession    CashSession?  @relation(fields: [cashSessionId], references: [id])
+  reference      String        @default("")
+  refundRequests RefundRequest[]
   idempotencyKey String        @unique
   voidedAt       DateTime?
   voidReason     String        @default("")
@@ -327,4 +349,105 @@ model NurseShift {
   endTime   String
 
   @@index([date])
+}
+
+// This session remembers only details supplied by its browser, never clinical records.
+model BookingContactSession {
+  id           String @id @default(uuid())
+  tokenHash    String @unique
+  phone        String
+  profile      Json
+  expiresAt    DateTime
+  appointments Appointment[]
+  @@index([expiresAt])
+}
+
+
+// Reception billing extends the existing Payment ledger; payments are never copied.
+model Invoice {
+  id            String @id @default(uuid())
+  number        String @unique
+  patientId     String
+  patient       Patient @relation(fields: [patientId], references: [id])
+  appointmentId String?
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id])
+  status        String @default("DRAFT")
+  discount      Int @default(0)
+  total         Int @default(0)
+  dueDate       String
+  createdById   String
+  createdAt     DateTime @default(now())
+  finalizedAt   DateTime?
+  items         InvoiceItem[]
+  payments      Payment[]
+  @@index([patientId, status])
+  @@index([dueDate])
+}
+
+model InvoiceItem {
+  id          String @id @default(uuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id])
+  treatmentId String? @unique
+  treatment   Treatment? @relation(fields: [treatmentId], references: [id])
+  serviceId   String
+  description String
+  quantity    Int @default(1)
+  unitPrice   Int
+}
+
+model QueueEntry {
+  id            String @id @default(uuid())
+  appointmentId String? @unique
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id])
+  patientId     String
+  patient       Patient @relation(fields: [patientId], references: [id])
+  doctorId      String
+  date          String
+  number        Int
+  status        String @default("WAITING")
+  arrivedAt     DateTime @default(now())
+  calledAt      DateTime?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  createdById   String
+  @@unique([date, number])
+  @@index([date, status])
+}
+
+model CashSession {
+  id            String @id @default(uuid())
+  receptionistId String
+  openingCash   Int
+  openedAt      DateTime @default(now())
+  closedAt      DateTime?
+  actualCash    Int?
+  expectedCash  Int?
+  discrepancy   Int?
+  explanation   String @default("")
+  payments      Payment[]
+  withdrawals   CashWithdrawal[]
+  @@index([receptionistId, closedAt])
+}
+
+model CashWithdrawal {
+  id            String @id @default(uuid())
+  cashSessionId String
+  cashSession   CashSession @relation(fields: [cashSessionId], references: [id])
+  amount        Int
+  reason        String
+  createdById   String
+  createdAt     DateTime @default(now())
+}
+
+model RefundRequest {
+  id          String @id @default(uuid())
+  paymentId   String
+  payment     Payment @relation(fields: [paymentId], references: [id])
+  amount      Int
+  reason      String
+  status      String @default("REQUESTED")
+  requestedById String
+  createdAt   DateTime @default(now())
+  @@index([paymentId, status])
 }

@@ -34,6 +34,11 @@ import {
   ShieldCheck,
   ArrowUpRight,
   BadgeDollarSign,
+  Bell,
+  ListOrdered,
+  ClipboardCheck,
+  Receipt,
+  Wallet,
 } from "lucide-react";
 import { roleNames, type Role } from "@/lib/domain";
 export type SessionUser = {
@@ -115,7 +120,7 @@ const navigation = [
       },
       {
         id: "leaves",
-        label: "Чөлөө, хаалт",
+        label: "Хуваарийн хүсэлт, чөлөө",
         icon: Clock3,
         roles: ["ADMIN", "DOCTOR", "RECEPTION"],
       },
@@ -175,8 +180,20 @@ const navigation = [
     ],
   },
 ];
+const receptionNavigation = [{ section: "РЕСЕПШН", items: [
+  { id: "dashboard", label: "Хяналтын самбар", icon: LayoutDashboard, roles: ["RECEPTION"] },
+  { id: "patients", label: "Өвчтөнүүд", icon: Users, roles: ["RECEPTION"] },
+  { id: "appointments", label: "Цаг захиалга", icon: CalendarDays, roles: ["RECEPTION"] },
+  { id: "visits", label: "Өнөөдрийн үзлэг", icon: ClipboardCheck, roles: ["RECEPTION"] },
+  { id: "queue", label: "Дараалал", icon: ListOrdered, roles: ["RECEPTION"] },
+  { id: "payments", label: "Касс / POS", icon: CreditCard, roles: ["RECEPTION"] },
+  { id: "transactions", label: "Гүйлгээ", icon: Receipt, roles: ["RECEPTION"] },
+  { id: "receivables", label: "Авлага", icon: Wallet, roles: ["RECEPTION"] },
+  { id: "notifications", label: "Мэдэгдэл", icon: Bell, roles: ["RECEPTION"] },
+  { id: "reports", label: "Тайлан", icon: ChartNoAxesCombined, roles: ["RECEPTION"] },
+]}];
 export function canVisitSection(role: Role, section: string) {
-  return navigation
+  return (role === "RECEPTION" ? receptionNavigation : navigation)
     .flatMap((group) => group.items)
     .some((item) => item.id === section && item.roles.includes(role));
 }
@@ -196,7 +213,8 @@ export function ErpShell({
   const pathname = usePathname();
   const router = useRouter();
   const active = pathname.split("/")[2] || "dashboard";
-  const activeTitle = navigation
+  const roleNavigation = user.role === "RECEPTION" ? receptionNavigation : navigation;
+  const activeTitle = roleNavigation
     .flatMap((g) => g.items)
     .find((i) => i.id === active)?.label;
   useEffect(() => {
@@ -303,7 +321,7 @@ export function ErpShell({
             </span>
           </Link>
           <nav id="erp-navigation" aria-label="Ажлын цэс">
-            {navigation.map((group) => {
+            {roleNavigation.map((group) => {
               const items = group.items.filter((i) =>
                 i.roles.includes(user.role),
               );
@@ -376,7 +394,7 @@ export function ErpShell({
               Ажлын орчин <ChevronRight size={14} />
               <span>
                 {
-                  navigation
+                  roleNavigation
                     .flatMap((g) => g.items)
                     .find((i) => i.id === active)?.label
                 }
@@ -386,13 +404,13 @@ export function ErpShell({
               className="erp-global-search"
               onSubmit={(e) => {
                 e.preventDefault();
-                router.push(`/erp/services?q=${encodeURIComponent(search)}`);
+                router.push(`/erp/${user.role === "RECEPTION" ? "patients" : "services"}?q=${encodeURIComponent(search)}`);
               }}
             >
               <Search size={18} />
               <input
-                aria-label="Үйлчилгээ хайх"
-                placeholder="Үйлчилгээ хайх…"
+                aria-label={user.role === "RECEPTION" ? "Өвчтөн хайх" : "Үйлчилгээ хайх"}
+                placeholder={user.role === "RECEPTION" ? "Өвчтөн хайх…" : "Үйлчилгээ хайх…"}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />

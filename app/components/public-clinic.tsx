@@ -1,14 +1,10 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
-import {
-  ArrowLeft,
-  ArrowRight,
-  CalendarDays,
-  Check,
-  Search,
-  Stethoscope,
-} from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import ServiceBrowser from "./service-browser";
+import BookingContactForm from "./booking-contact-form";
+import AvailabilityCalendar from "./availability-calendar";
+import { ArrowLeft, ArrowRight, CalendarDays, Check } from "lucide-react";
 import { api, Feedback, useResource, type Entity } from "../erp/ui";
 import { money, normalizePhone, statusNames, today } from "@/lib/domain";
 
@@ -17,11 +13,12 @@ type Catalog = {
   doctors: Entity[];
   clinic?: Record<string, string>;
 };
-export default function PublicClinic({
-  onClinic,
-}: {
-  onClinic?: (clinic: Record<string, string>) => void;
-}) {
+export default function PublicClinic() {
+  const searchParams = useSearchParams();
+  const initialService = searchParams.get("service");
+  const initialDoctor = searchParams.get("doctor") || "";
+  const initialized = useRef<string | null>(null);
+  const initialQuery = searchParams.toString();
   const {
     data: catalogData,
     error,
@@ -29,11 +26,9 @@ export default function PublicClinic({
     retry: retryCatalog,
   } = useResource<Catalog>("/api/public/catalog");
   const catalog = catalogData || { services: [], doctors: [] };
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("");
   const [step, setStep] = useState(1);
   const [service, setService] = useState<Entity | null>(null);
-  const [doctorId, setDoctorId] = useState("");
+  const [doctorId, setDoctorId] = useState(initialDoctor);
   const [date, setDate] = useState(today());
   const [earliest, setEarliest] = useState<
     { date: string; startTime: string; doctorId: string; doctorName: string }[]
@@ -46,11 +41,7 @@ export default function PublicClinic({
     key: string;
     value: string;
   }>({ key: "", value: "" });
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [busy, setBusy] = useState(false);
   const [complete, setComplete] = useState(false);
-  const [bookingError, setBookingError] = useState("");
   const [lookup, setLookup] = useState(false);
   const [lookupPhone, setLookupPhone] = useState("");
   const [confirmed, setConfirmed] = useState(false);
@@ -58,8 +49,20 @@ export default function PublicClinic({
   const [lookupError, setLookupError] = useState("");
   const [lookupBusy, setLookupBusy] = useState(false);
   useEffect(() => {
-    if (catalogData?.clinic) onClinic?.(catalogData.clinic);
-  }, [catalogData, onClinic]);
+    if (!catalogData || initialized.current === initialQuery) return;
+    initialized.current = initialQuery;
+    const selected = catalogData.services.find((s) => s.id === initialService);
+    const doctor = catalogData.doctors.find((d) => d.id === initialDoctor);
+    setService(selected || null);
+    setStep(selected ? 2 : 1);
+    setComplete(false);
+    setDoctorId(
+      doctor &&
+        (!selected?.doctorIds?.length || selected.doctorIds.includes(doctor.id))
+        ? doctor.id
+        : "",
+    );
+  }, [catalogData, initialQuery, initialService, initialDoctor]);
   const suggestionsUrl =
     service && date
       ? `/api/public/suggestions?${new URLSearchParams({ serviceId: service.id, date })}`
@@ -95,22 +98,15 @@ export default function PublicClinic({
   const setTime = (value: string) =>
     setTimeSelection({ key: availabilityUrl || "", value });
   const contactTel = `tel:+976${(catalog.clinic?.phone || "95963531").replace(/\D/g, "").replace(/^976/, "")}`;
-  const categories = [
-    ...new Set(catalog.services.map((s) => s.category || "Бусад")),
-  ];
-  const filtered = catalog.services.filter(
-    (s) =>
-      (!category || s.category === category) &&
-      (!search ||
-        s.name?.toLocaleLowerCase().includes(search.toLocaleLowerCase())),
-  );
   function choose(s: Entity) {
     earliestRequest.current++;
     setFindingEarliest(false);
     setEarliest([]);
     setEarliestError("");
     setSuggestedTime("");
-    setDoctorId("");
+    setDoctorId((id) =>
+      !s.doctorIds?.length || s.doctorIds.includes(id) ? id : "",
+    );
     setService(s);
     setStep(2);
     setComplete(false);
@@ -119,127 +115,6 @@ export default function PublicClinic({
   return (
     <>
       {error && <Feedback retry={retryCatalog}>{error}</Feedback>}
-      <section className="public-services" id="services">
-        <div className="section-heading">
-          <p className="eyebrow">МАНАЙ ҮЙЛЧИЛГЭЭ</p>
-          <h2>Таны инээмсэглэлд зориулсан үйлчилгээ</h2>
-          <p>Үйлчилгээгээ хялбар сонгож, өөрт тохирох цагаа аваарай.</p>
-        </div>
-        <div className="public-category-tabs">
-          <button
-            className={!category ? "selected" : ""}
-            onClick={() => setCategory("")}
-          >
-            Бүгд
-          </button>
-          {categories.map((c) => (
-            <button
-              key={c}
-              className={category === c ? "selected" : ""}
-              onClick={() => setCategory(c)}
-            >
-              {c}
-            </button>
-          ))}
-        </div>
-        <div className="public-service-grid">
-          {loading ? (
-            <p className="public-empty">Үйлчилгээ ачаалж байна…</p>
-          ) : filtered.length ? (
-            filtered.map((s) => (
-              <button
-                key={s.id}
-                className="public-service-card"
-                onClick={() => choose(s)}
-              >
-                {s.imageUrl ? (
-                  <span className="service-photo">
-                    <Image
-                      src={s.imageUrl}
-                      alt={s.name || "Үйлчилгээний зураг"}
-                      fill
-                      unoptimized
-                      sizes="(max-width:550px) 100vw, 380px"
-                      style={{ objectFit: "cover" }}
-                    />
-                  </span>
-                ) : (
-                  <span className="service-symbol">
-                    <Stethoscope size={23} />
-                  </span>
-                )}
-                <small>{s.category}</small>
-                <h3>{s.name}</h3>
-                <p>
-                  {s.description ||
-                    "Мэргэжлийн багийн чанартай шүдний тусламж үйлчилгээ."}
-                </p>
-                <div>
-                  <strong>{money(s.price || 0)}</strong>
-                  <span>
-                    Цаг сонгох <ArrowRight size={16} />
-                  </span>
-                </div>
-              </button>
-            ))
-          ) : (
-            <p className="public-empty">
-              {error || "Үйлчилгээний мэдээлэл удахгүй нэмэгдэнэ."}
-            </p>
-          )}
-        </div>
-      </section>
-      <section className="public-doctors" id="doctors">
-        <div className="section-heading">
-          <p className="eyebrow">МАНАЙ БАГ</p>
-          <h2>Таны төлөө мэргэжлийн эмч нар</h2>
-          <p>Эрүүл инээмсэглэлийг хамтдаа бүтээе.</p>
-        </div>
-        <div className="public-doctor-grid">
-          {catalog.doctors.length ? (
-            catalog.doctors.map((d) => (
-              <article className="public-doctor-card" key={d.id}>
-                {d.imageUrl ? (
-                  <div
-                    className="doctor-photo"
-                    style={{
-                      backgroundImage: `url("${d.imageUrl.replace(/["\\\n]/g, "")}")`,
-                    }}
-                    role="img"
-                    aria-label={d.name}
-                  />
-                ) : (
-                  <div className="doctor-placeholder">
-                    <Stethoscope size={43} />
-                  </div>
-                )}
-                <h3>{d.name}</h3>
-                <small>{d.specialty}</small>
-                <p>{d.bio}</p>
-                <button
-                  className="button button-outline"
-                  onClick={() => {
-                    setDoctorId(d.id);
-                    document
-                      .getElementById("booking")
-                      ?.scrollIntoView({ behavior: "smooth" });
-                  }}
-                >
-                  Цаг авах <ArrowRight size={16} />
-                </button>
-              </article>
-            ))
-          ) : (
-            <p className="public-empty">
-              {loading
-                ? "Эмчийн мэдээлэл ачаалж байна…"
-                : error
-                  ? "Эмчийн мэдээлэл ачаалж чадсангүй."
-                  : "Эмчийн мэдээлэл удахгүй нэмэгдэнэ."}
-            </p>
-          )}
-        </div>
-      </section>
       {suggestionError && (
         <Feedback retry={retrySuggestions}>{suggestionError}</Feedback>
       )}
@@ -254,7 +129,7 @@ export default function PublicClinic({
       >
         <div className="section-heading">
           <p className="eyebrow">ОНЛАЙН ЦАГ ЗАХИАЛГА</p>
-          <h2 id="booking-title">Үзлэгийн цагаа захиалаарай</h2>
+          <h1 id="booking-title">Үзлэгийн цагаа захиалаарай</h1>
           <p>Үйлчилгээгээ сонгоод, өөрт тохирох цагаа баталгаажуулаарай.</p>
         </div>
         <div className="booking-panel">
@@ -288,8 +163,6 @@ export default function PublicClinic({
                     setComplete(false);
                     setService(null);
                     setTime("");
-                    setName("");
-                    setPhone("");
                   }}
                 >
                   Дахин цаг авах
@@ -300,47 +173,13 @@ export default function PublicClinic({
                 {step === 1 && (
                   <>
                     <h3>Үйлчилгээ сонгох</h3>
-                    <div className="search-field">
-                      <Search size={22} />
-                      <input
-                        type="search"
-                        aria-label="Үйлчилгээний нэрээр хайх"
-                        placeholder="Үйлчилгээний нэрээр хайх..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                      />
-                    </div>
-                    <div className="category-field">
-                      <label htmlFor="service-category">Ангилал</label>
-                      <select
-                        id="service-category"
-                        value={category}
-                        onChange={(e) => setCategory(e.target.value)}
-                      >
-                        <option value="">Бүх үйлчилгээ</option>
-                        {categories.map((c) => (
-                          <option key={c}>{c}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="booking-service-list">
-                      {filtered.map((s) => (
-                        <button key={s.id} onClick={() => choose(s)}>
-                          <span>
-                            <strong>{s.name}</strong>
-                            <small>{s.category}</small>
-                          </span>
-                          <span>
-                            {money(s.price || 0)} <ArrowRight size={17} />
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                    {!filtered.length && (
-                      <p className="empty-state" role="status">
-                        {loading
-                          ? "Ачаалж байна…"
-                          : error || "Үйлчилгээ олдсонгүй."}{" "}
+                    <ServiceBrowser
+                      services={catalog.services}
+                      loading={loading}
+                      onSelect={choose}
+                    />
+                    {error && (
+                      <p className="empty-state">
                         <a href={contactTel}>Утсаар цаг авах</a>
                       </p>
                     )}
@@ -357,30 +196,44 @@ export default function PublicClinic({
                         Эмч
                         <select
                           value={doctorId}
-                          onChange={(e) => setDoctorId(e.target.value)}
+                          onChange={(e) => {
+                            earliestRequest.current++;
+                            setEarliest([]);
+                            setEarliestError("");
+                            setFindingEarliest(false);
+                            setSuggestedTime("");
+                            setDoctorId(e.target.value);
+                          }}
                         >
-                          <option value="">Эмч сонгох</option>
-                          {suggestions.map(({ doctor: d }) => (
-                            <option value={d.id} key={d.id}>
-                              {d.name} · {d.specialty}
-                            </option>
-                          ))}
+                          <option value="">Өдрөөр хайх · Бүх эмч</option>
+                          {catalog.doctors
+                            .filter(
+                              (d) =>
+                                !service?.doctorIds?.length ||
+                                service.doctorIds.includes(d.id),
+                            )
+                            .map((d) => (
+                              <option value={d.id} key={d.id}>
+                                {d.name} · {d.specialty}
+                              </option>
+                            ))}
                         </select>
                       </label>
-                      <label>
-                        Үзлэгийн өдөр
-                        <input
-                          type="date"
-                          min={today()}
-                          max={`${Number(today().slice(0, 4)) + 1}-12-31`}
-                          value={date}
-                          onChange={(e) => {
-                            setSuggestedTime("");
-                            setDate(e.target.value);
-                          }}
-                        />
-                      </label>
                     </div>
+                    {service && (
+                      <AvailabilityCalendar
+                        serviceId={service.id}
+                        doctorId={doctorId}
+                        date={date}
+                        onChange={(value) => {
+                          setSuggestedTime("");
+                          setDate(value);
+                        }}
+                      />
+                    )}
+                    <p className="booking-selected-date">
+                      Сонгосон өдөр: {date}
+                    </p>
                     <div className="suggestion-list" aria-live="polite">
                       <button
                         type="button"
@@ -395,7 +248,7 @@ export default function PublicClinic({
                             const response = await api<{
                               items: typeof earliest;
                             }>(
-                              `/api/public/earliest?${new URLSearchParams({ serviceId: service.id, from: today() })}`,
+                              `/api/public/earliest?${new URLSearchParams({ serviceId: service.id, ...(doctorId ? { doctorId } : {}), from: today() })}`,
                             );
                             if (request !== earliestRequest.current) return;
                             setEarliest(response.items);
@@ -437,7 +290,7 @@ export default function PublicClinic({
                           ))}
                         </div>
                       )}
-                      <h4>Танд санал болгох эмч, цаг</h4>
+                      <h4>Энэ өдөр цаг авч болох эмч нарын жагсаалт:</h4>
                       {suggesting ? (
                         <p>Боломжит цагийг тооцоолж байна…</p>
                       ) : suggestions.length ? (
@@ -477,6 +330,7 @@ export default function PublicClinic({
                         <p>Энэ өдөр сул цаг алга. Өөр өдөр сонгоно уу.</p>
                       )}
                     </div>
+                    {doctorId && <h4>Сонгосон эмчийн боломжтой цаг</h4>}
                     <div className="public-time-slots">
                       {slots.map((s) => (
                         <button
@@ -508,81 +362,30 @@ export default function PublicClinic({
                   </>
                 )}
                 {step === 3 && (
-                  <form
-                    onSubmit={async (e) => {
-                      e.preventDefault();
-                      setBusy(true);
-                      setBookingError("");
-                      try {
-                        await api("/api/public/booking", "POST", {
-                          name,
-                          phone,
-                          serviceId: service?.id,
-                          doctorId,
-                          date,
-                          startTime: time,
-                        });
-                        setComplete(true);
-                      } catch (e) {
-                        setBookingError((e as Error).message);
-                      } finally {
-                        setBusy(false);
-                      }
+                  <BookingContactForm
+                    onBack={() => setStep(2)}
+                    onSubmit={async (contact) => {
+                      await api("/api/public/booking", "POST", {
+                        ...contact,
+                        serviceId: service?.id,
+                        doctorId,
+                        date,
+                        startTime: time,
+                      });
+                      setComplete(true);
                     }}
-                  >
-                    <h3>Захиалгаа баталгаажуулах</h3>
-                    <div className="public-booking-summary">
-                      <span>{service?.name}</span>
-                      <span>
-                        {catalog.doctors.find((d) => d.id === doctorId)?.name}
-                      </span>
-                      <strong>
-                        {date} · {time}
-                      </strong>
-                    </div>
-                    <div className="public-booking-fields">
-                      <label>
-                        Таны нэр
-                        <input
-                          required
-                          value={name}
-                          minLength={2}
-                          maxLength={100}
-                          onChange={(e) => setName(e.target.value)}
-                          autoComplete="name"
-                        />
-                      </label>
-                      <label>
-                        Утасны дугаар
-                        <input
-                          type="tel"
-                          required
-                          pattern="[0-9 +\-]{8,15}"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                          autoComplete="tel"
-                        />
-                      </label>
-                    </div>
-                    <p className="booking-privacy-note">
-                      Эмнэлэг захиалгыг баталгаажуулах зорилгоор таны нэр, утсыг
-                      ашиглана.
-                    </p>
-                    <div className="booking-navigation">
-                      <button type="button" onClick={() => setStep(2)}>
-                        <ArrowLeft size={16} /> Буцах
-                      </button>
-                      <button className="button" disabled={busy}>
-                        {busy ? "Бүртгэж байна…" : "Захиалга илгээх"}
-                        <Check size={17} />
-                      </button>
-                    </div>
-                  </form>
-                )}
-                {bookingError && (
-                  <p className="public-error" role="alert">
-                    {bookingError}
-                  </p>
+                    summary={
+                      <div className="public-booking-summary">
+                        <span>{service?.name}</span>
+                        <span>
+                          {catalog.doctors.find((d) => d.id === doctorId)?.name}
+                        </span>
+                        <strong>
+                          {date} · {time}
+                        </strong>
+                      </div>
+                    }
+                  />
                 )}
               </>
             )}

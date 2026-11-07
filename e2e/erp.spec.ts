@@ -253,7 +253,7 @@ test("manual booking, concurrent overlap rejection and own-patient access", asyn
     endTime: "10:00",
     reason: "Чөлөө",
   });
-  expect(busyLeave.status()).toBe(409);
+  expect(busyLeave.status()).toBe(403);
   expect(
     (
       await post(doctor, "/api/erp/schedules", {
@@ -289,7 +289,7 @@ test("manual booking, concurrent overlap rejection and own-patient access", asyn
     endTime: "10:00",
   });
   expect(badHours.status()).toBe(409);
-  const goodHours = await patch(doctor, `/api/erp/schedules/${schedule.id}`, {
+  const goodHours = await patch(admin, `/api/erp/schedules/${schedule.id}`, {
     doctorId,
     weekday: schedule.weekday,
     startTime: "09:00",
@@ -413,7 +413,7 @@ test("inventory atomic stock, documents and export files", async () => {
   await book.xlsx.load(Uint8Array.from(await excel.body()).buffer);
   expect(book.getWorksheet("Төлбөр")!.rowCount).toBeGreaterThan(1);
 });
-test("public lookup is confirmed and contains booking fields only; CSRF blocked", async () => {
+test("public lookup requires a booking receipt session; CSRF blocked", async () => {
   const ctx = await playwrightRequest.newContext({ baseURL: origin });
   expect(
     (
@@ -427,19 +427,8 @@ test("public lookup is confirmed and contains booking fields only; CSRF blocked"
     phone: phones.patient,
     confirmed: true,
   });
-  expect(res.status()).toBe(200);
-  const result = await res.json();
-  expect(result.appointments.length).toBeGreaterThan(0);
-  for (const item of result.appointments) {
-    expect(Object.keys(item).sort()).toEqual([
-      "date",
-      "doctor",
-      "id",
-      "service",
-      "startTime",
-      "status",
-    ]);
-  }
+  expect(res.status()).toBe(403);
+  expect((await res.json()).appointments).toBeUndefined();
   expect(
     (
       await ctx.post("/api/public/booking", {
@@ -498,60 +487,103 @@ test("sidebar navigation leaves reports and follows the URL through back and for
   ).toBeVisible();
 });
 
-test("admin and doctor choose recurring work days from the schedule calendar", async ({
+test("doctor submits dated working hours and cannot bypass admin approval", async ({
   page,
 }) => {
+  const denied = await post(doctor, "/api/erp/schedule-week", {
+    doctorId,
+    days: Array.from({ length: 7 }, (_, weekday) => ({
+      weekday,
+      off: false,
+      startTime: "09:00",
+      endTime: "18:00",
+    })),
+  });
+  expect(denied.status()).toBe(403);
+  expect(
+    (
+      await post(doctor, "/api/erp/schedules", {
+        doctorId,
+        weekday: 1,
+        startTime: "09:00",
+        endTime: "18:00",
+      })
+    ).status(),
+  ).toBe(403);
   let payload: Record<string, unknown> = {};
-  await page.route("**/api/erp/schedules", async (route) => {
+  await page.route("**/api/erp/leaves", async (route) => {
     if (route.request().method() !== "POST") return route.continue();
     payload = route.request().postDataJSON();
-    await route.fulfill({ status: 200, json: { id: "calendar-form-check" } });
-  });
-  for (const phone of [phones.admin, phones.doctor]) {
-    await page.goto("/login");
-    await page.getByLabel("Утасны дугаар", { exact: true }).fill(phone);
-    await page.getByLabel("Нууц үг", { exact: true }).fill(password);
-    await page.getByRole("button", { name: "Нэвтрэх", exact: true }).click();
-    await expect(page).toHaveURL(/\/erp$/);
-    await page.goto("/erp/schedules");
-    await page
-      .getByRole("button", { name: "Шинээр нэмэх", exact: true })
-      .click();
-    const dialog = page.getByRole("dialog");
-    const doctorSelect = dialog.getByLabel("Эмч", { exact: true });
-    if (phone === phones.admin) await doctorSelect.selectOption(doctorId);
-    else {
-      await expect(doctorSelect).toHaveValue(doctorId);
-      await expect(doctorSelect).toBeDisabled();
-    }
-    await dialog
-      .getByLabel("Хуваарь сонгох сар", { exact: true })
-      .fill("2026-12");
-    await dialog
-      .getByRole("button", { name: "2026-12-07, Даваа", exact: true })
-      .click();
-    await expect(
-      dialog.getByRole("button", { name: "2026-12-14, Даваа", exact: true }),
-    ).toHaveAttribute("aria-pressed", "true");
-    await expect(dialog.getByRole("status")).toContainText(
-      "Долоо хоног бүрийн Даваа",
-    );
-    await dialog.getByLabel("Эхлэх цаг", { exact: true }).fill("18:00");
-    await dialog.getByLabel("Дуусах цаг", { exact: true }).fill("10:00");
-    await dialog.getByRole("button", { name: "Хадгалах", exact: true }).click();
-    await expect(dialog.getByRole("alert")).toContainText(
-      "Эхлэх цаг дуусах цагаас өмнө байна.",
-    );
-    await dialog.getByLabel("Эхлэх цаг", { exact: true }).fill("09:00");
-    await dialog.getByRole("button", { name: "Хадгалах", exact: true }).click();
-    await expect(dialog).not.toBeVisible();
-    expect(payload).toEqual({
-      doctorId,
-      weekday: 1,
-      startTime: "09:00",
-      endTime: "10:00",
+    await route.fulfill({
+      status: 201,
+      json: { id: "work-day-request", status: "PENDING" },
     });
-  }
+  });
+  await page.goto("/login");
+  await page.getByLabel("Утасны дугаар", { exact: true }).fill(phones.doctor);
+  await page.getByLabel("Нууц үг", { exact: true }).fill(password);
+  await page.getByRole("button", { name: "Нэвтрэх", exact: true }).click();
+  await expect(page).toHaveURL(/\/erp$/);
+  await page.goto("/erp/schedules");
+  await expect(
+    page.getByRole("button", { name: "Долоо хоног засах" }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Хуваарь үүсгэх" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByLabel("Эмч", { exact: true })).toBeDisabled();
+  await dialog.getByLabel("Ажиллах өдөр", { exact: true }).fill(day);
+  await dialog.getByLabel("Эхлэх цаг", { exact: true }).fill("14:00");
+  await dialog.getByLabel("Дуусах цаг", { exact: true }).fill("18:00");
+  await dialog.getByRole("button", { name: "Хүсэлт илгээх" }).click();
+  await expect(dialog).not.toBeVisible();
+  expect(payload).toMatchObject({
+    doctorId,
+    date: day,
+    startTime: "14:00",
+    endTime: "18:00",
+    kind: "SCHEDULE_OVERRIDE",
+  });
+});
+
+test("admin creates working hours for a calendar date", async ({ page }) => {
+  let payload: Record<string, unknown> = {};
+  await page.route("**/api/erp/leaves", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    payload = route.request().postDataJSON();
+    await route.fulfill({
+      status: 201,
+      json: { id: "calendar-form-check", status: "APPROVED" },
+    });
+  });
+  await page.goto("/login");
+  await page.getByLabel("Утасны дугаар", { exact: true }).fill(phones.admin);
+  await page.getByLabel("Нууц үг", { exact: true }).fill(password);
+  await page.getByRole("button", { name: "Нэвтрэх", exact: true }).click();
+  await expect(page).toHaveURL(/\/erp$/);
+  await page.goto("/erp/schedules");
+  await page.getByLabel("Хуваарийн сар").fill(day.slice(0, 7));
+  await page.getByRole("button", { name: new RegExp(`^${day}:`) }).click();
+  await page
+    .getByRole("button", { name: "Хуваарь үүсгэх", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Эмч", { exact: true }).selectOption(doctorId);
+  await expect(dialog.getByLabel("Ажиллах өдөр", { exact: true })).toHaveValue(
+    day,
+  );
+  await dialog.getByLabel("Эхлэх цаг", { exact: true }).fill("09:00");
+  await dialog.getByLabel("Дуусах цаг", { exact: true }).fill("18:00");
+  await dialog
+    .getByRole("button", { name: "Хуваарь баталж хадгалах", exact: true })
+    .click();
+  await expect(dialog).not.toBeVisible();
+  expect(payload).toMatchObject({
+    doctorId,
+    date: day,
+    kind: "SCHEDULE_OVERRIDE",
+    startTime: "09:00",
+    endTime: "18:00",
+  });
 });
 
 test("admin dashboard, patient card and responsive public UI", async ({
@@ -608,10 +640,10 @@ test("admin dashboard, patient card and responsive public UI", async ({
     ),
   ).toBe(true);
   const serviceBox = await page
-    .locator(".public-service-card")
+    .locator(".service-browser-item")
     .first()
     .boundingBox();
-  expect(serviceBox!.width / serviceBox!.height).toBeCloseTo(3 / 4, 2);
+  expect(serviceBox!.height).toBeLessThan(180);
   await page.screenshot({
     path: "test-results/home-mobile.png",
     fullPage: true,
@@ -619,24 +651,31 @@ test("admin dashboard, patient card and responsive public UI", async ({
   expect(errors).toEqual([]);
 });
 
-test("public visitor completes three-step booking and checks phone-only appointment", async ({
+test("public visitor completes three-step booking and checks receipt-bound appointment", async ({
   page,
 }) => {
   await page.goto("/");
   await page
-    .locator(".public-service-card")
+    .locator(".service-browser-item")
     .filter({ hasText: `QA Үзлэг ${phoneBase}` })
     .first()
     .click();
   await expect(
     page.getByRole("heading", { name: "Эмч, өдөр, цагаа сонгох" }),
   ).toBeVisible();
-  await page.locator(".public-booking-fields input[type=date]").fill(day);
+  await page
+    .getByRole("button", { name: `${day}: сул цагтай`, exact: true })
+    .click();
   await page.locator(".public-booking-fields select").selectOption(doctorId);
   await page.locator(".public-time-slots button").first().click();
   await page.getByRole("button", { name: "Үргэлжлүүлэх", exact: true }).click();
-  await page.getByLabel("Таны нэр").fill("QA Нийтийн захиалга");
+  await page
+    .getByRole("button", { name: "Үгүй, анх удаа", exact: true })
+    .click();
   await page.getByLabel("Утасны дугаар", { exact: true }).fill(phones.public);
+  await page
+    .getByLabel("Овог, нэр", { exact: true })
+    .fill("QA Нийтийн захиалга");
   await page.getByRole("button", { name: "Захиалга илгээх" }).click();
   await expect(
     page.getByRole("heading", { name: "Таны захиалга бүртгэгдлээ" }),
@@ -903,7 +942,9 @@ test("admin uploads service images and a PDF logo from the UI", async ({
   const row = page
     .getByRole("row")
     .filter({ hasText: `QA Үзлэг ${phoneBase}` });
-  await row.getByRole("button", { name: `Засах · QA Үзлэг ${phoneBase}`, exact: true }).click();
+  await row
+    .getByRole("button", { name: `Засах · QA Үзлэг ${phoneBase}`, exact: true })
+    .click();
   await page.getByRole("dialog").locator('input[type="file"]').setInputFiles({
     name: "service.png",
     mimeType: "image/png",
@@ -949,7 +990,7 @@ test("admin uploads service images and a PDF logo from the UI", async ({
     await expect(logo).toHaveAttribute("src", savedLogo);
   await expect(
     page
-      .locator(".public-service-card")
+      .locator(".service-browser-item")
       .filter({ hasText: `QA Үзлэг ${phoneBase}` })
       .getByRole("img"),
   ).toBeVisible();
@@ -1372,7 +1413,7 @@ test("service eligibility drives suggestions and booking duration stays internal
   expect(
     (
       await post(admin, "/api/public/booking", {
-        name: "QA Suggested",
+        name: "QA Нийтийн захиалга",
         phone: phones.public,
         doctorId: otherDoctorId,
         serviceId: focusedServiceId,
@@ -1386,7 +1427,7 @@ test("service eligibility drives suggestions and booking duration stays internal
     data: { telegramChatId: "22334455" },
   });
   const response = await post(admin, "/api/public/booking", {
-    name: "QA Suggested",
+    name: "QA Нийтийн захиалга",
     phone: phones.public,
     doctorId,
     serviceId: focusedServiceId,
@@ -1591,11 +1632,12 @@ test("guided dental chart, team calendar and persistent dark theme work for staf
   await expect(page.locator(".roster-day-detail")).toContainText(
     `QA Сувилагч ${phoneBase}`,
   );
-  await page.locator(".roster-person").first().click();
-  await expect(page.getByRole("dialog")).toContainText(
-    "Долоо хоногийн тогтмол хуваарь",
+  await expect(page.locator(".roster-day-detail")).toContainText(
+    "Хамт ажиллах баг",
   );
-  await page.getByRole("button", { name: "Хаах", exact: true }).click();
+  await expect(
+    page.locator(".roster-day-detail .roster-person").first(),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Бараан горим", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page.screenshot({
@@ -1686,14 +1728,16 @@ test("role workspaces show focused actions and public suggested times complete t
   await desk.dispose();
   await page.goto("/");
   await page
-    .locator(".public-service-card")
+    .locator(".service-browser-item")
     .filter({ hasText: `QA Тусгай ${phoneBase}` })
     .click();
-  await page.locator(".public-booking-fields input[type=date]").fill(day);
+  await page
+    .getByRole("button", { name: `${day}: сул цагтай`, exact: true })
+    .click();
   await expect(page.locator(".suggestion-list article")).toHaveCount(1);
-  await expect(page.locator(".booking-selected-service")).not.toContainText(
-    "минут",
-  );
+  await expect(
+    page.locator(".booking-selected-service").first(),
+  ).not.toContainText("минут");
   await page.locator(".suggestion-list article button").first().click();
   await expect(page.locator(".public-time-slots button.selected")).toHaveCount(
     1,

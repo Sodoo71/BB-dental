@@ -34,7 +34,7 @@ export default function WeekScheduleEditor({
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const close = useModalGuard(busy, { doctorId, days });
+  const close = useModalGuard(busy);
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
