@@ -19,6 +19,11 @@ html h1 {
 .public-home .main-nav a {
   border-radius: 999px;
 }
+@media (max-width: 640px) {
+  .public-home .main-nav.is-open {
+    border-radius: 0;
+  }
+}
 .public-home .site-header {
   border-bottom: 1px solid var(--line);
   box-shadow: none;
