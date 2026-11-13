@@ -10,6 +10,7 @@ import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../app/generated/prisma/client";
 import { chromium } from "@playwright/test";
+import ExcelJS from "exceljs";
 import { today } from "../lib/domain";
 const dir = await mkdtemp(join(tmpdir(), "bb-reception-browser-"));
 const database = await PGlite.create();
@@ -28,7 +29,7 @@ const pool = new Pool({
 });
 const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
 const base = "http://localhost:3197";
-let app, browser;
+let app, browser, testPage;
 let logs = "";
 let checks = 0;
 function pass(message) {
@@ -105,6 +106,13 @@ try {
       endTime: "09:30",
       status: "CONFIRMED",
     },
+  });
+  await prisma.setting.createMany({
+    data: [
+      { key: "clinicName", value: "BB Dental QA" },
+      { key: "phone", value: "77112233" },
+      { key: "address", value: "Улаанбаатар, туршилтын хаяг" },
+    ],
   });
   const connection = "postgresql://postgres@127.0.0.1:3198/reception_test";
   app = spawn(
@@ -449,6 +457,71 @@ try {
   pass(
     "Admin special time supports missing roster and approved day off while still rejecting inactive doctors",
   );
+  const pendingBooking = await call("/api/public/booking", null, "POST", {
+    name: patient.name,
+    phone: patient.phone,
+    doctorId: doctor.id,
+    serviceId: service.id,
+    date: "2099-04-01",
+    startTime: "09:00",
+  });
+  assert.equal(pendingBooking.status, 201);
+  assert.equal(
+    (
+      await prisma.appointment.findUniqueOrThrow({
+        where: { id: pendingBooking.body.id },
+      })
+    ).status,
+    "PENDING",
+  );
+  assert.equal(
+    (
+      await call(
+        `/api/erp/appointments/${pendingBooking.body.id}`,
+        "RECEPTION",
+        "PATCH",
+        { status: "CONFIRMED" },
+      )
+    ).status,
+    200,
+  );
+  const followUp = await call("/api/erp/appointments", "RECEPTION", "POST", {
+    name: patient.name,
+    phone: patient.phone,
+    patientId: patient.id,
+    doctorId: doctor.id,
+    serviceId: service.id,
+    date: "2099-04-02",
+    startTime: "09:00",
+    repeatOfId: pendingBooking.body.id,
+  });
+  assert.equal(followUp.status, 201);
+  assert.equal(
+    (
+      await prisma.appointment.findUniqueOrThrow({
+        where: { id: followUp.body.id },
+      })
+    ).repeatOfId,
+    pendingBooking.body.id,
+  );
+  assert.equal(
+    (
+      await call(
+        `/api/erp/appointments/${pendingBooking.body.id}`,
+        "RECEPTION",
+        "PATCH",
+        { status: "CANCELLED", note: "Test cancellation" },
+      )
+    ).status,
+    200,
+  );
+  assert.equal(
+    await prisma.payment.count({ where: { patientId: patient.id } }),
+    0,
+  );
+  pass(
+    "Unpaid public appointment confirms, follow-up links to original and cancellation persists",
+  );
   browser = await chromium.launch();
   const context = await browser.newContext({
     viewport: { width: 1440, height: 1000 },
@@ -457,25 +530,26 @@ try {
     { name: "bb_session", value: tokens.RECEPTION, url: base },
   ]);
   const page = await context.newPage();
+  testPage = page;
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(base + "/erp");
   await page
-    .getByRole("heading", { name: "Хяналтын самбар", exact: true })
+    .getByRole("heading", { name: "Нүүр хуудас", exact: true })
     .waitFor();
   await page.getByText("Test Patient", { exact: true }).waitFor();
   const nav = page.locator("#erp-navigation");
   assert.equal(await nav.locator("a").count(), 10);
   for (const [route, title] of [
-    ["patients", "Өвчтөнүүд"],
-    ["appointments", "Цаг захиалга"],
-    ["visits", "Өнөөдрийн үзлэг"],
-    ["queue", "Дараалал"],
-    ["payments", "Касс / POS"],
-    ["transactions", "Гүйлгээ"],
-    ["receivables", "Авлага"],
-    ["notifications", "Мэдэгдэл"],
-    ["reports", "Тайлан"],
+    ["patients", "Өвчтөн бүртгэл"],
+    ["appointments", "Цаг авах"],
+    ["visits", "Өнөөдрийн өвчтөнүүд"],
+    ["queue", "Хүлээж буй өвчтөн"],
+    ["payments", "Төлбөр авах"],
+    ["transactions", "Төлбөрийн түүх"],
+    ["receivables", "Төлөгдөөгүй төлбөр"],
+    ["notifications", "Мэдэгдлүүд"],
+    ["reports", "Миний тайлан"],
   ]) {
     await nav.getByRole("link", { name: title, exact: true }).click();
     await page
@@ -499,6 +573,18 @@ try {
   await page.goto(base + "/erp/appointments");
   await page.getByRole("button", { name: "Цаг захиалах", exact: true }).click();
   const bookingDialog = page.getByRole("dialog");
+  async function registerBookingPatient(name, phone) {
+    await bookingDialog
+      .getByRole("button", { name: "+ Шинэ өвчтөн бүртгэх", exact: true })
+      .click();
+    await bookingDialog.getByLabel(/Овог нэр/).fill(name);
+    await bookingDialog.getByLabel(/^Утас/).fill(phone);
+    await bookingDialog
+      .getByRole("button", { name: "Хадгалах", exact: true })
+      .click();
+    await bookingDialog.getByText(name, { exact: true }).waitFor();
+  }
+  await registerBookingPatient("Selected Time Patient", "99112255");
   await bookingDialog.getByLabel("Боломжит цагийн өдөр").fill("2099-02-04");
   await bookingDialog
     .getByLabel("Эхлэх цаг", { exact: true })
@@ -515,10 +601,7 @@ try {
   await bookingDialog
     .getByLabel("Эхлэх цаг", { exact: true })
     .selectOption("09:30");
-  await bookingDialog
-    .getByLabel("Шинэ өвчтөний нэр")
-    .fill("Selected Time Patient");
-  await bookingDialog.getByLabel("Шинэ өвчтөний утас").fill("99112255");
+
   await bookingDialog
     .getByRole("button", { name: "Цаг баталгаажуулах", exact: true })
     .click();
@@ -536,15 +619,13 @@ try {
     "Appointment time select persists selection and clears stale time after changing date",
   );
   await page.getByRole("button", { name: "Цаг захиалах", exact: true }).click();
+  await registerBookingPatient("Reception Special Patient", "99112277");
   await bookingDialog.getByLabel("Боломжит цагийн өдөр").fill("2099-02-06");
   await bookingDialog
     .getByLabel("Утсаар авсан захиалга", { exact: false })
     .check();
   await bookingDialog.getByLabel("Эхлэх цаг", { exact: true }).fill("08:10");
-  await bookingDialog
-    .getByLabel("Шинэ өвчтөний нэр")
-    .fill("Reception Special Patient");
-  await bookingDialog.getByLabel("Шинэ өвчтөний утас").fill("99112277");
+
   await bookingDialog
     .getByRole("button", { name: "Цаг баталгаажуулах", exact: true })
     .click();
@@ -593,6 +674,44 @@ try {
   });
   assert.equal(registeredPatient.gender, "FEMALE");
   pass("Patient registration UI persists to database");
+  const searchInput = page.getByRole("searchbox", {
+    name: "Хайх",
+    exact: true,
+  });
+  await searchInput.fill(registeredPatient.id);
+  await page
+    .getByRole("button", { name: "Browser Registered", exact: true })
+    .waitFor();
+  await page
+    .getByRole("button", { name: "Browser Registered", exact: true })
+    .click();
+  for (const label of [
+    "Үндсэн мэдээлэл",
+    "Цаг захиалгын түүх",
+    "Төлбөрийн түүх",
+    "Нэхэмжлэх",
+    "Төлөгдөөгүй төлбөр",
+  ]) {
+    await dialog.getByRole("button", { name: label, exact: true }).click();
+    assert.equal(
+      await dialog
+        .getByRole("button", { name: label, exact: true })
+        .getAttribute("aria-pressed"),
+      "true",
+    );
+  }
+  assert.equal(
+    (await dialog.innerText()).includes("SECRET_MEDICAL_HISTORY"),
+    false,
+  );
+  await dialog.getByRole("button", { name: "Хаах", exact: true }).click();
+  await searchInput.fill(registeredPatient.phone);
+  await page
+    .getByRole("button", { name: "Browser Registered", exact: true })
+    .waitFor();
+  pass(
+    "Patient search supports ID/phone and profile sections preserve privacy",
+  );
   const registeredRow = page.getByRole("row").filter({ hasText: "99112244" });
   await registeredRow
     .getByRole("button", { name: "Засах", exact: true })
@@ -645,10 +764,50 @@ try {
   );
   await page.goto(base + "/erp/queue");
   await page.getByText("#1", { exact: true }).waitFor();
-  await page.getByRole("button", { name: "Дуудсан", exact: true }).click();
-  await page.getByRole("button", { name: "Эмчилж буй", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Дуудагдсан", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Эмчлүүлж байна", exact: true })
+    .waitFor();
   pass(
     "Browser check-in and queue transition persist arrival and called state",
+  );
+  const cannotMove = await call(
+    `/api/erp/reschedule/${appointment.id}`,
+    "RECEPTION",
+    "POST",
+    {
+      doctorId: doctor.id,
+      serviceId: service.id,
+      date: today(),
+      startTime: "11:00",
+    },
+  );
+  assert.equal(cannotMove.status, 409);
+  await page
+    .getByRole("button", { name: "Эмчлүүлж байна", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Дууссан", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Дууссан", exact: true })
+    .waitFor({ state: "hidden" });
+  await page
+    .getByRole("button", { name: "Цаггүй өвчтөн", exact: true })
+    .click();
+  await dialog
+    .getByLabel("Өвчтөн", { exact: false })
+    .last()
+    .selectOption(registeredPatient.id);
+  await dialog.getByLabel("Эмч", { exact: false }).selectOption(doctor.id);
+  await dialog.getByRole("button", { name: "Хадгалах", exact: true }).click();
+  await dialog.waitFor({ state: "hidden" });
+  assert.equal(
+    await prisma.queueEntry.count({
+      where: { patientId: registeredPatient.id, status: "WAITING" },
+    }),
+    1,
+  );
+  pass(
+    "Queue completes, walk-in registers and checked-in appointment reschedule is rejected",
   );
   await page.goto(base + "/erp/payments");
   await page
@@ -673,36 +832,153 @@ try {
     200,
   );
   await page.getByRole("button", { name: "Мэдээлэл шинэчлэх" }).click();
-  await page.getByRole("button", { name: "Нээх / Төлөх" }).click();
-  await dialog
-    .getByRole("button", { name: "Төлбөр / Хэсэгчилсэн төлөлт" })
+  await page.locator("#pos-patient").selectOption(patient.id);
+  await page
+    .locator(".checkout-invoice")
+    .filter({ hasText: inv.body.number })
     .click();
-  await dialog.getByLabel("Энэ удаа төлөх дүн").fill("50000");
-  await dialog.getByLabel("Дүн", { exact: true }).fill("50000");
-  await dialog.getByLabel("Мөнгө хүлээн авсан, гүйлгээг шалгасан").check();
-  await dialog
-    .getByRole("button", { name: "Төлбөр бүртгэх", exact: true })
-    .click();
-  await dialog.getByText(/Төлсөн: 50,000/).waitFor();
+  await page.getByLabel("Энэ удаа төлөх дүн").fill("50000");
+  await mkdir("/private/tmp/bb-reception-qa", { recursive: true });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: "/private/tmp/bb-reception-qa/checkout-form.png",
+    fullPage: true,
+  });
+  await page.getByLabel("Мөнгө хүлээн авсан, гүйлгээг шалгасан").check();
+  await page.getByRole("button", { name: /Төлбөр баталгаажуулах/ }).click();
+  await page
+    .getByText("Төлбөр амжилттай бүртгэгдлээ.", { exact: true })
+    .waitFor();
+  await page
+    .locator(".checkout-receipt")
+    .getByText("50,000 ₮", { exact: true })
+    .first()
+    .waitFor();
   assert.equal(
     await prisma.payment.count({ where: { invoiceId: inv.body.id } }),
     1,
   );
-  pass(
-    "Browser cash-session opening and partial payment produce a real receipt",
+  const receipt = page.locator(".checkout-receipt");
+  await receipt
+    .locator(".clinic-document-header")
+    .getByText("BB Dental QA", { exact: true })
+    .waitFor();
+  assert.ok(
+    (await receipt.locator(".clinic-document-metadata").innerText()).includes(
+      "UTC+08:00",
+    ),
   );
-  await page.keyboard.press("Escape");
+  assert.ok(
+    (await receipt.locator(".clinic-document-metadata").innerText()).includes(
+      "RECEPTION",
+    ),
+  );
+  assert.equal(
+    await receipt
+      .locator(".clinic-document-logo")
+      .evaluate((el) => getComputedStyle(el).borderRadius),
+    "50%",
+  );
+  assert.ok((await receipt.innerText()).includes("RECEPTION"));
+  await page.evaluate(() => {
+    window.__printCount = 0;
+    window.print = () => {
+      window.__printCount++;
+    };
+  });
+  await page.evaluate(() => {
+    const other = document.querySelector(".clinic-document").cloneNode(true);
+    other.dataset.otherDocument = "true";
+    document.querySelector(".checkout-patient").appendChild(other);
+  });
+  await page
+    .getByRole("button", { name: "Баримт хэвлэх / PDF хадгалах" })
+    .click();
+  assert.equal(await page.evaluate(() => window.__printCount), 1);
+  await mkdir("/private/tmp/bb-reception-qa", { recursive: true });
+  await page.emulateMedia({ media: "print" });
+  assert.equal(
+    await page
+      .locator("[data-other-document]")
+      .evaluate((el) => el.getBoundingClientRect().height),
+    0,
+  );
+  assert.equal(
+    await page.locator("[data-clinic-print-target]").getAttribute("aria-label"),
+    "Төлбөрийн баримт",
+  );
+  const pdf = await page.pdf({
+    path: "/private/tmp/bb-reception-qa/receipt.pdf",
+    format: "A4",
+  });
+  assert.equal(pdf.subarray(0, 4).toString(), "%PDF");
+  assert.equal(
+    (pdf.toString("latin1").match(/\/Type\s*\/Page\b/g) || []).length,
+    1,
+  );
+  await page.emulateMedia({ media: null });
+  await page.locator("[data-other-document]").evaluate((el) => el.remove());
+  pass(
+    "Printing targets only the selected document, excluding other visible invoice/receipt content",
+  );
+  pass(
+    "Inline POS partial payment persists and renders printable receipt with cashier",
+  );
+  await page.getByRole("button", { name: "Дараагийн төлбөр авах" }).click();
+  await page.getByLabel("Энэ удаа төлөх дүн").fill("50000");
+  await page
+    .getByRole("button", { name: "+ Төлбөр хуваах", exact: true })
+    .click();
+  await page.getByLabel("Төлөх дүн 2", { exact: true }).fill("50000");
+  await page
+    .getByRole("button", { name: "+ Төлбөр хуваах", exact: true })
+    .click();
+  await page.getByLabel("Төлөх дүн 3", { exact: true }).fill("50000");
+  const refs = page.getByLabel("Гүйлгээний дугаар *", { exact: true });
+  await refs.nth(0).fill("browser-card-1");
+  await refs.nth(1).fill("browser-transfer-1");
+  await page.getByLabel("Мөнгө хүлээн авсан, гүйлгээг шалгасан").check();
+  await page.getByRole("button", { name: /Төлбөр баталгаажуулах/ }).click();
+  await page
+    .getByText("Төлбөр амжилттай бүртгэгдлээ.", { exact: true })
+    .waitFor();
+  await page
+    .locator(".checkout-receipt")
+    .getByText("0 ₮", { exact: true })
+    .waitFor();
+  assert.equal(
+    await prisma.payment.count({ where: { invoiceId: inv.body.id } }),
+    4,
+  );
+  pass("Browser three-method split settles remaining invoice balance");
+  for (const width of [1440, 820, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    assert.equal(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth > innerWidth + 1,
+      ),
+      false,
+    );
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({
+      path: `/private/tmp/bb-reception-qa/pos-${width}.png`,
+      fullPage: true,
+    });
+  }
+  pass("Desktop, tablet and mobile checkout have no page overflow");
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(base + "/erp");
   await page
-    .getByRole("heading", { name: "Хяналтын самбар", exact: true })
+    .getByRole("heading", { name: "Нүүр хуудас", exact: true })
     .waitFor();
   await page.getByRole("button", { name: "Цэс нээх", exact: true }).click();
   await page
     .locator("#erp-navigation")
-    .getByRole("link", { name: "Дараалал", exact: true })
+    .getByRole("link", { name: "Хүлээж буй өвчтөн", exact: true })
     .click();
-  await page.getByRole("heading", { name: "Дараалал", exact: true }).waitFor();
+  await page
+    .getByRole("heading", { name: "Хүлээж буй өвчтөн", exact: true })
+    .waitFor();
   assert.equal(
     await page.evaluate(
       () => document.documentElement.scrollWidth > innerWidth + 1,
@@ -729,7 +1005,7 @@ try {
     assert.equal(
       await page
         .locator("#erp-navigation")
-        .getByRole("link", { name: "Дараалал", exact: true })
+        .getByRole("link", { name: "Хүлээж буй өвчтөн", exact: true })
         .count(),
       0,
     );
@@ -761,9 +1037,253 @@ try {
   pass(
     "Admin phone-booking checkbox saves a special appointment outside regular hours",
   );
+  await page.goto(base + "/erp/settings");
+  await page
+    .getByRole("button", { name: "Төлбөрийн хэлбэр", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "+ Төлбөрийн хэлбэр нэмэх", exact: true })
+    .click();
+  const editor = page.locator(".payment-method-editor");
+  await editor.getByLabel("Нэр", { exact: true }).fill("Тест банк");
+  await editor
+    .getByLabel("Тооцооны төрөл", { exact: true })
+    .selectOption("TRANSFER");
+  await editor.getByLabel("Харагдах эрэмбэ").fill("7");
+  await editor.getByRole("button", { name: "Хадгалах", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Засах · Тест банк", exact: true })
+    .waitFor();
+  const configured = await prisma.paymentMethodOption.findFirstOrThrow({
+    where: { name: "Тест банк" },
+  });
+  assert.equal(configured.referenceRequired, true);
+  assert.equal(
+    (await call("/api/payment-methods", "RECEPTION", "POST", configured))
+      .status,
+    403,
+  );
+  assert.equal((await call("/api/payment-methods", "DOCTOR")).status, 403);
+  await page
+    .getByRole("button", { name: "Засах · Тест банк", exact: true })
+    .click();
+  await editor.getByLabel("Нэр", { exact: true }).fill("Тест банк шинэ");
+  await editor.getByLabel("Ашиглах", { exact: true }).uncheck();
+  await editor.getByRole("button", { name: "Хадгалах", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Засах · Тест банк шинэ", exact: true })
+    .waitFor();
+  const enabledMethods = await call("/api/payment-methods");
+  assert.equal(
+    enabledMethods.body.items.some((m) => m.id === configured.id),
+    false,
+  );
+  const historyCount = await prisma.payment.count();
+  const card = await prisma.paymentMethodOption.findFirstOrThrow({
+    where: { kind: "CARD" },
+  });
+  assert.equal(
+    (
+      await call("/api/payment-methods", "ADMIN", "POST", {
+        ...card,
+        name: "Шинэ картын нэр",
+        enabled: false,
+      })
+    ).status,
+    200,
+  );
+  const invalidInvoice = await call(
+    "/api/reception/invoice-create",
+    "RECEPTION",
+    "POST",
+    {
+      patientId: patient.id,
+      dueDate: today(),
+      items: [{ serviceId: service.id, quantity: 1 }],
+    },
+  );
+  await call("/api/reception/invoice-finalize", "RECEPTION", "POST", {
+    id: invalidInvoice.body.id,
+  });
+  assert.equal(
+    (
+      await call("/api/reception/collect", "RECEPTION", "POST", {
+        invoiceId: invalidInvoice.body.id,
+        idempotencyKey: crypto.randomUUID(),
+        amount: 100,
+        allocations: [
+          {
+            paymentMethodId: card.id,
+            amount: 100,
+            reference: "disabled-card-test",
+          },
+        ],
+      })
+    ).status,
+    409,
+  );
+  const previousCard = await prisma.payment.findFirstOrThrow({
+    where: { method: "CARD" },
+  });
+  assert.equal(previousCard.methodName, "Карт");
+  assert.equal(await prisma.payment.count(), historyCount);
+  assert.ok(
+    (await prisma.auditLog.count({
+      where: { entity: "payment-method", actorId: users.ADMIN.id },
+    })) >= 3,
+  );
+  pass(
+    "Admin UI adds/edits/disables methods; API rejects Reception edits and disabled collection while history survives",
+  );
+  await context.clearCookies();
+  await context.addCookies([
+    { name: "bb_session", value: tokens.RECEPTION, url: base },
+  ]);
+  await page.goto(base + "/erp/payments");
+  await page.locator("#pos-patient").selectOption(patient.id);
+  await page
+    .locator(".checkout-invoice")
+    .filter({ hasText: invalidInvoice.body.number })
+    .click();
+  const paymentSelect = page.getByLabel("Төлбөрийн хэлбэр", { exact: true });
+  assert.equal(
+    await paymentSelect.locator(`option[value="${card.id}"]`).count(),
+    0,
+  );
+  assert.equal(
+    await paymentSelect.locator(`option[value="${configured.id}"]`).count(),
+    0,
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => (document.documentElement.dataset.theme = "dark"));
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: "/private/tmp/bb-reception-qa/checkout-mobile-dark.png",
+    fullPage: true,
+  });
+  assert.equal(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > innerWidth + 1,
+    ),
+    false,
+  );
+  pass(
+    "Reception checkout dynamically hides disabled methods, including in mobile dark theme",
+  );
+  // Exercise actual authorized binary exports with configured clinic branding.
+  async function binaryExport(path, role = "ADMIN") {
+    const response = await fetch(base + path, {
+      headers: { Cookie: `bb_session=${tokens[role]}`, Origin: base },
+    });
+    assert.equal(response.status, 200);
+    return Buffer.from(await response.arrayBuffer());
+  }
+  const pdfHas = (bytes, text) =>
+    bytes.includes(Buffer.from(text)) ||
+    bytes.includes(Buffer.from(text, "utf16le").swap16());
+  const clinicalDoc = await prisma.document.create({
+    data: {
+      patientId: patient.id,
+      title: "Эмчилгээний зөвшөөрөл",
+      type: "CONSENT",
+      content: "Туршилтын зөвшөөрөл",
+      createdById: users.DOCTOR.id,
+    },
+  });
+  for (const [path, title, role] of [
+    [
+      `/api/export/patient?id=${patient.id}`,
+      "Өвчтөний мэдээллийн карт",
+      "ADMIN",
+    ],
+    [
+      `/api/export/document?id=${clinicalDoc.id}`,
+      "Эмчилгээний зөвшөөрөл",
+      "DOCTOR",
+    ],
+    ["/api/export/pdf?period=day", "BB Dental Clinic тайлан", "ADMIN"],
+  ]) {
+    const bytes = await binaryExport(path, role);
+    assert.equal(bytes.subarray(0, 4).toString(), "%PDF");
+    assert.ok(pdfHas(bytes, "BB Dental QA"));
+    assert.ok(pdfHas(bytes, title));
+    assert.ok(pdfHas(bytes, role));
+    assert.ok(pdfHas(bytes, "UTC+08:00"));
+  }
+  pass(
+    "Patient, clinical document and financial PDFs include configured clinic identity, title, exporter and local timestamp",
+  );
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(await binaryExport("/api/export/excel?period=day"));
+  assert.equal(workbook.worksheets.length, 5);
+  assert.equal(workbook.creator, "ADMIN");
+  for (const sheet of workbook.worksheets) {
+    assert.equal(sheet.getCell("A1").text, "Эмнэлэг");
+    assert.equal(sheet.getCell("B1").text, "BB Dental QA");
+    assert.ok(sheet.getCell("B2").text.includes(sheet.name));
+    assert.equal(sheet.getCell("B3").text, today());
+    assert.ok(sheet.getCell("B4").text.includes("UTC+08:00"));
+    assert.equal(sheet.getCell("B5").text, "ADMIN");
+    assert.ok(sheet.views[0].ySplit > 7);
+  }
+  pass(
+    "Every Excel sheet uses the shared title, period, clinic and download metadata",
+  );
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto(base + "/erp/reports");
+  async function csvDownload(button, filename, title) {
+    const downloading = page.waitForEvent("download");
+    await page.getByRole("button", { name: button, exact: true }).click();
+    const download = await downloading;
+    const path = `/private/tmp/bb-reception-qa/${filename}`;
+    await download.saveAs(path);
+    const text = await readFile(path, "utf8");
+    for (const value of [
+      "Эмнэлэг",
+      "BB Dental QA",
+      title,
+      "Хамрах хугацаа",
+      "Татсан / Хэвлэсэн огноо",
+      "UTC+08:00",
+      "Татсан ажилтан",
+      "RECEPTION",
+      "Лого (холбоос)",
+    ])
+      assert.ok(text.includes(value), `CSV missing ${value}`);
+    return text;
+  }
+  await csvDownload(
+    "Нэгдсэн CSV",
+    "reception-template.csv",
+    "Ресепшний нэгдсэн тайлан",
+  );
+  await csvDownload(
+    "Авлага CSV",
+    "receivables-template.csv",
+    "Төлөгдөөгүй төлбөрийн тайлан",
+  );
+  await page.goto(base + "/erp/payments");
+  await page.locator(".reception-cash-shell > summary").click();
+  await page
+    .getByText("Ээлжийн түүх / Хаалтын тайлан", { exact: true })
+    .click();
+  await csvDownload("CSV", "cash-template.csv", "Кассын ээлжийн тайлан");
+  pass(
+    "All three Reception CSV downloads carry the shared branded metadata and preserve authorized data",
+  );
   assert.deepEqual(errors, []);
   console.log(`${checks} browser/API verification groups passed.`);
 } catch (e) {
+  if (testPage) {
+    await testPage.screenshot({
+      path: "/private/tmp/bb-reception-failure.png",
+      fullPage: true,
+    });
+    console.error(
+      "BROWSER FAILURE",
+      await testPage.locator("body").innerText(),
+    );
+  }
   console.error(logs);
   throw e;
 } finally {

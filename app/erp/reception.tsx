@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   Plus,
-  Printer,
   Download,
   RefreshCw,
   CalendarDays,
@@ -22,10 +21,15 @@ import {
   Modal,
   Pagination,
   useResource,
+  useModalGuard,
+  PatientPicker,
   type Entity,
   type Field,
 } from "./ui";
 import { AppointmentForm, CalendarView } from "./workspace";
+import ReceptionPOS, { CheckoutForm, Receipt } from "./reception-pos";
+import type { PaymentOption } from "./payment-method-settings";
+import { ExportDocument, useClinicCsv } from "./export-document";
 import { useUser } from "./shell";
 import {
   clinicTimestamp,
@@ -34,10 +38,14 @@ import {
   statusNames,
   today,
 } from "@/lib/domain";
-import { queueNames, queueTransitions } from "@/lib/reception-domain";
+import {
+  queueNames,
+  queueTransitions,
+  receptionActionNames,
+} from "@/lib/reception-domain";
 import "./reception.css";
 
-type Invoice = {
+export type Invoice = {
   id: string;
   number: string;
   patientId: string;
@@ -63,6 +71,7 @@ type Transaction = Entity & {
   invoiceId?: string;
   invoice?: { number: string };
   reference: string;
+  methodName?: string;
   createdById: string;
   receptionist: string;
   refundRequests: {
@@ -73,7 +82,7 @@ type Transaction = Entity & {
   }[];
 };
 type Queue = Entity & { number: number; arrivedAt: string; status: string };
-type Session = {
+export type Session = {
   id: string;
   openingCash: number;
   expected: number;
@@ -84,10 +93,18 @@ type Session = {
   discrepancy?: number;
   explanation: string;
   payments: Transaction[];
-  withdrawals: { amount: number; reason: string }[];
+  withdrawals: { id: string; amount: number; reason: string }[];
 };
 type Report = {
   statistics: Record<string, number>;
+  methodBreakdown: { name: string; amount: number }[];
+  doctorStatus: {
+    id: string;
+    name: string;
+    status: string;
+    hours: string;
+    nextTime: string | null;
+  }[];
   appointments: (Entity & { paymentStatus: string; queueEntry?: Queue })[];
   methods: Record<string, number>;
   receivables: {
@@ -105,16 +122,16 @@ type Report = {
 };
 type Options = { doctors: Entity[]; services: Entity[] };
 const labels: Record<string, string> = {
-  dashboard: "Хяналтын самбар",
-  patients: "Өвчтөнүүд",
-  appointments: "Цаг захиалга",
-  visits: "Өнөөдрийн үзлэг",
-  queue: "Дараалал",
-  payments: "Касс / POS",
-  transactions: "Гүйлгээ",
-  receivables: "Авлага",
-  notifications: "Мэдэгдэл",
-  reports: "Тайлан",
+  dashboard: "Нүүр хуудас",
+  patients: "Өвчтөн бүртгэл",
+  appointments: "Цаг авах",
+  visits: "Өнөөдрийн өвчтөнүүд",
+  queue: "Хүлээж буй өвчтөн",
+  payments: "Төлбөр авах",
+  transactions: "Төлбөрийн түүх",
+  receivables: "Төлөгдөөгүй төлбөр",
+  notifications: "Мэдэгдлүүд",
+  reports: "Миний тайлан",
 };
 const patientFields: Field[] = [
   { key: "name", label: "Овог нэр", required: true },
@@ -177,30 +194,6 @@ function Table({
     </div>
   );
 }
-function exportRows(name: string, rows: (string | number)[][]) {
-  const csv =
-    "\uFEFF" +
-    rows
-      .map((row) =>
-        row
-          .map(
-            (cell) =>
-              `"${String(cell)
-                .replace(/^[=+@\-]/, "'$&")
-                .replaceAll('"', '""')}"`,
-          )
-          .join(","),
-      )
-      .join("\r\n");
-  const url = URL.createObjectURL(
-    new Blob([csv], { type: "text/csv;charset=utf-8" }),
-  );
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name + ".csv";
-  a.click();
-  URL.revokeObjectURL(url);
-}
 function shiftDay(date: string, delta: number) {
   const d = new Date(`${date}T12:00Z`);
   d.setUTCDate(d.getUTCDate() + delta);
@@ -247,6 +240,7 @@ export default function ReceptionWorkspace({ module }: { module: string }) {
     initial?: Record<string, unknown>;
   } | null>(null);
   const [patientId, setPatientId] = useState<string | null>(null);
+  const [receiptId, setReceiptId] = useState<string | null>(null);
   const [invoiceId, setInvoiceId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -266,6 +260,9 @@ export default function ReceptionWorkspace({ module }: { module: string }) {
     refresh();
   };
   const options = useResource<Options>("/api/erp/options");
+  const paymentOptions = useResource<{ items: PaymentOption[] }>(
+    module === "transactions" ? "/api/reception/transaction-methods" : null,
+  );
   const query = new URLSearchParams({
     date: module === "visits" ? today() : date,
     from: date,
@@ -273,7 +270,7 @@ export default function ReceptionWorkspace({ module }: { module: string }) {
     q: search,
     page: String(page),
     status,
-    method,
+    ...(method ? { paymentMethodId: method } : {}),
     ...(overdue ? { overdue: "true" } : {}),
   });
   const resource =
@@ -319,7 +316,9 @@ export default function ReceptionWorkspace({ module }: { module: string }) {
     version,
   );
   const queue = useResource<{ items: Queue[] }>(
-    module === "queue" ? `/api/reception/queue?${query}` : null,
+    ["queue", "dashboard"].includes(module)
+      ? `/api/reception/queue?${query}`
+      : null,
     version,
   );
   const invoices = useResource<{
@@ -328,9 +327,7 @@ export default function ReceptionWorkspace({ module }: { module: string }) {
     balance: number;
     patientBalances: Record<string, number>;
   }>(
-    ["payments", "receivables"].includes(module)
-      ? `/api/reception/${resource}?${query}`
-      : null,
+    module === "receivables" ? `/api/reception/${resource}?${query}` : null,
     version,
   );
   const transactions = useResource<{ items: Transaction[]; total: number }>(
@@ -534,6 +531,7 @@ export default function ReceptionWorkspace({ module }: { module: string }) {
         <button
           className="erp-secondary"
           aria-label="Мэдээлэл шинэчлэх"
+          disabled={busy}
           onClick={refresh}
         >
           <RefreshCw size={17} /> Шинэчлэх
@@ -550,8 +548,12 @@ export default function ReceptionWorkspace({ module }: { module: string }) {
       {["dashboard", "visits"].includes(module) && (
         <div className="reception-quick-actions">
           {[
-            { kind: "patient", label: "Өвчтөн бүртгэх", icon: Users },
-            { kind: "appointment", label: "Цаг захиалах", icon: CalendarDays },
+            { kind: "patient", label: "+ Шинэ өвчтөн бүртгэх", icon: Users },
+            {
+              kind: "appointment",
+              label: "+ Цаг захиалах",
+              icon: CalendarDays,
+            },
             {
               kind: "walk-in",
               label: "Цаггүй өвчтөн / Ирсэн",
@@ -567,22 +569,24 @@ export default function ReceptionWorkspace({ module }: { module: string }) {
               {a.label}
             </button>
           ))}
+          <Link className="erp-secondary" href="/erp/patients">
+            Өвчтөн хайх
+          </Link>
           <Link className="erp-primary" href="/erp/payments">
-            <CreditCard size={18} /> Касс нээх
+            <CreditCard size={18} /> Төлбөр авах
           </Link>
         </div>
       )}
       {module === "dashboard" && data.data && (
         <div className="reception-stats">
           {[
-            ["Нийт захиалга", "appointments"],
-            ["Баталгаажсан", "confirmed"],
+            ["Өнөөдрийн захиалга", "appointments"],
             ["Ирсэн өвчтөн", "checkedIn"],
-            ["Хүлээж буй", "waiting"],
-            ["Эмчилж буй", "inProgress"],
+            ["Хүлээж буй өвчтөн", "waiting"],
+            ["Эмчлүүлж буй өвчтөн", "inProgress"],
             ["Дууссан үзлэг", "completed"],
-            ["Цуглуулсан төлбөр", "collected"],
-            ["Нийт авлага", "outstanding"],
+            ["Өнөөдрийн цуглуулсан төлбөр", "collected"],
+            ["Төлөгдөөгүй төлбөр", "outstanding"],
           ].map(([label, key]) => (
             <article key={key}>
               <span>{label}</span>
@@ -595,7 +599,15 @@ export default function ReceptionWorkspace({ module }: { module: string }) {
           ))}
         </div>
       )}
-      {module !== "notifications" && (
+      {module === "dashboard" && data.data && (
+        <DashboardOperations
+          report={data.data}
+          queue={queue.data?.items || []}
+          version={version}
+          onPatient={setPatientId}
+        />
+      )}
+      {!["notifications", "payments"].includes(module) && (
         <div className="reception-filters">
           {!["queue", "reports"].includes(module) && (
             <label>
@@ -616,7 +628,7 @@ export default function ReceptionWorkspace({ module }: { module: string }) {
               <input
                 type="date"
                 value={module === "visits" ? today() : date}
-                disabled={module === "visits"}
+                disabled={["visits", "dashboard"].includes(module)}
                 onChange={(e) => {
                   setDate(e.target.value);
                   setPage(1);
@@ -715,9 +727,9 @@ export default function ReceptionWorkspace({ module }: { module: string }) {
                   }}
                 >
                   <option value="">Бүгд</option>
-                  {Object.entries(methodNames).map(([k, v]) => (
-                    <option key={k} value={k}>
-                      {v}
+                  {paymentOptions.data?.items.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
                     </option>
                   ))}
                 </select>
@@ -888,7 +900,7 @@ export default function ReceptionWorkspace({ module }: { module: string }) {
                 headers={[
                   "№",
                   "Өвчтөн",
-                  "Эмч / Цаг",
+                  "Эмч / Үйлчилгээ / Цаг",
                   "Ирсэн цаг",
                   "Хүлээлт",
                   "Дарааллын төлөв",
@@ -912,6 +924,9 @@ export default function ReceptionWorkspace({ module }: { module: string }) {
                       </td>
                       <td>
                         {e.doctor?.name}
+                        <small>
+                          {e.appointment?.service?.name || "Цаггүй үзлэг"}
+                        </small>
                         <small>{e.appointment?.startTime || "Цаггүй"}</small>
                       </td>
                       <td>{clinicTimestamp(e.arrivedAt)}</td>
@@ -954,12 +969,46 @@ export default function ReceptionWorkspace({ module }: { module: string }) {
             </section>
           )}
           {module === "payments" && (
-            <CashPanel
-              sessions={sessions.data?.items || []}
-              onAction={(kind) => setModal({ kind })}
+            <div inert={busy}>
+              {sessions.loading ? (
+                <LoadingSkeleton />
+              ) : activeSession ? (
+                <details className="reception-cash-shell">
+                  <summary>
+                    <span className="reception-status">Касс нээлттэй</span>
+                    <span>
+                      Бэлэн: <strong>{money(activeSession.expected)}</strong>
+                    </span>
+                    <span>Кассын мэдээлэл / Ээлж хаах</span>
+                  </summary>
+                  <CashPanel
+                    sessions={sessions.data?.items || []}
+                    onAction={(kind) => setModal({ kind })}
+                  />
+                </details>
+              ) : (
+                <CashPanel
+                  sessions={sessions.data?.items || []}
+                  onAction={(kind) => setModal({ kind })}
+                />
+              )}
+            </div>
+          )}
+          {module === "payments" && (
+            <ReceptionPOS
+              version={version}
+              onSaved={refresh}
+              onBusyChange={setBusy}
+              onInvoice={setInvoiceId}
+              onNewInvoice={(id) =>
+                setModal({
+                  kind: "invoice",
+                  initial: id ? { patientId: id } : undefined,
+                })
+              }
             />
           )}
-          {["payments", "receivables"].includes(module) && (
+          {module === "receivables" && (
             <section className="reception-panel">
               {module === "receivables" && (
                 <p>
@@ -1052,7 +1101,7 @@ export default function ReceptionWorkspace({ module }: { module: string }) {
                     </td>
                     <td>{p.patient?.name}</td>
                     <td>
-                      {methodNames[p.method || ""]}
+                      {p.methodName || methodNames[p.method || ""]}
                       <small>{p.reference}</small>
                     </td>
                     <td>{money(p.amount || 0)}</td>
@@ -1073,7 +1122,7 @@ export default function ReceptionWorkspace({ module }: { module: string }) {
                         {p.invoiceId && (
                           <button
                             className="erp-secondary"
-                            onClick={() => setInvoiceId(p.invoiceId!)}
+                            onClick={() => setReceiptId(p.id)}
                           >
                             Баримт
                           </button>
@@ -1120,6 +1169,11 @@ export default function ReceptionWorkspace({ module }: { module: string }) {
               setInvoiceId(id);
             }}
           />
+        </Modal>
+      )}
+      {receiptId && (
+        <Modal title="Төлбөрийн баримт" onClose={() => setReceiptId(null)}>
+          <Receipt id={receiptId} />
         </Modal>
       )}
       {invoiceId && (
@@ -1350,6 +1404,124 @@ export default function ReceptionWorkspace({ module }: { module: string }) {
   );
 }
 
+function DashboardOperations({
+  report,
+  queue,
+  version,
+  onPatient,
+}: {
+  report: Report;
+  queue: Queue[];
+  version: number;
+  onPatient: (id: string) => void;
+}) {
+  const notifications = useResource<{
+    events: { id: string; action: string; createdAt: string }[];
+    readAt: string | null;
+  }>("/api/reception/notifications", version);
+  const waiting = queue.filter((q) => ["WAITING", "CALLED"].includes(q.status));
+  const pending = report.appointments.filter((a) => a.status === "PENDING");
+  return (
+    <div className="dashboard-operations">
+      <section className="reception-panel">
+        <div className="reception-section-title">
+          <h2>Хүлээж буй өвчтөнүүд</h2>
+          <Link href="/erp/queue">Дараалал нээх</Link>
+        </div>
+        {waiting.length ? (
+          waiting.slice(0, 6).map((q) => (
+            <div className="operational-row" key={q.id}>
+              <div>
+                <button
+                  className="reception-link"
+                  onClick={() => onPatient(q.patientId!)}
+                >
+                  #{q.number} · {q.patient?.name}
+                </button>
+                <small>
+                  {q.doctor?.name} ·{" "}
+                  {q.appointment?.service?.name || "Цаггүй үзлэг"}
+                </small>
+              </div>
+              <WaitingTime arrivedAt={q.arrivedAt} />
+            </div>
+          ))
+        ) : (
+          <p>Одоогоор хүлээж буй өвчтөн алга.</p>
+        )}
+      </section>
+      <section className="reception-panel">
+        <h2>Эмч нарын өнөөдрийн хуваарь</h2>
+        {report.doctorStatus.map((d) => (
+          <div className="operational-row" key={d.id}>
+            <div>
+              <strong>{d.name}</strong>
+              <small>
+                {d.hours}
+                {d.nextTime ? ` · Дараагийн захиалга ${d.nextTime}` : ""}
+              </small>
+            </div>
+            <span className="reception-status">{d.status}</span>
+          </div>
+        ))}
+        {!report.doctorStatus.length && <p>Идэвхтэй эмч бүртгээгүй.</p>}
+      </section>
+      <section className="reception-panel">
+        <div className="reception-section-title">
+          <h2>Баталгаажуулах захиалга · {pending.length}</h2>
+          <Link href="/erp/appointments">Захиалга нээх</Link>
+        </div>
+        {pending.slice(0, 5).map((a) => (
+          <p key={a.id}>
+            {a.startTime} · {a.patient?.name} · {a.doctor?.name}
+          </p>
+        ))}
+        {!pending.length && <p>Өнөөдрийн захиалгууд баталгаажсан.</p>}
+        {report.statistics.outstanding > 0 && (
+          <p className="reception-alert">
+            <Link href="/erp/receivables">
+              Төлөгдөөгүй төлбөр: {money(report.statistics.outstanding)}
+            </Link>
+          </p>
+        )}
+      </section>
+      <section className="reception-panel">
+        <div className="reception-section-title">
+          <h2>Анхаарах мэдээлэл</h2>
+          <Link href="/erp/notifications">Бүгдийг харах</Link>
+        </div>
+        {notifications.error ? (
+          <Feedback retry={notifications.retry}>{notifications.error}</Feedback>
+        ) : notifications.loading ? (
+          <LoadingSkeleton />
+        ) : (
+          notifications.data?.events
+            .filter(
+              (e) =>
+                !notifications.data?.readAt ||
+                e.createdAt > notifications.data.readAt,
+            )
+            .slice(0, 4)
+            .map((e) => (
+              <div className="operational-row" key={e.id}>
+                <strong>
+                  {receptionActionNames[e.action] || "Мэдээлэл шинэчлэгдсэн"}
+                </strong>
+                <small>{clinicTimestamp(e.createdAt)}</small>
+              </div>
+            ))
+        )}
+        {notifications.data &&
+          !notifications.data.events.some(
+            (e) =>
+              !notifications.data?.readAt ||
+              e.createdAt > notifications.data.readAt,
+          ) && <p>Шинэ мэдэгдэл алга.</p>}
+      </section>
+    </div>
+  );
+}
+
 function PatientProfile({
   id,
   version,
@@ -1360,72 +1532,158 @@ function PatientProfile({
   onInvoice: (id: string) => void;
 }) {
   const patient = useResource<Entity>(`/api/erp/patients/${id}`, version);
-  const invoices = useResource<{ items: Invoice[]; balance: number }>(
-    `/api/reception/invoices?patientId=${id}`,
-    version,
-  );
+  const invoices = useResource<{
+    items: Invoice[];
+    balance: number;
+    total: number;
+  }>(`/api/reception/invoices?patientId=${id}`, version);
+  const [tab, setTab] = useState("basic");
   if (patient.error || invoices.error)
     return <Feedback>{patient.error || invoices.error}</Feedback>;
   if (!patient.data || !invoices.data) return <LoadingSkeleton />;
   const p = patient.data;
+  const tabs = [
+    ["basic", "Үндсэн мэдээлэл"],
+    ["appointments", "Цаг захиалгын түүх"],
+    ["payments", "Төлбөрийн түүх"],
+    ["invoices", "Нэхэмжлэх"],
+    ["outstanding", "Төлөгдөөгүй төлбөр"],
+  ];
   return (
     <div className="reception-profile">
       <h2>{p.name}</h2>
       <p>
-        {p.phone} · {p.birthDate || "Төрсөн огноогүй"} ·{" "}
-        {p.address || "Хаяггүй"}
+        {p.phone} · ID: <span className="reception-id">{p.id}</span>
       </p>
-      <small>ID: {p.id}</small>
       {p.allergies && (
         <p role="note" className="reception-alert">
           Харшил: {p.allergies}
         </p>
       )}
-      <h3>Нийт үлдэгдэл: {money(invoices.data.balance)}</h3>
-      <Table headers={["Нэхэмжлэх", "Төлсөн", "Үлдэгдэл"]}>
-        {invoices.data.items.map((i) => (
-          <tr key={i.id}>
-            <td>
-              <button
-                className="reception-link"
-                onClick={() => onInvoice(i.id)}
-              >
-                {i.number.slice(0, 24)}
-              </button>
-            </td>
-            <td>{money(i.paid)}</td>
-            <td>{money(i.balance)}</td>
-          </tr>
+      <nav
+        className="profile-sections"
+        aria-label="Өвчтөний мэдээллийн хэсгүүд"
+      >
+        {tabs.map(([key, label]) => (
+          <button
+            className="erp-secondary"
+            key={key}
+            aria-pressed={tab === key}
+            onClick={() => setTab(key)}
+          >
+            {label}
+          </button>
         ))}
-      </Table>
-      <h3>Цаг захиалгын түүх</h3>
-      <Table headers={["Огноо / Цаг", "Эмч / Үйлчилгээ", "Төлөв"]}>
-        {p.appointments?.map((a) => (
-          <tr key={a.id}>
-            <td>
-              {a.date} · {a.startTime}
-            </td>
-            <td>
-              {a.doctor?.name}
-              <small>{a.service?.name}</small>
-            </td>
-            <td>
-              <Badge value={a.status!} />
-            </td>
-          </tr>
-        ))}
-      </Table>
-      <h3>Төлбөрийн түүх</h3>
-      <Table headers={["Огноо", "Хэлбэр", "Дүн", "Төлөв"]}>
-        {p.payments?.map((a) => (
-          <tr key={a.id}>
-            <td>{a.date}</td>
-            <td>{methodNames[a.method!]}</td>
-            <td>{money(a.amount!)}</td>
-            <td>{a.voidedAt ? "Хүчингүй" : "Бүртгэгдсэн"}</td>
-          </tr>
-        ))}
-      </Table>
+      </nav>
+      <section aria-label={tabs.find((t) => t[0] === tab)?.[1]}>
+        {tab === "basic" && (
+          <dl className="checkout-summary">
+            {[
+              ["Нэр", p.name],
+              ["Утас", p.phone],
+              ["Төрсөн огноо", p.birthDate],
+              [
+                "Хүйс",
+                (
+                  {
+                    MALE: "Эрэгтэй",
+                    FEMALE: "Эмэгтэй",
+                    OTHER: "Бусад",
+                  } as Record<string, string>
+                )[p.gender || ""],
+              ],
+              ["Хаяг", p.address],
+              ["Асран хамгаалагч", p.guardianName],
+              ["Асран хамгаалагчийн утас", p.guardianPhone],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd>{value || "Бүртгэлгүй"}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+        {tab === "appointments" && (
+          <>
+            <Table headers={["Огноо / Цаг", "Эмч / Үйлчилгээ", "Төлөв"]}>
+              {p.appointments?.map((a) => (
+                <tr key={a.id}>
+                  <td>
+                    {a.date} · {a.startTime}
+                  </td>
+                  <td>
+                    {a.doctor?.name}
+                    <small>{a.service?.name}</small>
+                  </td>
+                  <td>
+                    <Badge value={a.status!} />
+                  </td>
+                </tr>
+              ))}
+            </Table>
+            {!p.appointments?.length && <Empty />}
+          </>
+        )}
+        {tab === "payments" && (
+          <>
+            <Table headers={["Огноо", "Хэлбэр", "Дүн", "Төлөв"]}>
+              {p.payments?.map((a) => (
+                <tr key={a.id}>
+                  <td>{a.date}</td>
+                  <td>{a.methodName || methodNames[a.method!]}</td>
+                  <td>{money(a.amount!)}</td>
+                  <td>{a.voidedAt ? "Хүчингүй" : "Бүртгэгдсэн"}</td>
+                </tr>
+              ))}
+            </Table>
+            {!p.payments?.length && <Empty />}
+          </>
+        )}
+        {["invoices", "outstanding"].includes(tab) && (
+          <>
+            <h3>Төлөгдөөгүй төлбөр: {money(invoices.data.balance)}</h3>
+            <Table
+              headers={["Нэхэмжлэх", "Нийт", "Төлсөн", "Үлдэгдэл", "Төлөв"]}
+            >
+              {invoices.data.items
+                .filter(
+                  (i) =>
+                    tab === "invoices" ||
+                    (i.status === "FINALIZED" && i.balance > 0),
+                )
+                .map((i) => (
+                  <tr key={i.id}>
+                    <td>
+                      <button
+                        className="reception-link"
+                        onClick={() => onInvoice(i.id)}
+                      >
+                        {i.number}
+                      </button>
+                    </td>
+                    <td>{money(i.total)}</td>
+                    <td>{money(i.paid)}</td>
+                    <td>{money(i.balance)}</td>
+                    <td>
+                      {i.status === "DRAFT"
+                        ? "Ноорог"
+                        : i.balance === 0
+                          ? "Төлсөн"
+                          : i.paid > 0
+                            ? "Хэсэгчлэн төлсөн"
+                            : "Төлөгдөөгүй"}
+                    </td>
+                  </tr>
+                ))}
+            </Table>
+            {invoices.data.total > invoices.data.items.length && (
+              <Link href={`/erp/receivables?q=${p.phone}`}>
+                Бүх төлөгдөөгүй төлбөрийг харах
+              </Link>
+            )}
+          </>
+        )}
+      </section>
     </div>
   );
 }
@@ -1457,8 +1715,8 @@ function InvoiceForm({
   return (
     <>
       <p>
-        Үнийн жагсаалт болон эмчийн бүртгэсэн эмчилгээний дүнг сервер шалгана.
-        Ресепшн хөнгөлөлт өөрчлөх эрхгүй.
+        Үйлчилгээний батлагдсан үнэ эсвэл эмчийн бүртгэсэн эмчилгээний дүнгээр
+        нэхэмжилнэ.
       </p>
       {!patientId && (
         <EntityForm
@@ -1615,13 +1873,27 @@ function InvoiceDetail({
     `/api/reception/invoice?id=${encodeURIComponent(id)}`,
     version,
   );
-  const [collection, setCollection] = useState(false);
+  const [receiptId, setReceiptId] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  useModalGuard(busy);
   if (request.error)
     return <Feedback retry={request.retry}>{request.error}</Feedback>;
   if (!request.data) return <LoadingSkeleton />;
   const i = request.data;
+  const total =
+    i.status === "DRAFT"
+      ? i.items.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0)
+      : i.total;
+  if (receiptId)
+    return (
+      <>
+        <p className="reception-success" role="status">
+          Төлбөр амжилттай бүртгэгдлээ.
+        </p>
+        <Receipt id={receiptId} />
+      </>
+    );
   async function action(name: string, itemId?: string) {
     setBusy(true);
     setError("");
@@ -1636,11 +1908,13 @@ function InvoiceDetail({
   }
   return (
     <>
-      <div className="reception-print">
-        <h2>
-          BB DENTAL ·{" "}
-          {i.status === "DRAFT" ? "Ноорог" : "Нэхэмжлэх / Төлбөрийн баримт"}
-        </h2>
+      <ExportDocument
+        title={i.status === "DRAFT" ? "Нэхэмжлэхийн ноорог" : "Нэхэмжлэх"}
+        period={`Үүсгэсэн: ${clinicTimestamp(i.createdAt)} · Төлөх хугацаа: ${i.dueDate}`}
+        reference={i.number}
+        printable={i.status !== "DRAFT"}
+        printLabel="Нэхэмжлэх хэвлэх / PDF хадгалах"
+      >
         <p className="reception-id">{i.number}</p>
         <p>
           {i.patient.name} · {i.patient.phone}
@@ -1675,8 +1949,8 @@ function InvoiceDetail({
           Хөнгөлөлт: {money(0)}
         </p>
         <h3>
-          Нийт: {money(i.total)} · Төлсөн: {money(i.paid)} · Үлдэгдэл:{" "}
-          {money(i.balance)}
+          Нийт: {money(total)} · Төлсөн: {money(i.paid)} · Үлдэгдэл:{" "}
+          {money(i.status === "DRAFT" ? total : i.balance)}
         </h3>
         {i.credit > 0 && <p>Өмнөх илүү төлөлт: {money(i.credit)}</p>}
         <p>Төлөх хугацаа: {i.dueDate}</p>
@@ -1688,7 +1962,7 @@ function InvoiceDetail({
                 {p.id}
                 <small>{p.date}</small>
               </td>
-              <td>{methodNames[p.method!]}</td>
+              <td>{p.methodName || methodNames[p.method!]}</td>
               <td>{p.reference}</td>
               <td>{money(p.amount!)}</td>
               <td>{p.voidedAt ? "Хүчингүй" : "Бүртгэгдсэн"}</td>
@@ -1696,7 +1970,7 @@ function InvoiceDetail({
           ))}
         </Table>
         <p>Энэ баримт нь дотоод төлбөрийн бүртгэл.</p>
-      </div>
+      </ExportDocument>
       {error && <Feedback>{error}</Feedback>}
       <div className="reception-actions reception-no-print">
         {i.status === "DRAFT" ? (
@@ -1707,202 +1981,19 @@ function InvoiceDetail({
           >
             Нэхэмжлэх баталгаажуулах
           </button>
-        ) : (
-          <>
-            <button className="erp-secondary" onClick={() => window.print()}>
-              <Printer size={16} /> Баримт хэвлэх
-            </button>
-            {i.balance > 0 && (
-              <button
-                className="erp-primary"
-                onClick={() => setCollection(!collection)}
-              >
-                Төлбөр / Хэсэгчилсэн төлөлт
-              </button>
-            )}
-          </>
-        )}
+        ) : null}
       </div>
-      {collection && (
-        <CollectionForm
+      {i.status === "FINALIZED" && i.balance > 0 && (
+        <CheckoutForm
+          key={`${i.id}:${i.paid}`}
           invoice={i}
-          onSaved={() => {
-            setCollection(false);
+          onSaved={(payments) => {
+            setReceiptId(payments[0].id);
             onSaved();
           }}
         />
       )}
     </>
-  );
-}
-function CollectionForm({
-  invoice,
-  onSaved,
-}: {
-  invoice: Invoice;
-  onSaved: () => void;
-}) {
-  const [key] = useState(() => crypto.randomUUID());
-  const [allocations, setAllocations] = useState([
-    { method: "CASH", amount: String(invoice.balance), reference: "" },
-  ]);
-  const [total, setTotal] = useState(String(invoice.balance));
-  const [confirmed, setConfirmed] = useState(false);
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const session = useResource<{ items: Session[] }>(
-    "/api/reception/cash-sessions",
-  );
-  const active = session.data?.items.find((s) => !s.closedAt);
-  return (
-    <form
-      className="reception-collection reception-no-print"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        setBusy(true);
-        setError("");
-        try {
-          if (!confirmed)
-            throw new Error(
-              "Бодитоор хүлээн авсан төлбөрийг баталгаажуулна уу.",
-            );
-          await api("/api/reception/collect", "POST", {
-            invoiceId: invoice.id,
-            idempotencyKey: key,
-            amount: Number(total),
-            allocations: allocations.map((a) => ({
-              ...a,
-              amount: Number(a.amount),
-            })),
-          });
-          onSaved();
-        } catch (e) {
-          setError((e as Error).message);
-        } finally {
-          setBusy(false);
-        }
-      }}
-    >
-      <h3>Төлбөр хүлээн авах</h3>
-      <p>
-        Бэлэн бус төлбөрийг банк / терминалаас шалгаж, бодит гүйлгээний дугаарыг
-        оруулна. QPay болон картын төлбөрийг энэ системээр үүсгэхгүй.
-      </p>
-      {!active && (
-        <p className="reception-alert">Кассын ээлж нээх шаардлагатай.</p>
-      )}
-      {error && <Feedback>{error}</Feedback>}
-      <label>
-        Энэ удаа төлөх дүн
-        <input
-          type="number"
-          min="1"
-          max={invoice.balance}
-          required
-          value={total}
-          onChange={(e) => setTotal(e.target.value)}
-        />
-      </label>
-      {allocations.map((a, index) => (
-        <fieldset key={index} disabled={busy}>
-          <legend>Хуваарилалт {index + 1}</legend>
-          <label>
-            Хэлбэр
-            <select
-              value={a.method}
-              onChange={(e) =>
-                setAllocations(
-                  allocations.map((v, n) =>
-                    n === index ? { ...v, method: e.target.value } : v,
-                  ),
-                )
-              }
-            >
-              {Object.entries(methodNames).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Дүн
-            <input
-              type="number"
-              min="1"
-              required
-              value={a.amount}
-              onChange={(e) =>
-                setAllocations(
-                  allocations.map((v, n) =>
-                    n === index ? { ...v, amount: e.target.value } : v,
-                  ),
-                )
-              }
-            />
-          </label>
-          {a.method !== "CASH" && (
-            <label>
-              Баталгаажсан гүйлгээний дугаар
-              <input
-                required
-                minLength={3}
-                value={a.reference}
-                onChange={(e) =>
-                  setAllocations(
-                    allocations.map((v, n) =>
-                      n === index ? { ...v, reference: e.target.value } : v,
-                    ),
-                  )
-                }
-              />
-            </label>
-          )}
-          {allocations.length > 1 && (
-            <button
-              type="button"
-              className="erp-secondary"
-              onClick={() =>
-                setAllocations(allocations.filter((_, n) => n !== index))
-              }
-            >
-              Хасах
-            </button>
-          )}
-        </fieldset>
-      ))}
-      <div className="reception-actions">
-        <button
-          className="erp-secondary"
-          type="button"
-          disabled={busy || allocations.length >= 4}
-          onClick={() =>
-            setAllocations([
-              ...allocations,
-              { method: "TRANSFER", amount: "", reference: "" },
-            ])
-          }
-        >
-          Төлбөр хуваах
-        </button>
-        <span>
-          Нийлбэр:{" "}
-          {money(allocations.reduce((s, a) => s + Number(a.amount), 0))}
-        </span>
-      </div>
-      <label className="reception-check">
-        <input
-          type="checkbox"
-          required
-          checked={confirmed}
-          onChange={(e) => setConfirmed(e.target.checked)}
-        />
-        Мөнгө хүлээн авсан, гүйлгээг шалгасан
-      </label>
-      <button className="erp-primary" disabled={busy || !active}>
-        {busy ? "Бүртгэж байна…" : "Төлбөр бүртгэх"}
-      </button>
-    </form>
   );
 }
 function CashPanel({
@@ -1912,25 +2003,25 @@ function CashPanel({
   sessions: Session[];
   onAction: (kind: string) => void;
 }) {
+  const csv = useClinicCsv();
   const current = sessions.find((s) => !s.closedAt);
   return (
     <section className="reception-panel">
       <h2>Кассын ээлж</h2>
+      {csv.error && <Feedback>{csv.error}</Feedback>}
       {current ? (
         <>
-          <div className="reception-stats">
-            <article>
-              <span>Эхлэх бэлэн</span>
-              <strong>{money(current.openingCash)}</strong>
-            </article>
-            <article>
-              <span>Тооцоолсон бэлэн</span>
-              <strong>{money(current.expected)}</strong>
-            </article>
-            <article>
-              <span>Бэлэн бус төлөлт</span>
-              <strong>{money(current.nonCash)}</strong>
-            </article>
+          <div className="cash-summary-bar">
+            <span className="reception-status">Миний ээлж нээлттэй</span>
+            <span>
+              Эхлэх бэлэн <strong>{money(current.openingCash)}</strong>
+            </span>
+            <span>
+              Кассанд байх бэлэн <strong>{money(current.expected)}</strong>
+            </span>
+            <span>
+              Бэлэн бус <strong>{money(current.nonCash)}</strong>
+            </span>
           </div>
           <div className="reception-actions">
             <button
@@ -1951,6 +2042,31 @@ function CashPanel({
         <button className="erp-primary" onClick={() => onAction("cash-open")}>
           Кассын ээлж нээх
         </button>
+      )}
+      {current && (
+        <details>
+          <summary>Энэ ээлжийн төлбөр ба мөнгөний хөдөлгөөн</summary>
+          <p>Нээсэн: {clinicTimestamp(current.openedAt)}</p>
+          <Table headers={["Төлбөрийн огноо", "Хэлбэр", "Дүн"]}>
+            {current.payments.map((p) => (
+              <tr key={p.id}>
+                <td>{p.date}</td>
+                <td>{p.methodName || methodNames[p.method!]}</td>
+                <td>
+                  {money(p.amount!)}
+                  {p.voidedAt ? " · Хүчингүй" : ""}
+                </td>
+              </tr>
+            ))}
+          </Table>
+          <h3>Бэлэн мөнгө гаргасан</h3>
+          {current.withdrawals.map((w) => (
+            <p key={w.id}>
+              {money(w.amount)} · {w.reason}
+            </p>
+          ))}
+          {!current.withdrawals.length && <p>Мөнгөн зарлага бүртгээгүй.</p>}
+        </details>
       )}
       <details>
         <summary>Ээлжийн түүх / Хаалтын тайлан</summary>
@@ -1986,33 +2102,42 @@ function CashPanel({
               <td>
                 <button
                   className="erp-secondary"
+                  disabled={csv.busy}
                   onClick={() =>
-                    exportRows(`cash-${s.id}`, [
-                      [
-                        "Ээлж",
-                        "Эхлэх",
-                        "Тооцоолсон",
-                        "Тоолсон",
-                        "Зөрүү",
-                        "Тайлбар",
+                    csv.download({
+                      name: `cash-${s.id}`,
+                      title: "Кассын ээлжийн тайлан",
+                      period: `${clinicTimestamp(s.openedAt)} — ${s.closedAt ? clinicTimestamp(s.closedAt) : "Нээлттэй ээлж"}`,
+                      reference: s.id,
+                      rows: [
+                        [
+                          "Ээлж",
+                          "Эхлэх",
+                          "Тооцоолсон",
+                          "Тоолсон",
+                          "Зөрүү",
+                          "Тайлбар",
+                        ],
+                        [
+                          s.id,
+                          s.openingCash,
+                          s.expected,
+                          s.actualCash ?? "",
+                          s.discrepancy ?? "",
+                          s.explanation,
+                        ],
+                        [],
+                        ["Гүйлгээ", "Хэлбэр", "Дүн"],
+                        ...s.payments.map(
+                          (p) =>
+                            [
+                              p.id,
+                              p.methodName || methodNames[p.method!],
+                              p.amount!,
+                            ] as (string | number)[],
+                        ),
                       ],
-                      [
-                        s.id,
-                        s.openingCash,
-                        s.expected,
-                        s.actualCash ?? "",
-                        s.discrepancy ?? "",
-                        s.explanation,
-                      ],
-                      [],
-                      ["Гүйлгээ", "Хэлбэр", "Дүн"],
-                      ...s.payments.map(
-                        (p) =>
-                          [p.id, methodNames[p.method!], p.amount!] as (
-                            string | number
-                          )[],
-                      ),
-                    ])
+                    })
                   }
                 >
                   CSV
@@ -2034,6 +2159,7 @@ function ReceptionReport({
   from: string;
   to: string;
 }) {
+  const csv = useClinicCsv();
   const metrics = [
     ["Нэхэмжилсэн дүн", "billed"],
     ["Бодитоор цуглуулсан", "collected"],
@@ -2045,30 +2171,34 @@ function ReceptionReport({
   ];
   return (
     <section className="reception-panel">
+      {csv.error && <Feedback>{csv.error}</Feedback>}
       <div className="reception-actions">
         <button
           className="erp-secondary"
+          disabled={csv.busy}
           onClick={() =>
-            exportRows(`reception-${from}-${to}`, [
-              ["Үзүүлэлт", "Утга"],
-              ...metrics.map(([l, k]) => [l, data.statistics[k]]),
-              [],
-              ["Төлбөрийн хэлбэр", "Цуглуулсан"],
-              ...Object.entries(data.methods).map(([k, v]) => [
-                methodNames[k],
-                v,
-              ]),
-              [],
-              ["Өдөр", "Цаг", "Өвчтөн", "Эмч", "Үйлчилгээ", "Төлөв"],
-              ...data.appointments.map((a) => [
-                a.date!,
-                a.startTime!,
-                a.patient!.name!,
-                a.doctor!.name!,
-                a.service!.name!,
-                statusNames[a.status!],
-              ]),
-            ])
+            csv.download({
+              name: `reception-${from}-${to}`,
+              title: "Ресепшний нэгдсэн тайлан",
+              period: `${from} — ${to}`,
+              rows: [
+                ["Үзүүлэлт", "Утга"],
+                ...metrics.map(([l, k]) => [l, data.statistics[k]]),
+                [],
+                ["Төлбөрийн хэлбэр", "Цуглуулсан"],
+                ...data.methodBreakdown.map((m) => [m.name, m.amount]),
+                [],
+                ["Өдөр", "Цаг", "Өвчтөн", "Эмч", "Үйлчилгээ", "Төлөв"],
+                ...data.appointments.map((a) => [
+                  a.date!,
+                  a.startTime!,
+                  a.patient!.name!,
+                  a.doctor!.name!,
+                  a.service!.name!,
+                  statusNames[a.status!],
+                ]),
+              ],
+            })
           }
         >
           <Download size={16} /> Нэгдсэн CSV
@@ -2088,10 +2218,10 @@ function ReceptionReport({
       </div>
       <h3>Төлбөрийн хэлбэрээр</h3>
       <Table headers={["Хэлбэр", "Цуглуулсан"]}>
-        {Object.entries(data.methods).map(([k, v]) => (
-          <tr key={k}>
-            <td>{methodNames[k]}</td>
-            <td>{money(v)}</td>
+        {data.methodBreakdown.map((m) => (
+          <tr key={m.name}>
+            <td>{m.name}</td>
+            <td>{money(m.amount)}</td>
           </tr>
         ))}
       </Table>
@@ -2124,27 +2254,33 @@ function ReceptionReport({
       <h3>Авлагын тайлан (одоогийн)</h3>
       <button
         className="erp-secondary"
+        disabled={csv.busy}
         onClick={() =>
-          exportRows(`receivables-${to}`, [
-            [
-              "Нэхэмжлэх",
-              "Өвчтөн",
-              "Утас",
-              "Нийт",
-              "Төлсөн",
-              "Авлага",
-              "Хугацаа",
+          csv.download({
+            name: `receivables-${today()}`,
+            title: "Төлөгдөөгүй төлбөрийн тайлан",
+            period: "Татсан үеийн нийт үлдэгдэл",
+            rows: [
+              [
+                "Нэхэмжлэх",
+                "Өвчтөн",
+                "Утас",
+                "Нийт",
+                "Төлсөн",
+                "Авлага",
+                "Хугацаа",
+              ],
+              ...data.receivables.map((i) => [
+                i.number,
+                i.patient.name!,
+                i.patient.phone!,
+                i.total,
+                i.paid,
+                i.balance,
+                i.dueDate,
+              ]),
             ],
-            ...data.receivables.map((i) => [
-              i.number,
-              i.patient.name!,
-              i.patient.phone!,
-              i.total,
-              i.paid,
-              i.balance,
-              i.dueDate,
-            ]),
-          ])
+          })
         }
       >
         Авлага CSV
@@ -2181,8 +2317,21 @@ function ReceptionReport({
         {data.activity.map((a) => (
           <tr key={a.id}>
             <td>{clinicTimestamp(a.createdAt)}</td>
-            <td>{a.action}</td>
-            <td>{a.entity}</td>
+            <td>{receptionActionNames[a.action] || "Бүртгэл шинэчилсэн"}</td>
+            <td>
+              {(
+                {
+                  invoice: "Нэхэмжлэх",
+                  payment: "Төлбөр",
+                  queue: "Дараалал",
+                  "cash-session": "Кассын ээлж",
+                  patients: "Өвчтөн",
+                  appointments: "Захиалга",
+                  reschedule: "Цаг шилжүүлэх",
+                  patient: "Өвчтөн",
+                } as Record<string, string>
+              )[a.entity] || "Бүртгэл"}
+            </td>
           </tr>
         ))}
       </Table>
@@ -2201,10 +2350,12 @@ function Notifications({
     pending: Entity[];
     followUps: Entity[];
     outstanding: { id: string; number: string; balance: number }[];
+    upcoming: Entity[];
     readAt: string | null;
     asOf: string;
   }>("/api/reception/notifications", version);
   const [error, setError] = useState("");
+  const [showRead, setShowRead] = useState(false);
   if (request.error)
     return <Feedback retry={request.retry}>{request.error}</Feedback>;
   if (!request.data) return <LoadingSkeleton />;
@@ -2245,6 +2396,15 @@ function Notifications({
       ) : (
         <p>Хүлээгдэж буй захиалга байхгүй.</p>
       )}
+      <h3>Өнөөдрийн удахгүй эхлэх үзлэг</h3>
+      {d.upcoming.map((a) => (
+        <p key={a.id}>
+          <Link href="/erp/visits">
+            {a.startTime} · {a.patient?.name}
+          </Link>
+        </p>
+      ))}
+      {!d.upcoming.length && <p>Удахгүй эхлэх захиалга байхгүй.</p>}
       <h3>Өнөөдрийн давтан үзлэг</h3>
       {d.followUps.map((a) => (
         <p key={a.id}>
@@ -2260,17 +2420,42 @@ function Notifications({
         </p>
       ))}
       <h3>Үйл явдал</h3>
+      <label className="reception-check">
+        <input
+          type="checkbox"
+          checked={showRead}
+          onChange={(e) => setShowRead(e.target.checked)}
+        />
+        Уншсан мэдэгдлийг хамт харах
+      </label>
       <Table headers={["Огноо", "Үйлдэл", "Хэсэг", "Төлөв"]}>
-        {d.events.map((e) => (
-          <tr key={e.id}>
-            <td>{clinicTimestamp(e.createdAt)}</td>
-            <td>{e.action}</td>
-            <td>{e.entity}</td>
-            <td>{!d.readAt || e.createdAt > d.readAt ? "Шинэ" : "Уншсан"}</td>
-          </tr>
-        ))}
+        {d.events
+          .filter((e) => showRead || !d.readAt || e.createdAt > d.readAt)
+          .map((e) => (
+            <tr key={e.id}>
+              <td>{clinicTimestamp(e.createdAt)}</td>
+              <td>
+                {receptionActionNames[e.action] || "Мэдээлэл шинэчлэгдсэн"}
+              </td>
+              <td>
+                {(
+                  {
+                    appointments: "Цаг захиалга",
+                    reschedule: "Цаг шилжүүлэх",
+                    payments: "Төлбөр",
+                    payment: "Төлбөр",
+                    queue: "Дараалал",
+                    leaves: "Хуваарь",
+                  } as Record<string, string>
+                )[e.entity] || "Үйл ажиллагаа"}
+              </td>
+              <td>{!d.readAt || e.createdAt > d.readAt ? "Шинэ" : "Уншсан"}</td>
+            </tr>
+          ))}
       </Table>
-      {!d.events.length && <Empty />}
+      {!d.events.some(
+        (e) => showRead || !d.readAt || e.createdAt > d.readAt,
+      ) && <p>Шинэ үйл явдал алга.</p>}
     </section>
   );
 }
@@ -2278,29 +2463,63 @@ function Notifications({
 function ReceptionAppointmentForm(
   props: Parameters<typeof AppointmentForm>[0],
 ) {
-  const [search, setSearch] = useState("");
+  const [selectedPatient, setSelectedPatient] = useState(
+    String(props.initial?.patientId || ""),
+  );
+  const [register, setRegister] = useState(false);
+  const patient = useResource<Entity>(
+    selectedPatient ? `/api/erp/patients/${selectedPatient}` : null,
+  );
   return (
-    <>
-      <label className="reception-doctor-search">
-        Эмч хайх
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Нэр, мэргэжил…"
+    <div className="reception-booking">
+      <h3>1. Өвчтөн сонгох</h3>
+      {!props.rescheduleId && (
+        <>
+          <label htmlFor="booking-patient">Өвчтөн</label>
+          <PatientPicker
+            id="booking-patient"
+            value={selectedPatient}
+            onChange={(id) => {
+              setSelectedPatient(id);
+              setRegister(false);
+            }}
+          />
+          {!selectedPatient && (
+            <button
+              className="erp-secondary"
+              onClick={() => setRegister(!register)}
+            >
+              + Шинэ өвчтөн бүртгэх
+            </button>
+          )}
+        </>
+      )}
+      {register && (
+        <EntityForm
+          fields={patientFields}
+          onCancel={() => setRegister(false)}
+          onSubmit={async (values) => {
+            const p = await api<Entity>("/api/erp/patients", "POST", values);
+            setSelectedPatient(p.id);
+            setRegister(false);
+          }}
         />
-      </label>
-      <AppointmentForm
-        {...props}
-        options={{
-          ...props.options,
-          doctors: props.options.doctors.filter((d) =>
-            `${d.name} ${d.specialty}`
-              .toLowerCase()
-              .includes(search.toLowerCase()),
-          ),
-        }}
-      />
-    </>
+      )}
+      {patient.error && (
+        <Feedback retry={patient.retry}>{patient.error}</Feedback>
+      )}
+      {patient.data && (
+        <p>
+          <strong>{patient.data.name}</strong> · {patient.data.phone}
+        </p>
+      )}
+      {selectedPatient && patient.data && (
+        <AppointmentForm
+          {...props}
+          key={selectedPatient}
+          initial={{ ...props.initial, patientId: selectedPatient }}
+        />
+      )}
+    </div>
   );
 }

@@ -10,6 +10,7 @@ import {
   rateLimit,
 } from "@/lib/auth";
 import { exportClinicData } from "@/lib/data-export";
+import { exportMetadata, exportMetadataRows } from "@/lib/export-template";
 import { ApiError, safe } from "@/lib/http";
 import { reportData } from "@/lib/reports";
 import {
@@ -36,8 +37,12 @@ export async function GET(
     const user = await requireUser();
     const { kind } = await ctx.params;
     if (user.role === "RECEPTION")
-      throw new ApiError(403, "Ресепшний баримт, тайлангийн хэсгийг ашиглана уу.");
+      throw new ApiError(
+        403,
+        "Ресепшний баримт, тайлангийн хэсгийг ашиглана уу.",
+      );
     const q = new URL(req.url).searchParams;
+    const generatedAt = new Date().toISOString();
     if (kind === "data") {
       if (user.role !== "ADMIN")
         throw new ApiError(403, "Зөвхөн админ өгөгдөл экспортлоно.");
@@ -117,6 +122,11 @@ export async function GET(
         },
         await pdfBranding(),
         `Карт ${patient.id.slice(0, 8).toUpperCase()}`,
+        {
+          period: "Бүртгэлтэй үзлэг, эмчилгээний түүх",
+          exportedBy: user.name,
+          generatedAt,
+        },
       );
       await audit(user, "EXPORT", "patient", id);
       return download(bytes, "application/pdf", "patient-card.pdf");
@@ -152,6 +162,11 @@ export async function GET(
         },
         await pdfBranding(),
         `Баримт ${item.id.slice(0, 8).toUpperCase()}`,
+        {
+          period: `Баримт бүртгэсэн: ${clinicTimestamp(item.createdAt.toISOString())}`,
+          exportedBy: user.name,
+          generatedAt,
+        },
       );
       await audit(user, "EXPORT", "document", id);
       return download(bytes, "application/pdf", "document.pdf");
@@ -161,6 +176,7 @@ export async function GET(
     const reportTitle =
       (await db.setting.findUnique({ where: { key: "reportTitle" } }))?.value ||
       "BB Dental Clinic тайлан";
+    const reportDocumentTitle = `${reportTitle} · Санхүүгийн нэгдсэн тайлан`;
     const period = q.get("period") || "month";
     const year = q.get("year") || today().slice(0, 4),
       month = q.get("month") || today().slice(5, 7);
@@ -176,11 +192,27 @@ export async function GET(
       ? `${periodLabel} · ${report.serviceName}`
       : periodLabel;
     if (kind === "excel") {
+      const brand = await pdfBranding();
+      const meta = exportMetadata(
+        {
+          ...brand,
+          logoUrl: new URL(brand.logoUrl || "/images/default-logo.png", req.url)
+            .href,
+        },
+        {
+          title: reportDocumentTitle,
+          period: label,
+          exportedBy: user.name,
+          generatedAt,
+        },
+      );
       const book = new ExcelJS.Workbook();
-      book.creator = "BB Dental ERP";
+      book.creator = user.name;
+      book.created = new Date(generatedAt);
+      book.modified = new Date(generatedAt);
+      book.subject = `${reportDocumentTitle} · ${label}`;
       const summary = book.addWorksheet("Нэгдсэн тайлан");
       summary.addRows([
-        [reportTitle, label],
         ["Үзүүлэлт", "Дүн"],
         ["Орлого", report.revenue],
         ["Зардал", report.expense],
@@ -228,7 +260,7 @@ export async function GET(
           p.patient.phone,
           p.appointment?.service.name || "Шууд төлбөр",
           p.appointment?.doctor.name || "—",
-          methodNames[p.method],
+          p.methodName || methodNames[p.method],
           p.amount,
         ]),
       );
@@ -241,8 +273,51 @@ export async function GET(
       doctors.addRow(["Эмч", "Захиалгын тоо"]);
       report.byDoctor.forEach((d) => doctors.addRow([d.name, d.count]));
       book.eachSheet((sheet) => {
-        sheet.views = [{ state: "frozen", ySplit: 1 }];
-        sheet.getRow(1).font = { bold: true, color: { argb: "FF007B7F" } };
+        const metadataRows = exportMetadataRows({
+          ...meta,
+          title: `${reportDocumentTitle} · ${sheet.name}`,
+        });
+        const columnCount = Math.max(2, sheet.columnCount);
+        sheet.spliceRows(1, 0, ...metadataRows, []);
+        const headerRow = metadataRows.length + 2;
+        metadataRows.forEach(([, value], index) => {
+          if (columnCount > 2)
+            sheet.mergeCells(index + 1, 2, index + 1, columnCount);
+          const row = sheet.getRow(index + 1);
+          row.height = Math.max(
+            22,
+            Math.min(
+              100,
+              Math.ceil(String(value).length / (22 * (columnCount - 1))) * 16,
+            ),
+          );
+          row.getCell(1).font = { bold: true, color: { argb: "FF164E53" } };
+          row.getCell(2).alignment = { vertical: "middle", wrapText: true };
+          if (index === metadataRows.length - 1 && value)
+            row.getCell(2).value = {
+              text: String(value),
+              hyperlink: String(value),
+            };
+        });
+        sheet.views = [{ state: "frozen", ySplit: headerRow }];
+        sheet.getRow(headerRow).font = {
+          bold: true,
+          color: { argb: "FFFFFFFF" },
+        };
+        sheet.getRow(headerRow).fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FF007F83" },
+        };
+        sheet.pageSetup = {
+          paperSize: 9,
+          orientation: columnCount > 4 ? "landscape" : "portrait",
+          fitToPage: true,
+          fitToWidth: 1,
+          fitToHeight: 0,
+          printTitlesRow: `1:${headerRow}`,
+        };
+        sheet.headerFooter.oddFooter = `&L${brand.name.replaceAll("&", "&&")}&C&P / &N`;
         sheet.columns.forEach((col) => {
           col.width = 25;
         });
@@ -257,7 +332,7 @@ export async function GET(
     }
     if (kind === "pdf") {
       const bytes = await createClinicPdf(
-        reportTitle,
+        reportDocumentTitle,
         (pdf) => {
           pdf.facts([
             ["Тайлант хугацаа", label],
@@ -323,7 +398,7 @@ export async function GET(
             report.payments.map((p) => [
               p.date,
               `${p.patient.name}\n${p.appointment?.service.name || "Шууд төлбөр"}`,
-              methodNames[p.method],
+              p.methodName || methodNames[p.method],
               money(p.amount),
             ]),
           );
@@ -343,6 +418,7 @@ export async function GET(
         },
         await pdfBranding(),
         label,
+        { period: label, exportedBy: user.name, generatedAt },
       );
       await audit(user, "EXPORT", "report", label);
       return download(bytes, "application/pdf", "bb-dental-report.pdf");

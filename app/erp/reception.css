@@ -306,3 +306,80 @@
   outline-offset: 2px;
 }
 @media(max-width:600px) { .reception-table table { min-width:640px; } }
+
+/* Operational workspace and checkout share the existing theme tokens. */
+.reception-workspace { min-width: 0; }
+.reception-pos { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 20px; align-items: start; }
+.reception-pos > *, .checkout-allocation > *, .checkout-summary > div > * { min-width: 0; }
+.checkout-patient > label { display: block; margin: 12px 0 8px; }
+.checkout-patient-info { padding: 16px 0; border-bottom: 1px solid var(--erp-border); }
+.checkout-patient-info p, .checkout-hint { color: var(--erp-muted); font-size: 13px; line-height: 1.6; }
+.checkout-invoices { display: grid; gap: 10px; margin: 16px 0; }
+.reception-workspace button.checkout-invoice { display: grid; justify-content: stretch; text-align: left; padding: 16px; gap: 9px; width: 100%; border: 1px solid var(--erp-border); background: var(--surface); color: var(--erp-text); border-radius: 10px; cursor: pointer; }
+.checkout-invoice.selected { border-color: var(--reception-accent) !important; background: color-mix(in srgb, var(--reception-accent) 8%, var(--surface)) !important; box-shadow: inset 3px 0 var(--reception-accent); }
+.checkout-invoice small { color: var(--erp-muted); }
+.checkout-summary { display: grid; gap: 0; margin: 16px 0; }
+.checkout-summary > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); align-items: baseline; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--erp-border); font-size: 13px; }
+.checkout-summary dt { color: var(--erp-muted); }
+.checkout-summary dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+.checkout-summary .checkout-total { font-size: 19px; font-weight: 700; padding: 16px 0; }
+.checkout-total dt { color: var(--erp-text); }
+.checkout-form { margin-top: 20px; }
+.checkout-form h3, .checkout-confirmation h4 { margin: 0; }
+.checkout-form fieldset.checkout-allocations { display: grid; gap: 16px; padding: 0; border: 0; min-width: 0; }
+.checkout-allocations legend { font-size: 12px; color: var(--erp-muted); margin-bottom: 12px; }
+.checkout-allocation { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; padding-bottom: 16px; border-bottom: 1px solid var(--erp-border); }
+.checkout-reference, .checkout-method-description { grid-column: 1 / -1; }
+.checkout-allocation input, .checkout-allocation select { width: 100%; }
+.checkout-method-description { margin: 0; font-size: 12px; color: var(--erp-muted); }
+.checkout-confirmation { background: var(--erp-bg, var(--surface)); padding: 16px; border-radius: 10px; }
+.checkout-confirmation > strong { display: block; margin-top: 12px; }
+.checkout-submit { width: 100%; min-height: 48px; }
+.checkout-empty { display: grid; justify-items: center; text-align: center; gap: 12px; padding: 32px 12px; color: var(--erp-muted); }
+.checkout-empty h2, .checkout-empty p { margin: 0; }
+.checkout-receipt { display: grid; gap: 20px; }
+.receipt-payments { padding: 0; list-style: none; }
+.receipt-payments li { padding: 12px 0; border-bottom: 1px solid var(--erp-border); }
+.receipt-payments li > div { display: flex; justify-content: space-between; gap: 16px; }
+.receipt-payments small { display: block; margin-top: 6px; overflow-wrap: anywhere; }
+.dashboard-operations { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+.reception-section-title { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.reception-section-title a { font-size: 12px; }
+.operational-row { display: flex; justify-content: space-between; align-items: center; gap: 14px; border-top: 1px solid var(--erp-border); padding: 12px 0; font-size: 13px; }
+.operational-row small { display: block; color: var(--erp-muted); margin-top: 5px; line-height: 1.5; }
+.profile-sections { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0; }
+.profile-sections button[aria-pressed="true"] { border-color: var(--erp-primary); color: var(--erp-primary); background: color-mix(in srgb,var(--erp-primary) 8%,var(--surface)); }
+.reception-profile section { min-width: 0; }
+.reception-profile td { overflow-wrap: anywhere; }
+.reception-booking { display: grid; gap: 12px; }
+.reception-booking > h3 { margin: 0; }
+.reception-workspace :is(button,a,input,select,summary):focus-visible { outline: 2px solid var(--erp-primary); outline-offset: 3px; }
+.reception-workspace button, .reception-workspace summary { min-height: 44px; }
+.reception-workspace .reception-link { min-height: 32px; }
+@media (max-width: 1050px) {
+  .reception-pos { grid-template-columns: minmax(0,1fr); }
+}
+@media (max-width: 700px) {
+  .dashboard-operations { grid-template-columns: minmax(0,1fr); }
+  .checkout-allocation { grid-template-columns: minmax(0,1fr); }
+  .operational-row { align-items: start; flex-wrap: wrap; }
+  .checkout-summary .checkout-total { font-size: 17px; }
+  .reception-quick-actions > * { flex: 1 1 160px; min-height: 44px; }
+  .profile-sections button { flex: 1 1 140px; }
+}
+@media print {
+  body:has(.reception-print) :is(.erp-sidebar,.erp-topbar,.reception-heading,.reception-filters,.reception-quick-actions) { display: none !important; }
+  body:has(.reception-print) .reception-workspace > :not(:has(.reception-print)) { display: none !important; }
+  body:has(.reception-print) .reception-pos > :not(:has(.reception-print)) { display: none !important; }
+  body:has(.reception-print) :is(.reception-pos,.checkout-payment,.checkout-receipt) { display: block; padding: 0; margin: 0; border: 0; }
+  .reception-print { position: static; }
+  .reception-print * { color: black !important; background: white !important; }
+  .reception-print .checkout-summary > div, .reception-print .receipt-payments li { break-inside: avoid; border-color: #ccc; }
+}
+.cash-summary-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 24px; margin: 0 0 14px; font-size: 13px; color: var(--erp-muted); }
+.cash-summary-bar strong { color: var(--erp-text); margin-left: 6px; }
+.reception-cash-shell { border: 1px solid var(--erp-border); border-radius: 10px; background: var(--surface); min-width: 0; }
+.reception-cash-shell > summary { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 20px; padding: 12px 18px; cursor: pointer; font-size: 13px; color: var(--erp-muted); }
+.reception-cash-shell > summary::after { content: "▾"; margin-left: auto; }
+.reception-cash-shell[open] > summary::after { content: "▴"; }
+.reception-cash-shell > .reception-panel { border: 0; border-top: 1px solid var(--erp-border); }

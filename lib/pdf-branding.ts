@@ -48,5 +48,9 @@ export async function pdfBranding(): Promise<PdfBrand> {
     phone: values.phone || "+976 9596-3531",
     address: values.address || "",
     logo,
+    logoUrl:
+      values.logoUrl && isCloudinaryImage(values.logoUrl)
+        ? values.logoUrl
+        : "/images/default-logo.png",
   };
 }

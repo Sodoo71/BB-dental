@@ -180,17 +180,18 @@ const navigation = [
     ],
   },
 ];
-const receptionNavigation = [{ section: "РЕСЕПШН", items: [
-  { id: "dashboard", label: "Хяналтын самбар", icon: LayoutDashboard, roles: ["RECEPTION"] },
-  { id: "patients", label: "Өвчтөнүүд", icon: Users, roles: ["RECEPTION"] },
-  { id: "appointments", label: "Цаг захиалга", icon: CalendarDays, roles: ["RECEPTION"] },
-  { id: "visits", label: "Өнөөдрийн үзлэг", icon: ClipboardCheck, roles: ["RECEPTION"] },
-  { id: "queue", label: "Дараалал", icon: ListOrdered, roles: ["RECEPTION"] },
-  { id: "payments", label: "Касс / POS", icon: CreditCard, roles: ["RECEPTION"] },
-  { id: "transactions", label: "Гүйлгээ", icon: Receipt, roles: ["RECEPTION"] },
-  { id: "receivables", label: "Авлага", icon: Wallet, roles: ["RECEPTION"] },
-  { id: "notifications", label: "Мэдэгдэл", icon: Bell, roles: ["RECEPTION"] },
-  { id: "reports", label: "Тайлан", icon: ChartNoAxesCombined, roles: ["RECEPTION"] },
+const receptionNavigation = [{ section: "ӨДӨР ТУТМЫН АЖИЛ", items: [
+  { id: "dashboard", label: "Нүүр хуудас", icon: LayoutDashboard, roles: ["RECEPTION"] },
+  { id: "patients", label: "Өвчтөн бүртгэл", icon: Users, roles: ["RECEPTION"] },
+  { id: "appointments", label: "Цаг авах", icon: CalendarDays, roles: ["RECEPTION"] },
+  { id: "visits", label: "Өнөөдрийн өвчтөнүүд", icon: ClipboardCheck, roles: ["RECEPTION"] },
+  { id: "queue", label: "Хүлээж буй өвчтөн", icon: ListOrdered, roles: ["RECEPTION"] },
+]}, { section: "ТӨЛБӨР БА МЭДЭЭЛЭЛ", items: [
+  { id: "payments", label: "Төлбөр авах", icon: CreditCard, roles: ["RECEPTION"] },
+  { id: "transactions", label: "Төлбөрийн түүх", icon: Receipt, roles: ["RECEPTION"] },
+  { id: "receivables", label: "Төлөгдөөгүй төлбөр", icon: Wallet, roles: ["RECEPTION"] },
+  { id: "notifications", label: "Мэдэгдлүүд", icon: Bell, roles: ["RECEPTION"] },
+  { id: "reports", label: "Миний тайлан", icon: ChartNoAxesCombined, roles: ["RECEPTION"] },
 ]}];
 export function canVisitSection(role: Role, section: string) {
   return (role === "RECEPTION" ? receptionNavigation : navigation)

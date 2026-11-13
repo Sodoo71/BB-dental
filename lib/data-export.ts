@@ -41,6 +41,7 @@ export async function exportClinicData() {
       appointments: await tx.appointment.findMany(),
       treatments: await tx.treatment.findMany(),
       payments: await tx.payment.findMany(),
+      paymentMethods: await tx.paymentMethodOption.findMany(),
       expenses: await tx.expense.findMany(),
       inventory: await tx.inventoryItem.findMany(),
       stockMovements: await tx.stockMovement.findMany(),

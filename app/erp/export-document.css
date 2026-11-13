@@ -1,0 +1,30 @@
+.clinic-document { min-width: 0; color: var(--erp-text); }
+.clinic-document-header { border-bottom: 2px solid var(--erp-primary, #007f83); padding-bottom: 18px; margin-bottom: 24px; }
+.clinic-document-brand { display: flex; gap: 16px; align-items: center; }
+.clinic-document-logo { width: 64px; height: 64px; border-radius: 50%; object-fit: contain; overflow: hidden; border: 1px solid var(--erp-border); background: white; flex: 0 0 64px; }
+.clinic-document-brand strong { font-size: 20px; line-height: 1.3; }
+.clinic-document-brand p { font-size: 12px; line-height: 1.6; color: var(--erp-muted); overflow-wrap: anywhere; margin: 6px 0 0; }
+.clinic-document-header > h2 { margin: 22px 0 14px; line-height: 1.4; }
+.clinic-document-metadata { display: grid; gap: 8px; margin: 0; font-size: 12px; }
+.clinic-document-metadata > div { display: grid; grid-template-columns: minmax(110px, .8fr) minmax(0,1.5fr); gap: 12px; }
+.clinic-document-metadata dt { color: var(--erp-muted); }
+.clinic-document-metadata dd { margin: 0; overflow-wrap: anywhere; }
+.clinic-document-body { min-width: 0; }
+.clinic-document-footer { border-top: 1px solid var(--erp-border); padding-top: 12px; margin: 24px 0; font-size: 11px; color: var(--erp-muted); }
+@media(max-width:600px) {
+  .clinic-document-metadata > div { grid-template-columns: minmax(0,1fr); gap: 4px; }
+  .clinic-document-brand { align-items: start; gap: 12px; }
+  .clinic-document-brand strong { font-size: 17px; }
+}
+@media print {
+  body[data-clinic-printing] .clinic-document:not([data-clinic-print-target]) { display: none !important; }
+  body[data-clinic-printing] .reception-workspace > :not(:has([data-clinic-print-target])),
+  body[data-clinic-printing] .reception-pos > :not(:has([data-clinic-print-target])),
+  body[data-clinic-printing] dialog:not(:has([data-clinic-print-target])) { display: none !important; }
+  .clinic-document { font-family: Inter, sans-serif; font-size: 10pt; }
+  .clinic-document-header { border-bottom-color: #007f83; break-inside: avoid; }
+  .clinic-document-logo { border-color: #d4e5e3; border-radius: 50%; }
+  .clinic-document-brand strong { color: #164e53 !important; }
+  .clinic-document-metadata > div { grid-template-columns: 155px minmax(0,1fr); }
+  .clinic-document-footer { break-inside: avoid; }
+}

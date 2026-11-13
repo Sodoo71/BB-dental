@@ -24,7 +24,7 @@ test("partial collections and legacy deposits do not produce negative receivable
     10000,
   );
 });
-test("split allocations must equal payment and external settlements require references", () => {
+test("split allocations must equal payment and identify a method; reference policy is validated by the server", () => {
   const data = {
     invoiceId: id,
     idempotencyKey: id,
@@ -43,9 +43,16 @@ test("split allocations must equal payment and external settlements require refe
   assert.equal(
     collectionSchema.safeParse({
       ...data,
-      allocations: [{ method: "QPAY", amount: 200000 }],
+      allocations: [{ amount: 200000 }],
     }).success,
     false,
+  );
+  assert.equal(
+    collectionSchema.safeParse({
+      ...data,
+      allocations: [{ paymentMethodId: id, amount: 200000 }],
+    }).success,
+    true,
   );
   assert.equal(
     collectionSchema.safeParse({ ...data, amount: -1 }).success,

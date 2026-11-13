@@ -1,9 +1,31 @@
 import { z } from "zod";
 import { dateSchema, moneySchema } from "./domain";
+export const receptionActionNames: Record<string, string> = {
+  CREATE: "Шинэ бүртгэл",
+  UPDATE: "Бүртгэл шинэчлэгдсэн",
+  CHECK_IN: "Өвчтөн ирсэн",
+  PAYMENT_RECEIVED: "Төлбөр бүртгэгдсэн",
+  REFUND_REQUESTED: "Буцаалтын хүсэлт",
+  QUEUE_CALLED: "Өвчтөн дуудагдсан",
+  QUEUE_IN_PROGRESS: "Үзлэг эхэлсэн",
+  QUEUE_COMPLETED: "Үзлэг дууссан",
+  QUEUE_CANCELLED: "Дараалал цуцлагдсан",
+  QUEUE_WAITING: "Хүлээлтэд шилжсэн",
+  CASH_OPENED: "Кассын ээлж нээгдсэн",
+  CASH_CLOSED: "Кассын ээлж хаагдсан",
+  CASH_WITHDRAWAL: "Бэлэн мөнгө гаргасан",
+  INVOICE_CREATED: "Нэхэмжлэх үүссэн",
+  "INVOICE-FINALIZE": "Нэхэмжлэх баталгаажсан",
+  "INVOICE-REMOVE-ITEM": "Нэхэмжлэхийн мөр хассан",
+  PATIENT_ARCHIVED: "Өвчтөн архивлагдсан",
+  APPOINTMENT_CONFIRMED: "Захиалга баталгаажсан",
+  APPOINTMENT_CANCELLED: "Захиалга цуцлагдсан",
+  APPOINTMENT_NO_SHOW: "Өвчтөн ирээгүй",
+};
 export const queueNames: Record<string, string> = {
-  WAITING: "Хүлээж буй",
-  CALLED: "Дуудсан",
-  IN_PROGRESS: "Эмчилж буй",
+  WAITING: "Хүлээж байна",
+  CALLED: "Дуудагдсан",
+  IN_PROGRESS: "Эмчлүүлж байна",
   COMPLETED: "Дууссан",
   CANCELLED: "Цуцалсан",
 };
@@ -41,20 +63,21 @@ export const expectedCash = (
   withdrawals.reduce((s, p) => s + p.amount, 0);
 export const allocationSchema = z
   .object({
-    method: z.enum(["CASH", "TRANSFER", "CARD", "QPAY"]),
+    paymentMethodId: z.string().uuid().optional(),
+    method: z.enum(["CASH", "TRANSFER", "CARD", "QPAY"]).optional(),
     amount: moneySchema.refine((n) => n > 0),
     reference: z.string().trim().max(200).default(""),
   })
   .refine(
-    (a) => a.method === "CASH" || a.reference.length >= 3,
-    "Банк / терминалын баталгаажсан гүйлгээний дугаар шаардлагатай.",
+    (a) => Boolean(a.paymentMethodId || a.method),
+    "Төлбөрийн хэлбэр сонгоно уу.",
   );
 export const collectionSchema = z
   .object({
     invoiceId: z.string().min(1).max(100),
     idempotencyKey: z.string().uuid(),
     amount: moneySchema.refine((n) => n > 0),
-    allocations: z.array(allocationSchema).min(1).max(4),
+    allocations: z.array(allocationSchema).min(1).max(12),
   })
   .refine(
     (d) => d.allocations.reduce((s, a) => s + a.amount, 0) === d.amount,

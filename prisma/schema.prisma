@@ -223,6 +223,11 @@ model Payment {
   appointment    Appointment?  @relation(fields: [appointmentId], references: [id])
   amount         Int
   method         PaymentMethod
+  paymentMethodId String?
+  paymentMethod  PaymentMethodOption? @relation(fields: [paymentMethodId], references: [id], onDelete: Restrict)
+  methodName     String        @default("")
+  cashierName    String        @default("")
+  receiptBalance Int?
   note           String        @default("")
   date           String
   createdById    String
@@ -238,6 +243,19 @@ model Payment {
   createdAt      DateTime      @default(now())
 
   @@index([date, voidedAt])
+  @@index([paymentMethodId, date])
+}
+
+// Configurable labels/policies; Payment.method remains the immutable ledger/cash category.
+model PaymentMethodOption {
+  id                String        @id @default(uuid())
+  name              String
+  kind              PaymentMethod
+  enabled           Boolean       @default(true)
+  sortOrder         Int           @default(0)
+  referenceRequired Boolean       @default(false)
+  description       String        @default("")
+  payments          Payment[]
 }
 
 model Expense {

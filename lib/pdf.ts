@@ -1,12 +1,13 @@
 import path from "node:path";
 import { readFile } from "node:fs/promises";
 import PDFDocument from "pdfkit";
-import { clinicTimestamp } from "./domain";
+import { exportMetadata, type ExportDetails } from "./export-template";
 export type PdfBrand = {
   name: string;
   phone: string;
   address: string;
   logo: Buffer;
+  logoUrl?: string;
 };
 export const defaultLogoPath = path.join(
   process.cwd(),
@@ -21,7 +22,7 @@ const colors = {
   wash: "#F1F8F6",
 };
 const LEFT = 42,
-  TOP = 178,
+  TOP = 228,
   WIDTH = 511,
   BOTTOM = 66;
 export type PdfColumn = {
@@ -258,18 +259,29 @@ export async function createClinicPdf(
   title: string,
   render: (pdf: ClinicPdf) => Promise<void> | void,
   brand: PdfBrand,
-  reference = "",
+  reference: string,
+  details: Omit<ExportDetails, "title" | "reference">,
 ) {
   const fallback = await readFile(defaultLogoPath);
   let logo = brand.logo;
   const font = path.join(process.cwd(), "public/fonts/NotoSans-Regular.ttf");
+  const meta = exportMetadata(
+    { ...brand, logoUrl: brand.logoUrl || "/images/default-logo.png" },
+    { ...details, title, reference },
+  );
   const doc = new PDFDocument({
     size: "A4",
     margins: { top: TOP, left: LEFT, right: LEFT, bottom: BOTTOM },
     font,
     bufferPages: true,
     autoFirstPage: false,
-    info: { Title: title, Author: brand.name, Creator: "BB Dental ERP" },
+    info: {
+      Title: title,
+      Author: brand.name,
+      Creator: "BB Dental ERP",
+      Subject: `${details.period} | ${meta.generatedLabel} | ${details.exportedBy}${reference ? ` | ${reference}` : ""}`,
+      CreationDate: new Date(meta.generatedAt),
+    },
   });
   const chunks: Buffer[] = [];
   const complete = new Promise<Buffer>((resolve, reject) => {
@@ -277,21 +289,37 @@ export async function createClinicPdf(
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
   });
-  const stamp = clinicTimestamp(new Date().toISOString());
+  const stamp = meta.generatedLabel;
   doc.on("pageAdded", () => {
     doc.save();
     doc.rect(0, 0, doc.page.width, doc.page.height).fill("#FFFFFF");
     doc.rect(0, 0, doc.page.width, 6).fill(colors.teal);
+    const drawLogo = (bytes: Buffer) => {
+      doc
+        .save()
+        .circle(LEFT + 28, 54, 28)
+        .clip();
+      try {
+        doc.image(bytes, LEFT, 26, {
+          fit: [56, 56],
+          align: "center",
+          valign: "center",
+        });
+      } finally {
+        doc.restore();
+      }
+    };
     try {
-      doc.image(logo, LEFT, 26, {
-        fit: [54, 54],
-        align: "center",
-        valign: "center",
-      });
+      drawLogo(logo);
     } catch {
       logo = fallback;
-      doc.image(logo, LEFT, 26, { fit: [54, 54] });
+      drawLogo(logo);
     }
+    doc
+      .circle(LEFT + 28, 54, 28)
+      .strokeColor(colors.line)
+      .lineWidth(0.8)
+      .stroke();
     doc
       .fontSize(19)
       .fillColor(colors.dark)
@@ -321,6 +349,28 @@ export async function createClinicPdf(
       .fontSize(16)
       .fillColor(colors.dark)
       .text(title, LEFT, 126, { width: WIDTH, height: 40, ellipsis: true });
+    doc
+      .fontSize(8)
+      .fillColor(colors.ink)
+      .text(`Хамрах хугацаа: ${meta.period}`, LEFT, 171, {
+        width: WIDTH,
+        height: 14,
+        ellipsis: true,
+      });
+    doc
+      .fontSize(7.5)
+      .fillColor(colors.muted)
+      .text(`Татсан / Хэвлэсэн: ${stamp}`, LEFT, 188, {
+        width: WIDTH,
+        height: 12,
+        ellipsis: true,
+      });
+    doc.text(
+      `Татсан ажилтан: ${meta.exportedBy}${reference ? `  ·  ${reference}` : ""}`,
+      LEFT,
+      203,
+      { width: WIDTH, height: 12, ellipsis: true },
+    );
     doc.restore();
     doc.fillColor(colors.ink).fontSize(10);
     doc.x = LEFT;
@@ -344,12 +394,10 @@ export async function createClinicPdf(
     doc
       .fontSize(7)
       .fillColor(colors.muted)
-      .text(
-        `Хэвлэсэн: ${stamp}${reference ? `  ·  ${reference}` : ""}`,
-        LEFT,
-        y,
-        { width: WIDTH - 90, lineBreak: false },
-      );
+      .text(`Татсан / Хэвлэсэн: ${stamp}`, LEFT, y, {
+        width: WIDTH - 90,
+        lineBreak: false,
+      });
     doc.text(
       `${page - range.start + 1} / ${range.count}`,
       LEFT + WIDTH - 70,

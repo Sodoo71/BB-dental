@@ -345,6 +345,275 @@ try {
   check("financial and queue mutations are audited", () =>
     assert.equal(audit, 14),
   );
+  const { listPaymentMethods, savePaymentMethod, defaultMethodIds } =
+    await import("../lib/payment-methods");
+  const admin = { ...actor, role: "ADMIN" };
+  const defaults = await listPaymentMethods(actor);
+  check(
+    "migration adds four enabled methods without changing old payments",
+    () => {
+      assert.equal(defaults.items.length, 4);
+      assert.equal(historical.payments[0].method, "CASH");
+    },
+  );
+  for (const role of ["RECEPTION", "DOCTOR"])
+    await assert.rejects(
+      savePaymentMethod({ ...actor, role }, {}),
+      /Зөвхөн админ/,
+    );
+  passed++;
+  console.log("PASS method management rejects non-admin actors");
+  const makeInvoice = async () => {
+    const i = await action(actor, "invoice-create", {
+      patientId: patient.id,
+      dueDate: today(),
+      items: [{ serviceId: service.id, quantity: 1 }],
+    });
+    await action(actor, "invoice-finalize", { id: i.id });
+    return i;
+  };
+  const collect = (i, allocations, key = crypto.randomUUID()) =>
+    action(actor, "collect", {
+      invoiceId: i.id,
+      idempotencyKey: key,
+      amount: allocations.reduce((n, a) => n + a.amount, 0),
+      allocations,
+    });
+  const closedInvoice = await makeInvoice();
+  await assert.rejects(
+    collect(closedInvoice, [
+      { paymentMethodId: defaultMethodIds.CASH, amount: 200000 },
+    ]),
+    /Кассын ээлж/,
+  );
+  passed++;
+  console.log("PASS closed cash session rejects an otherwise valid payment");
+  await action(actor, "cash-open", { openingCash: 0 });
+  for (const kind of ["CASH", "CARD", "TRANSFER", "QPAY"]) {
+    const i = await makeInvoice();
+    const payments = await collect(i, [
+      {
+        paymentMethodId: defaultMethodIds[kind],
+        amount: 200000,
+        reference: kind === "CASH" ? "" : `full-${kind}`,
+      },
+    ]);
+    const receipt = await data(
+      actor,
+      "receipt",
+      new URLSearchParams({ id: payments[0].id }),
+    );
+    check(`full ${kind} payment and receipt`, () => {
+      assert.equal(receipt.total, 200000);
+      assert.equal(receipt.balance, 0);
+      assert.equal(receipt.cashier, actor.name);
+      assert.equal(receipt.payments.length, 1);
+    });
+    await assert.rejects(
+      collect(i, [{ paymentMethodId: defaultMethodIds.CASH, amount: 1 }]),
+      /үлдэгдлээс/,
+    );
+  }
+  const three = await makeInvoice();
+  const split3 = await collect(three, [
+    { paymentMethodId: defaultMethodIds.CASH, amount: 40000 },
+    {
+      paymentMethodId: defaultMethodIds.CARD,
+      amount: 60000,
+      reference: "split-card",
+    },
+    {
+      paymentMethodId: defaultMethodIds.QPAY,
+      amount: 100000,
+      reference: "split-qpay",
+    },
+  ]);
+  const receipt3 = await data(
+    actor,
+    "receipt",
+    new URLSearchParams({ id: split3[2].id }),
+  );
+  check("three-way split appears as one receipt", () => {
+    assert.equal(receipt3.total, 200000);
+    assert.equal(receipt3.payments.length, 3);
+    assert.equal(receipt3.balance, 0);
+  });
+  const custom = await savePaymentMethod(admin, {
+    name: "Нэмэлт банк",
+    kind: "TRANSFER",
+    enabled: true,
+    sortOrder: 8,
+    referenceRequired: true,
+    description: "Test method",
+  });
+  const customInvoice = await makeInvoice();
+  await assert.rejects(
+    collect(customInvoice, [{ paymentMethodId: custom.id, amount: 50000 }]),
+    /гүйлгээний дугаар/,
+  );
+  const partialKey = crypto.randomUUID();
+  const customPayment = await collect(
+    customInvoice,
+    [{ paymentMethodId: custom.id, amount: 50000, reference: "custom-ref" }],
+    partialKey,
+  );
+  await savePaymentMethod(admin, {
+    ...custom,
+    name: "Шинэ нэр",
+    enabled: false,
+  });
+  assert.equal(
+    (await listPaymentMethods(actor)).items.some((m) => m.id === custom.id),
+    false,
+  );
+  await assert.rejects(
+    collect(customInvoice, [
+      { paymentMethodId: custom.id, amount: 1, reference: "disabled" },
+    ]),
+    /идэвхгүй/,
+  );
+  const retryDisabled = await collect(
+    customInvoice,
+    [{ paymentMethodId: custom.id, amount: 50000, reference: "custom-ref" }],
+    partialKey,
+  );
+  assert.equal(retryDisabled[0].id, customPayment[0].id);
+  const saved = await prisma.payment.findUniqueOrThrow({
+    where: { id: customPayment[0].id },
+  });
+  const receiptBefore = await data(
+    actor,
+    "receipt",
+    new URLSearchParams({ id: saved.id }),
+  );
+  check(
+    "disabled methods reject new payments and preserve snapshot/retry/receipt",
+    () => {
+      assert.equal(saved.methodName, "Нэмэлт банк");
+      assert.equal(saved.method, "TRANSFER");
+      assert.equal(receiptBefore.payments[0].methodName, "Нэмэлт банк");
+      assert.equal(receiptBefore.balance, 150000);
+    },
+  );
+  await assert.rejects(
+    prisma.paymentMethodOption.delete({ where: { id: custom.id } }),
+  );
+  await assert.rejects(
+    savePaymentMethod(admin, { ...custom, kind: "CASH" }),
+    /тооцооны төрлийг/,
+  );
+  const optional = await savePaymentMethod(admin, {
+    ...custom,
+    name: "Лавлагаа заавал биш",
+    enabled: true,
+    referenceRequired: false,
+  });
+  await collect(customInvoice, [
+    { paymentMethodId: optional.id, amount: 150000 },
+  ]);
+  const receiptAfter = await data(
+    actor,
+    "receipt",
+    new URLSearchParams({ id: saved.id }),
+  );
+  check(
+    "configured optional reference accepted and earlier receipt balance stays unchanged",
+    () => assert.equal(receiptAfter.balance, 150000),
+  );
+  const duplicateRefInvoice = await makeInvoice();
+  await assert.rejects(
+    collect(duplicateRefInvoice, [
+      { paymentMethodId: optional.id, amount: 1, reference: "custom-ref" },
+    ]),
+    /өмнө бүртгэгдсэн/,
+  );
+  const defaultCard = defaults.items.find((m) => m.kind === "CARD");
+  await savePaymentMethod(admin, { ...defaultCard, enabled: false });
+  await assert.rejects(
+    collect(duplicateRefInvoice, [
+      { method: "CARD", amount: 1, reference: "legacy-bypass" },
+    ]),
+    /идэвхгүй/,
+  );
+  passed++;
+  console.log(
+    "PASS disabled default cannot be bypassed with legacy enum payload",
+  );
+  await savePaymentMethod(admin, defaultCard);
+  // Unpaid balance must not block booking or arrival.
+  const queuedWalkIns = await prisma.queueEntry.findMany({
+    where: { patientId: patient.id, status: "WAITING" },
+  });
+  for (const entry of queuedWalkIns)
+    await action(actor, "queue-status", { id: entry.id, status: "CANCELLED" });
+  const unpaid = await makeInvoice();
+  const nextSlots = await availability(doctor.id, service.id, today(), prisma);
+  const unpaidBooking = await createBooking(
+    { ...booking, startTime: nextSlots[0] },
+    actor.id,
+  );
+  await action(actor, "check-in", {
+    appointmentId: unpaidBooking.id,
+    patientId: patient.id,
+    doctorId: doctor.id,
+  });
+  await assert.rejects(
+    action(actor, "patient-archive", { id: patient.id }),
+    /Авлага/,
+  );
+  check(
+    "unpaid invoice does not block booking or check-in; archive remains restricted",
+    () => assert.ok(unpaid.id),
+  );
+  const cleanPatient = await prisma.patient.create({
+    data: { name: "Archive eligible", phone: "99110088" },
+  });
+  await action(actor, "patient-archive", { id: cleanPatient.id });
+  check("eligible patient archives without deletion", () =>
+    assert.ok(cleanPatient.id),
+  );
+  const auditMethods = await prisma.auditLog.count({
+    where: { entity: "payment-method", actorId: admin.id },
+  });
+  check("admin payment configuration changes are audited", () =>
+    assert.ok(auditMethods >= 5),
+  );
+  const legacyCash = await data(
+    actor,
+    "transactions",
+    new URLSearchParams({
+      from: "2026-01-01",
+      to: "2026-01-01",
+      paymentMethodId: defaultMethodIds.CASH,
+      q: "Historical",
+    }),
+  );
+  check(
+    "method history filters include pre-migration enum-only settlements",
+    () => assert.equal(legacyCash.items[0].id, "legacy-payment"),
+  );
+  const futurePatient = await prisma.patient.create({
+    data: { name: "Future booking", phone: "99110077" },
+  });
+  await createBooking(
+    {
+      ...booking,
+      patientId: futurePatient.id,
+      name: futurePatient.name,
+      phone: futurePatient.phone,
+      date: "2099-01-05",
+      startTime: "10:00",
+    },
+    actor.id,
+  );
+  await assert.rejects(
+    action(actor, "patient-archive", { id: futurePatient.id }),
+    /идэвхтэй захиалгатай/,
+  );
+  passed++;
+  console.log(
+    "PASS future active appointment prevents archive without any debt",
+  );
   console.log(`${passed} isolated reception checks passed.`);
 } finally {
   setSystemTime();

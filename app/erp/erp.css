@@ -4361,3 +4361,19 @@ html .login-form .erp-primary {
   accent-color:#0d9488;
 }
 .appointment-time-field { display:grid; gap:8px; margin-top:14px; }
+
+.payment-method-list { display: grid; gap: 0; margin: 20px 0; }
+.payment-method-list article { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--erp-border); }
+.payment-method-list small { display: block; color: var(--erp-muted); margin-top: 6px; }
+.payment-method-list p { margin: 6px 0; }
+.payment-method-editor { display: grid; gap: 18px; margin-top: 24px; }
+.payment-method-editor fieldset { min-width: 0; border: 0; padding: 0; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+.payment-method-editor label { display: grid; gap: 8px; font-size: 13px; }
+.payment-method-editor input:not([type="checkbox"]), .payment-method-editor select, .payment-method-editor textarea { min-width: 0; width: 100%; background: var(--surface); color: var(--erp-text); border: 1px solid var(--erp-border); border-radius: 8px; padding: 12px; }
+.payment-method-editor label:has(input[type="checkbox"]) { display: flex; align-items: center; gap: 8px; }
+@media(max-width:600px) {
+  .payment-method-list article { align-items: start; flex-direction: column; }
+  .payment-method-editor fieldset { grid-template-columns: minmax(0,1fr); }
+}
+.appointment-availability > div > label { display: grid; gap: 6px; min-width: 0; font-size: 12px; color: var(--erp-muted); }
+.appointment-availability > div > label :is(select,input) { width: 100%; min-width: 0; }

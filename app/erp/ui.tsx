@@ -64,6 +64,7 @@ export type Entity = {
   tooth?: number;
   amount?: number;
   method?: string;
+  methodName?: string;
   title?: string;
   type?: string;
   content?: string;
@@ -207,7 +208,7 @@ export function Empty({
 export function Money({ value }: { value: number }) {
   return <span className="money-value">{money(value)}</span>;
 }
-function PatientPicker({
+export function PatientPicker({
   value,
   onChange,
   id,
@@ -251,7 +252,7 @@ function PatientPicker({
       <div>
         <Search size={16} />
         <input
-          placeholder="Нэр, утсаар өвчтөн хайх"
+          placeholder="Нэр, утас, өвчтөний ID…"
           aria-label="Өвчтөн хайх"
           value={search}
           onChange={(e) => setSearch(e.target.value)}

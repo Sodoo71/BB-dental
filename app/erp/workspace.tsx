@@ -1649,7 +1649,7 @@ function cells(
       return [
         person,
         i.date,
-        <Badge key="method" value={i.method || ""} />,
+        <span className="erp-badge" key="method">{i.methodName || methodNames[i.method || ""]}</span>,
         <Money key="amount" value={i.amount || 0} />,
         <span
           key="status"
@@ -1756,20 +1756,9 @@ export function AppointmentForm({
   return (
     <>
       <div className="appointment-availability">
-        <h3>Боломжит цаг шалгах</h3>
+        <h3>{user.role === "RECEPTION" ? "2. Үйлчилгээ, эмч, цаг сонгох" : "Боломжит цаг шалгах"}</h3>
         <div>
-          <select
-            aria-label="Боломжит цагийн эмч"
-            value={doctorId}
-            onChange={(e) => { setDoctorId(e.target.value); setStartTime(""); }}
-          >
-            {eligibleDoctors.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
-          <select
+          <label>Үйлчилгээ<select
             aria-label="Боломжит цагийн үйлчилгээ"
             value={serviceId}
             onChange={(e) => { setServiceId(e.target.value); setStartTime(""); }}
@@ -1779,14 +1768,25 @@ export function AppointmentForm({
                 {s.name}
               </option>
             ))}
-          </select>
-          <input
+          </select></label>
+          <label>Эмч<select
+            aria-label="Боломжит цагийн эмч"
+            value={doctorId}
+            onChange={(e) => { setDoctorId(e.target.value); setStartTime(""); }}
+          >
+            {eligibleDoctors.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select></label>
+          <label>Огноо<input
             aria-label="Боломжит цагийн өдөр"
             type="date"
             value={date}
             min={today()}
             onChange={(e) => { setDate(e.target.value); setStartTime(""); }}
-          />
+          /></label>
         </div>
         <p>
           {slotsLoading
@@ -1801,7 +1801,7 @@ export function AppointmentForm({
         <label className="appointment-time-field">Эхлэх цаг
           {manualTime ? <input aria-label="Эхлэх цаг" type="time" step="60" value={startTime} onChange={e => setStartTime(e.target.value)} /> : <select aria-label="Эхлэх цаг" value={startTime} disabled={slotsLoading} onChange={e => setStartTime(e.target.value)}><option value="">{slotsLoading ? "Цаг ачаалж байна…" : "Цаг сонгох"}</option>{slots.map(s => <option key={s} value={s}>{s}</option>)}</select>}
         </label>
-        {manualTime && <p>Тусгай цаг оноох: ердийн ажлын хуваарь, чөлөөний хязгаараас гадуур цаг товлож болно. Давхцал, үйлчилгээний хугацаа болон эмчийн идэвхтэй төлөвийг сервер шалгана.</p>}
+        {manualTime && <p>Тусгай цаг оноох: ердийн ажлын хуваарь, чөлөөний хязгаараас гадуур цаг товлож болно. Сонгосон цаг өөр захиалгатай давхцахгүй, үйлчилгээний хугацаанд хүрэлцэх ёстой.</p>}
       </div>
       <EntityForm
         fields={[

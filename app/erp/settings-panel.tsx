@@ -16,10 +16,12 @@ import {
   ExternalLink,
   CheckCircle2,
   KeyRound,
+  CreditCard,
 } from "lucide-react";
 import ImageUpload from "../components/image-upload";
 import PasswordInput from "../components/password-input";
 import SystemPanel from "./system-panel";
+import PaymentMethodSettings from "./payment-method-settings";
 import { api, Feedback, useResource, type Entity } from "./ui";
 import { useUser } from "./shell";
 const defaults: Record<string, string> = {
@@ -138,6 +140,7 @@ function SettingsEditor({ settings }: { settings: { items: Entity[] } }) {
           ["clinic", "Эмнэлэг ба footer", Globe],
           ["branding", "Лого ба тайлан", ImageIcon],
           ["telegram", "Telegram", Send],
+          ["payments", "Төлбөрийн хэлбэр", CreditCard],
           ["system", "Систем ба бүртгэл", ShieldCheck],
         ].map(([key, label, Icon]) => {
           const I = Icon as typeof Globe;
@@ -167,7 +170,9 @@ function SettingsEditor({ settings }: { settings: { items: Entity[] } }) {
           {message}
         </div>
       )}
-      {tab === "telegram" ? (
+      {tab === "payments" ? (
+        <PaymentMethodSettings />
+      ) : tab === "telegram" ? (
         <TelegramPanel onMessage={setMessage} />
       ) : tab === "system" ? (
         <SystemPanel />

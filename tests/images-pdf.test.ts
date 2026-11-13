@@ -115,11 +115,20 @@ test("branded PDF embeds the logo/font and paginates long Mongolian content", as
     },
     brand,
     "ЗАГВАР",
+    {
+      period: "Бүртгэлтэй үзлэг, эмчилгээний түүх",
+      exportedBy: "Тест ажилтан",
+      generatedAt: "2026-11-13T01:30:00.000Z",
+    },
   );
   const raw = bytes.toString("latin1");
   assert.equal(bytes.subarray(0, 4).toString(), "%PDF");
   assert.match(raw, /\/Subtype \/Image/);
   assert.match(raw, /FontFile2/);
+  assert.ok(bytes.includes(Buffer.from("Тест ажилтан", "utf16le").swap16()));
+  assert.ok(
+    bytes.includes(Buffer.from("2026-11-13 09:30", "utf16le").swap16()),
+  );
   assert.ok((raw.match(/\/Type \/Page\b/g) || []).length >= 3);
   await writeFile("/private/tmp/bb-dental-pdf-preview.pdf", bytes);
 });

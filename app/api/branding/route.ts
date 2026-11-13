@@ -6,9 +6,20 @@ import { json, safe } from "@/lib/http";
 export async function GET() {
   return safe(async () => {
     await connection();
-    if (!databaseConfigured()) return json({ logoUrl: "" });
-    const setting = await db.setting.findUnique({ where: { key: "logoUrl" } });
-    const value = setting?.value || "";
-    return json({ logoUrl: value && isCloudinaryImage(value) ? value : "" });
+    const settings = databaseConfigured()
+      ? await db.setting.findMany({
+          where: { key: { in: ["logoUrl", "clinicName", "phone", "address"] } },
+        })
+      : [];
+    const values = Object.fromEntries(settings.map((s) => [s.key, s.value]));
+    return json({
+      name: values.clinicName || "BB Dental Clinic",
+      phone: values.phone || "+976 9596-3531",
+      address: values.address || "",
+      logoUrl:
+        values.logoUrl && isCloudinaryImage(values.logoUrl)
+          ? values.logoUrl
+          : "/images/default-logo.png",
+    });
   });
 }

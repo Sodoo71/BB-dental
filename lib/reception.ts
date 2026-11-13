@@ -4,7 +4,9 @@ import { db } from "./db";
 import type { Prisma } from "@/app/generated/prisma/client";
 import type { Actor } from "./auth";
 import { ApiError } from "./http";
-import { dateSchema, moneySchema, today } from "./domain";
+import { dateSchema, moneySchema, today, methodNames, nowTime } from "./domain";
+import { defaultMethodIds } from "./payment-methods";
+import { workIntervals } from "./work-schedule";
 import { doctorLock, notifyDoctor } from "./booking";
 import {
   collectionSchema,
@@ -253,6 +255,7 @@ export async function receptionAction(
       // Lock order is shared by close, withdrawals and collection.
       await lock(tx, `cash:${actor.id}`);
       await lock(tx, `invoice:${d.invoiceId}`);
+      await lock(tx, "payment-methods");
       const existing = await tx.payment.findMany({
         where: { idempotencyKey: { startsWith: `${d.idempotencyKey}:` } },
         orderBy: { idempotencyKey: "asc" },
@@ -265,7 +268,9 @@ export async function receptionAction(
               p.invoiceId !== d.invoiceId ||
               p.createdById !== actor.id ||
               p.amount !== d.allocations[i].amount ||
-              p.method !== d.allocations[i].method ||
+              p.paymentMethodId !==
+                (d.allocations[i].paymentMethodId ||
+                  defaultMethodIds[d.allocations[i].method || ""]) ||
               p.reference !== d.allocations[i].reference,
           )
         )
@@ -287,14 +292,32 @@ export async function receptionAction(
         );
       const results = [];
       for (const [i, a] of d.allocations.entries()) {
+        const option = await tx.paymentMethodOption.findUnique({
+          where: {
+            id:
+              a.paymentMethodId ||
+              defaultMethodIds[a.method || ""] ||
+              "missing",
+          },
+        });
+        if (!option?.enabled || (a.method && option.kind !== a.method))
+          throw new ApiError(
+            409,
+            "Төлбөрийн хэлбэр идэвхгүй болсон байна. Шинэчилж сонгоно уу.",
+          );
+        if (option.referenceRequired && a.reference.length < 3)
+          throw new ApiError(
+            400,
+            `${option.name}: гүйлгээний дугаар оруулна уу.`,
+          );
         // External settlements are manually reconciled using a bank/terminal reference.
         // No gateway is called and no gateway success is fabricated.
-        if (a.method !== "CASH") {
-          await lock(tx, `settlement:${a.method}:${a.reference}`);
+        if (option.kind !== "CASH" && a.reference) {
+          await lock(tx, `settlement:${option.kind}:${a.reference}`);
           if (
             await tx.payment.findFirst({
               where: {
-                method: a.method,
+                method: option.kind,
                 reference: a.reference,
                 voidedAt: null,
               },
@@ -311,12 +334,18 @@ export async function receptionAction(
             appointmentId: invoice.appointmentId,
             invoiceId: invoice.id,
             cashSessionId: session.id,
-            ...a,
+            amount: a.amount,
+            reference: a.reference,
+            method: option.kind,
+            paymentMethodId: option.id,
+            methodName: option.name,
+            cashierName: actor.name,
+            receiptBalance: invoiceBalance(invoice).balance - d.amount,
             date: today(),
             createdById: actor.id,
             idempotencyKey: `${d.idempotencyKey}:${i}`,
             note:
-              a.method === "CASH"
+              option.kind === "CASH"
                 ? "Reception collection"
                 : "Manually reconciled external settlement",
           },
@@ -472,6 +501,59 @@ export async function receptionData(
     .max(10000)
     .parse(q.get("page") || 1);
   const search = (q.get("q") || "").trim().slice(0, 100);
+  if (resource === "transaction-methods") {
+    // History filters include disabled methods; collection still accepts enabled methods only.
+    return {
+      items: await db.paymentMethodOption.findMany({
+        orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+      }),
+    };
+  }
+  if (resource === "receipt") {
+    const payment = await db.payment.findUniqueOrThrow({
+      where: { id: z.string().uuid().parse(q.get("id")) },
+      include: {
+        patient: { select: { name: true, phone: true } },
+        invoice: { include: { payments: true } },
+      },
+    });
+    const group = payment.idempotencyKey.match(/^([0-9a-f-]{36}):\d+$/i)?.[1];
+    const payments = group
+      ? await db.payment.findMany({
+          where: {
+            invoiceId: payment.invoiceId,
+            idempotencyKey: { startsWith: `${group}:` },
+          },
+          orderBy: { idempotencyKey: "asc" },
+        })
+      : [payment];
+    const cashier = await db.user.findUnique({
+      where: { id: payment.createdById },
+      select: { name: true },
+    });
+    return {
+      number: `BB-R-${group || payment.id}`,
+      createdAt: payment.createdAt,
+      patient: payment.patient,
+      invoiceNumber: payment.invoice?.number || "Өмнөх бүртгэл",
+      invoiceTotal: payment.invoice?.total || 0,
+      cashier: payment.cashierName || cashier?.name || payment.createdById,
+      payments: payments.map((p) => ({
+        id: p.id,
+        amount: p.amount,
+        methodName: p.methodName || methodNames[p.method],
+        reference: p.reference,
+        voidedAt: p.voidedAt,
+      })),
+      total: payments
+        .filter((p) => !p.voidedAt)
+        .reduce((sum, p) => sum + p.amount, 0),
+      balanceAtPayment: payment.receiptBalance !== null,
+      balance:
+        payment.receiptBalance ??
+        (payment.invoice ? invoiceBalance(payment.invoice).balance : 0),
+    };
+  }
   if (resource === "invoices" || resource === "receivables") {
     const invoices = await db.invoice.findMany({
       where: {
@@ -550,7 +632,9 @@ export async function receptionData(
       where: { date },
       include: {
         patient: { select: { id: true, name: true, phone: true } },
-        appointment: { select: { startTime: true } },
+        appointment: {
+          select: { startTime: true, service: { select: { name: true } } },
+        },
       },
       orderBy: { number: "asc" },
     });
@@ -582,8 +666,23 @@ export async function receptionData(
     };
   }
   if (resource === "transactions") {
+    let methodFilter: Prisma.PaymentWhereInput = {};
+    if (q.get("paymentMethodId")) {
+      const id = z.string().uuid().parse(q.get("paymentMethodId"));
+      const option = await db.paymentMethodOption.findUnique({ where: { id } });
+      methodFilter =
+        option && defaultMethodIds[option.kind] === id
+          ? {
+              OR: [
+                { paymentMethodId: id },
+                { paymentMethodId: null, method: option.kind },
+              ],
+            }
+          : { paymentMethodId: id };
+    }
     const where: Prisma.PaymentWhereInput = {
       date: { gte: from, lte: to },
+      AND: [methodFilter],
       ...(q.get("method")
         ? {
             method: z
@@ -628,7 +727,9 @@ export async function receptionData(
       items: items.map((p) => ({
         ...p,
         receptionist:
-          users.find((u) => u.id === p.createdById)?.name || p.createdById,
+          p.cashierName ||
+          users.find((u) => u.id === p.createdById)?.name ||
+          p.createdById,
       })),
       total: await db.payment.count({ where }),
     };
@@ -694,7 +795,62 @@ export async function receptionData(
       take: 200,
     });
     const collected = payments.filter((p) => !p.voidedAt);
+    const methodBreakdown = Object.entries(
+      collected.reduce<Record<string, number>>((totals, p) => {
+        const name = p.methodName || methodNames[p.method];
+        totals[name] = (totals[name] || 0) + p.amount;
+        return totals;
+      }, {}),
+    ).map(([name, amount]) => ({ name, amount }));
+    let doctorStatus: {
+      id: string;
+      name: string;
+      status: string;
+      hours: string;
+      nextTime: string | null;
+    }[] = [];
+    if (resource === "dashboard") {
+      const doctors = await db.doctor.findMany({
+        where: { active: true },
+        include: {
+          schedules: {
+            where: { weekday: new Date(`${date}T12:00Z`).getUTCDay() },
+          },
+          leaves: { where: { date, status: "APPROVED" } },
+        },
+        orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      });
+      const clock = nowTime();
+      doctorStatus = doctors.map((d) => {
+        const intervals = workIntervals(d.schedules[0], d.leaves);
+        const current = queue.find(
+          (e) => e.doctorId === d.id && e.status === "IN_PROGRESS",
+        );
+        return {
+          id: d.id,
+          name: d.name,
+          hours: intervals.length
+            ? intervals.map((h) => `${h.startTime}–${h.endTime}`).join(", ")
+            : "Ажиллах хуваарьгүй",
+          status: current
+            ? "Эмчлүүлж буй өвчтөнтэй"
+            : !intervals.some((h) => h.startTime <= clock && h.endTime > clock)
+              ? "Ажлын цаггүй"
+              : "Ажлын цагт",
+          nextTime:
+            appointments.find(
+              (a) =>
+                a.doctorId === d.id &&
+                a.date === date &&
+                a.startTime >= clock &&
+                ["PENDING", "CONFIRMED"].includes(a.status),
+            )?.startTime || null,
+        };
+      });
+    }
     return {
+      doctorStatus,
+      methodBreakdown,
       appointments: appointments.map((a) => ({
         ...a,
         paymentStatus: a.invoices.length
@@ -808,6 +964,21 @@ export async function receptionData(
       select: { id: true, date: true, startTime: true, createdAt: true },
       take: 50,
     });
+    const upcoming = await db.appointment.findMany({
+      where: {
+        date: today(),
+        startTime: { gte: nowTime() },
+        status: { in: ["PENDING", "CONFIRMED"] },
+      },
+      select: {
+        id: true,
+        startTime: true,
+        createdAt: true,
+        patient: { select: { name: true } },
+      },
+      orderBy: { startTime: "asc" },
+      take: 20,
+    });
     const balances = await db.invoice.findMany({
       where: { status: "FINALIZED", dueDate: { lte: today() } },
       include: { payments: true },
@@ -820,6 +991,7 @@ export async function receptionData(
       events,
       pending,
       followUps,
+      upcoming,
       outstanding: balances
         .filter((i) => invoiceBalance(i).balance > 0)
         .map((i) => ({
