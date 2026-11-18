@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import HomeCatalog from "./home-catalog";
 import Link from "next/link";
 import Hero from "./home/Hero";
 import { ClinicLogo } from "./clinic-branding";
+import { api } from "../erp/ui";
 
 function Icon({ name }: { name: "phone" | "pin" }) {
   return (
@@ -48,9 +49,35 @@ function Brand({ name = "BB Dental Clinic" }: { name?: string }) {
 }
 export default function HomePage() {
   const [clinic, setClinic] = useState<Record<string, string>>({});
-  const contactPhone = clinic.phone || "9596-3531";
+  const contactPhone = clinic.phone ?? "9596-3531";
+  const contactEmail = clinic.email ?? "sodoosodbileg71@gmail.com";
   const tel = `tel:+976${contactPhone.replace(/\D/g, "").replace(/^976/, "")}`;
   const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => {
+    let request: AbortController | undefined;
+    async function refreshClinic() {
+      request?.abort();
+      const controller = new AbortController();
+      request = controller;
+      try {
+        const { clinic } = await api<{ clinic: Record<string, string> }>(
+          "/api/public/clinic",
+          "GET",
+          undefined,
+          controller.signal,
+        );
+        if (clinic && !controller.signal.aborted) setClinic(clinic);
+      } catch {
+        // Keep the currently displayed settings during a connection failure.
+      }
+    }
+    void refreshClinic();
+    window.addEventListener("focus", refreshClinic);
+    return () => {
+      request?.abort();
+      window.removeEventListener("focus", refreshClinic);
+    };
+  }, []);
   return (
     <div className="public-home">
       <header className="site-header">
@@ -90,10 +117,12 @@ export default function HomePage() {
             <a className="staff-access" href="/login">
               Ажилтны нэвтрэх
             </a>
-            <a href={tel} className="phone-link">
-              <Icon name="phone" />
-              <span>+976 {contactPhone}</span>
-            </a>
+            {contactPhone && (
+              <a href={tel} className="phone-link">
+                <Icon name="phone" />
+                <span>+976 {contactPhone}</span>
+              </a>
+            )}
             <Link href="/booking" className="button header-book">
               Цаг авах
             </Link>
@@ -102,7 +131,7 @@ export default function HomePage() {
       </header>
       <main>
         <Hero clinicName={clinic.clinicName} />
-        <HomeCatalog onClinic={setClinic} />
+        <HomeCatalog />
       </main>
       <footer className="site-footer" id="contact">
         <div className="footer-inner">
@@ -110,42 +139,47 @@ export default function HomePage() {
             <div className="footer-about">
               <Brand name={clinic.clinicName} />
               <p>
-                {clinic.footerDescription ||
+                {clinic.footerDescription ??
                   "Танд болон таны гэр бүлд чанартай, сэтгэл ханамжтай шүдний тусламж үйлчилгээг үзүүлэхэд бид бэлэн байна."}
               </p>
             </div>
             <div>
-              <h2>{clinic.footerHoursTitle || "Цагийн хуваарь"}</h2>
+              <h2>{clinic.footerHoursTitle ?? "Цагийн хуваарь"}</h2>
               <p>
-                {clinic.hours ||
+                {clinic.hours ??
                   "Даваа - Баасан: 09:00 - 19:00 | Бямба - Ням: 10:00 - 18:00"}
               </p>
             </div>
             <div className="footer-contact">
-              <h2>{clinic.footerContactTitle || "Холбоо барих"}</h2>
-              <a href={tel}>
-                <Icon name="phone" />
-                +976 {contactPhone}
-              </a>
-              <a
-                className="email"
-                href={`mailto:${clinic.email || "sodoosodbileg71@gmail.com"}`}
-              >
-                {clinic.email || "sodoosodbileg71@gmail.com"}
-              </a>
-              <p className="address">
-                <Icon name="pin" />
-                <span>
-                  {clinic.address ||
-                    "БГД, 12-р хороо, 3, 4-р хороолол, Бичлийн аркны автобусны буудал дээр, Азифармтай эмийн сангийн 3 давхарт, BB Dental Clinic"}
-                </span>
-              </p>
+              <h2>{clinic.footerContactTitle ?? "Холбоо барих"}</h2>
+              {contactPhone && (
+                <a href={tel}>
+                  <Icon name="phone" />
+                  +976 {contactPhone}
+                </a>
+              )}
+              {contactEmail && (
+                <a className="email" href={`mailto:${contactEmail}`}>
+                  {contactEmail}
+                </a>
+              )}
+              {clinic.address !== "" && (
+                <p className="address">
+                  <Icon name="pin" />
+                  <span>
+                    {clinic.address ??
+                      "БГД, 12-р хороо, 3, 4-р хороолол, Бичлийн аркны автобусны буудал дээр, Азифармтай эмийн сангийн 3 давхарт, BB Dental Clinic"}
+                  </span>
+                </p>
+              )}
             </div>
             <div>
-              <h2>{clinic.footerBookingTitle || "Онлайн цаг захиалга"}</h2>
-              <Link className="button footer-book" href="/booking">
-                {clinic.footerBookingLabel || "Одоо цаг авах"}
-              </Link>
+              <h2>{clinic.footerBookingTitle ?? "Онлайн цаг захиалга"}</h2>
+              {clinic.footerBookingLabel !== "" && (
+                <Link className="button footer-book" href="/booking">
+                  {clinic.footerBookingLabel ?? "Одоо цаг авах"}
+                </Link>
+              )}
             </div>
           </div>
           {(clinic.facebookUrl || clinic.instagramUrl) && (
@@ -163,7 +197,7 @@ export default function HomePage() {
             </div>
           )}
           <div className="copyright">
-            {clinic.copyrightText ||
+            {clinic.copyrightText ??
               "© 2026 BB Dental Clinic. Бүх эрх хуулиар хамгаалагдсан."}
           </div>
         </div>

@@ -74,6 +74,13 @@ try {
       await route.fulfill({ status: 200, json });
     });
     await page.goto(base);
+    const catalog = page.getByRole("region", {
+      name: "Үйлчилгээ",
+      exact: true,
+    });
+    await expect(
+      catalog.locator(".service-browser-item").first(),
+    ).toContainText("35,000 ₮");
     await expect(page.locator(".service-browser-item")).toHaveCount(pageSize);
     await expect(page.locator("#booking")).toHaveCount(0);
     await expect(page.locator(".header-book")).toHaveAttribute(

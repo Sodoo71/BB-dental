@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
 import { ErpShell } from "./shell";
+import "./doctor-home.css";
 async function Protected({ children }: { children: React.ReactNode }) {
   const user = await currentUser();
   if (!user) redirect("/login");

@@ -44,6 +44,7 @@ import Employees from "./employees";
 import Profile from "./profile";
 import BrandLoader from "../components/brand-loader";
 import RoleHome from "./role-home";
+import DoctorHome from "./doctor-home";
 import RosterCalendar from "./roster-calendar";
 import { patientAge } from "@/lib/patient-demographics";
 import ScheduleForm from "./schedule-form";
@@ -66,6 +67,7 @@ import {
   roleNames,
   statusNames,
   today,
+  dateSchema,
   clinicTimestamp,
 } from "@/lib/domain";
 
@@ -426,6 +428,7 @@ function WorkspaceSection({ module }: { module: string }) {
   if (!canVisitSection(user.role, module))
     return <Feedback>Энэ хэсэгт хандах эрхгүй байна.</Feedback>;
   if (user.role === "RECEPTION") return <Suspense fallback={<BrandLoader />}><ReceptionWorkspace module={module} /></Suspense>;
+  if (user.role === "DOCTOR" && module === "dashboard") return <DoctorHome />;
   if (module === "profile") return <Profile />;
   if (module === "users") return <Employees />;
   if (module === "settings") return <SettingsPanel />;
@@ -439,8 +442,10 @@ function WorkspaceSection({ module }: { module: string }) {
 }
 function StandardWorkspace({ module }: { module: string }) {
   const query = useSearchParams();
+  const target =
+    module === "calendar" ? query.get("date") : module === "patients" ? query.get("patient") : null;
   return (
-    <WorkspaceData key={`${module}:${query.get("q") || ""}`} module={module} />
+    <WorkspaceData key={`${module}:${query.get("q") || ""}:${target || ""}`} module={module} />
   );
 }
 function WorkspaceData({ module }: { module: string }) {
@@ -453,7 +458,9 @@ function WorkspaceData({ module }: { module: string }) {
   const [year, setYear] = useState(today().slice(0, 4));
   const [month, setMonth] = useState(today().slice(5, 7));
   const [page, setPage] = useState(1);
-  const [calendarDate, setCalendarDate] = useState(today());
+  const [calendarDate, setCalendarDate] = useState(
+    () => dateSchema.safeParse(urlParams.get("date")).data ?? today(),
+  );
   const [calendarMode, setCalendarMode] = useState("day");
   const [status, setStatus] = useState("");
   const [reportService, setReportService] = useState("");
@@ -485,7 +492,10 @@ function WorkspaceData({ module }: { module: string }) {
     item: Entity;
     kind: "delete" | "void";
   } | null>(null);
-  const [patientId, setPatientId] = useState<string | null>(null);
+  const [patientId, setPatientId] = useState<string | null>(() => {
+    const id = urlParams.get("patient");
+    return module === "patients" && id && /^[0-9a-f-]{36}$/i.test(id) ? id : null;
+  });
   const {
     data: patient,
     error: patientError,

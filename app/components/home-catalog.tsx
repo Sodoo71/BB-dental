@@ -1,38 +1,34 @@
 "use client";
-import { useEffect } from "react";
 import Link from "next/link";
 import { ArrowRight, Stethoscope } from "lucide-react";
 import { Feedback, useResource, type Entity } from "../erp/ui";
 import ServiceBrowser from "./service-browser";
 
-export default function HomeCatalog({
-  onClinic,
-}: {
-  onClinic: (clinic: Record<string, string>) => void;
-}) {
+export default function HomeCatalog() {
   const { data, error, loading, retry } = useResource<{
     services: Entity[];
     doctors: Entity[];
-    clinic?: Record<string, string>;
   }>("/api/public/catalog");
   const catalog = data || { services: [], doctors: [] };
-  useEffect(() => {
-    if (data?.clinic) onClinic(data.clinic);
-  }, [data, onClinic]);
   return (
     <>
-      {error && <Feedback retry={retry}>{error}</Feedback>}
-      <section className="public-services" id="services">
-        <div className="section-heading">
-          <p className="eyebrow">МАНАЙ ҮЙЛЧИЛГЭЭ</p>
-          <h2>Танд тохирох үйлчилгээг олоорой</h2>
-          <p>Нэр эсвэл ангиллаар хайж, үйлчилгээгээ сонгоод цагаа аваарай.</p>
-        </div>
-        <ServiceBrowser services={catalog.services} loading={loading} />
-        <div className="home-booking-link">
-          <Link href="/booking" className="button">
-            Цаг захиалах <ArrowRight size={16} />
-          </Link>
+      <section
+        className="public-services"
+        id="services"
+        aria-labelledby="services-heading"
+      >
+        <div className="home-service-catalog">
+          <div className="home-service-header" id="prices">
+            <h2 id="services-heading">Үйлчилгээ</h2>
+            <Link href="/booking" className="button">
+              Цаг захиалах <ArrowRight size={16} />
+            </Link>
+          </div>
+          {error ? (
+            <Feedback retry={retry}>Үйлчилгээг ачаалж чадсангүй.</Feedback>
+          ) : (
+            <ServiceBrowser services={catalog.services} loading={loading} />
+          )}
         </div>
       </section>
       <section className="public-doctors" id="doctors">

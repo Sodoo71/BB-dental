@@ -214,6 +214,8 @@ export function ErpShell({
   const pathname = usePathname();
   const router = useRouter();
   const active = pathname.split("/")[2] || "dashboard";
+  const doctorWorkspace = user.role === "DOCTOR";
+  const searchPatients = user.role !== "ADMIN";
   const roleNavigation = user.role === "RECEPTION" ? receptionNavigation : navigation;
   const activeTitle = roleNavigation
     .flatMap((g) => g.items)
@@ -284,7 +286,7 @@ export function ErpShell({
   }, [drawerOpen]);
   return (
     <UserContext.Provider value={user}>
-      <div className={`erp-shell${collapsed ? " sidebar-collapsed" : ""}`}>
+      <div className={`erp-shell${doctorWorkspace ? " erp-shell-doctor" : ""}${collapsed ? " sidebar-collapsed" : ""}`}>
         <a href="#erp-main-content" className="skip-link" inert={drawerOpen}>
           Үндсэн агуулга руу очих
         </a>
@@ -380,6 +382,7 @@ export function ErpShell({
               ) : (
                 <PanelLeftClose size={19} />
               )}
+              {doctorWorkspace && <span className="doctor-action-label">{collapsed ? "Цэс дэлгэх" : "Цэс хураах"}</span>}
             </button>
             <button
               className="erp-mobile-menu"
@@ -390,6 +393,7 @@ export function ErpShell({
               onClick={() => setOpen(!open)}
             >
               {open ? <X /> : <Menu />}
+              {doctorWorkspace && <span className="doctor-action-label">{drawerOpen ? "Цэс хаах" : "Цэс нээх"}</span>}
             </button>
             <div className="erp-breadcrumb">
               Ажлын орчин <ChevronRight size={14} />
@@ -405,13 +409,13 @@ export function ErpShell({
               className="erp-global-search"
               onSubmit={(e) => {
                 e.preventDefault();
-                router.push(`/erp/${user.role === "RECEPTION" ? "patients" : "services"}?q=${encodeURIComponent(search)}`);
+                router.push(`/erp/${searchPatients ? "patients" : "services"}?q=${encodeURIComponent(search)}`);
               }}
             >
               <Search size={18} />
               <input
-                aria-label={user.role === "RECEPTION" ? "Өвчтөн хайх" : "Үйлчилгээ хайх"}
-                placeholder={user.role === "RECEPTION" ? "Өвчтөн хайх…" : "Үйлчилгээ хайх…"}
+                aria-label={searchPatients ? "Өвчтөн хайх" : "Үйлчилгээ хайх"}
+                placeholder={searchPatients ? "Өвчтөн хайх…" : "Үйлчилгээ хайх…"}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -420,12 +424,17 @@ export function ErpShell({
             <div className="erp-user">
               {user.role !== "RECEPTION" ? (
                 <Link
-                  className="user-avatar profile-link"
+                  className={doctorWorkspace ? "doctor-profile-action profile-link" : "user-avatar profile-link"}
                   href="/erp/profile"
                   aria-label="Миний профайл засах"
                   title="Миний профайл"
                 >
-                  <UserAvatar imageUrl={user.imageUrl} name={user.name} />
+                  {doctorWorkspace ? (
+                    <>
+                      <span className="user-avatar"><UserAvatar imageUrl={user.imageUrl} name={user.name} /></span>
+                      <span className="doctor-action-label">Профайл</span>
+                    </>
+                  ) : <UserAvatar imageUrl={user.imageUrl} name={user.name} />}
                 </Link>
               ) : (
                 <span className="user-avatar">{user.name.slice(0, 1)}</span>
@@ -444,6 +453,7 @@ export function ErpShell({
                 }}
               >
                 <LogOut size={18} />
+                {doctorWorkspace && <span className="doctor-action-label">Гарах</span>}
               </button>
             </div>
           </header>

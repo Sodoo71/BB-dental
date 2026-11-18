@@ -130,14 +130,14 @@ export default function ServiceBrowser({
                 <span className="service-browser-info">
                   <small>{s.category || "Бусад"}</small>
                   <strong>{s.name}</strong>
+                  <span className="service-browser-price">
+                    {money(s.price ?? 0)}
+                  </span>
                   {s.description && (
                     <span className="service-browser-description">
                       {s.description}
                     </span>
                   )}
-                  <span className="service-browser-price">
-                    {money(s.price || 0)}
-                  </span>
                 </span>
               </span>
               <ArrowRight size={18} aria-hidden="true" />

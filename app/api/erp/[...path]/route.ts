@@ -45,6 +45,7 @@ import {
   timeSchema,
   periodRange,
   today,
+  nowTime,
   clock,
   minutes,
 } from "@/lib/domain";
@@ -308,6 +309,41 @@ export async function GET(req: Request, ctx: Ctx) {
       });
     if (resource === "dashboard") {
       if (user.role === "ADMIN") return json(await reportData(q));
+      if (user.role === "DOCTOR" && q.get("view") === "doctor-home") {
+        const doctorId = user.doctor?.id || "none";
+        const day = today();
+        const [visits, upcoming] = await Promise.all([
+          db.appointment.findMany({
+            where: { doctorId, date: day, status: { notIn: ["CANCELLED", "NO_SHOW"] } },
+            select: { patientId: true },
+          }),
+          db.appointment.findMany({
+            where: {
+              doctorId,
+              status: { in: ["PENDING", "CONFIRMED"] },
+              OR: [{ date: { gt: day } }, { date: day, startTime: { gte: nowTime() } }],
+            },
+            select: {
+              id: true, date: true, startTime: true,
+              patient: { select: { name: true } },
+              service: { select: { name: true } },
+            },
+            orderBy: [{ date: "asc" }, { startTime: "asc" }, { id: "asc" }],
+            take: 3,
+          }),
+        ]);
+        const patients = [...new Set(visits.map((visit) => visit.patientId))];
+        const returning = patients.length ? await db.appointment.groupBy({
+          by: ["patientId"],
+          where: { doctorId, patientId: { in: patients }, date: { lt: day }, status: "COMPLETED" },
+        }) : [];
+        return json({
+          appointmentCount: visits.length,
+          newPatients: patients.length - returning.length,
+          returningPatients: returning.length,
+          upcoming,
+        });
+      }
       const appointments = await db.appointment.findMany({
         where: {
           date,

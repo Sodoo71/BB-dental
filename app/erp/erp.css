@@ -4192,12 +4192,14 @@ html .login-form .erp-primary {
   .erp-shell.sidebar-collapsed
     :is(
       .erp-brand > span,
-      .nav-label,
       .nav-group > p,
       .nav-active-dot,
       .sidebar-user > span:last-child,
       .sidebar-bottom > a
     ) {
+    display: none;
+  }
+  .erp-shell.sidebar-collapsed:not(.erp-shell-doctor) .nav-label {
     display: none;
   }
   .erp-shell.sidebar-collapsed .nav-group a {

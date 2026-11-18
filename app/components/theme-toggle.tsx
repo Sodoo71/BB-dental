@@ -57,6 +57,9 @@ export default function ThemeToggle() {
           }}
         >
           <Icon size={17} />
+          <span className="theme-action-label" aria-hidden="true">
+            {label}
+          </span>
         </button>
       ))}
     </div>

@@ -1707,14 +1707,60 @@ test("role workspaces show focused actions and public suggested times complete t
     });
     const staffPage = await context.newPage();
     await staffPage.goto(`${origin}/erp`);
-    await expect(staffPage.locator(".role-actions")).toContainText(
-      role === "DOCTOR" ? "Миний үзлэг" : "Касс, төлбөр",
-    );
+    if (role === "DOCTOR") {
+      await expect(
+        staffPage.getByRole("heading", { name: "Өнөөдрийн үзлэг" }),
+      ).toBeVisible();
+      await expect(
+        staffPage.getByRole("heading", { name: "Миний хуваарь" }),
+      ).toBeVisible();
+      for (const action of ["Шинэчлэх", "Өмнөх сар", "Дараах сар"]) {
+        const button = staffPage.getByRole("button", {
+          name: action,
+          exact: true,
+        });
+        await expect(button.getByText(action, { exact: true })).toBeVisible();
+        await expect
+          .poll(() =>
+            button.evaluate((control) => {
+              const label = control
+                .querySelector("span")
+                ?.getBoundingClientRect();
+              const icon = control
+                .querySelector("svg")
+                ?.getBoundingClientRect();
+              const frame = control.getBoundingClientRect();
+              return Boolean(
+                label &&
+                icon &&
+                label.left >= frame.left &&
+                label.right <= frame.right &&
+                label.bottom <= frame.bottom &&
+                label.top >= icon.bottom,
+              );
+            }),
+          )
+          .toBe(true);
+      }
+    } else {
+      await expect(staffPage.locator(".role-actions")).toContainText(
+        "Касс, төлбөр",
+      );
+    }
     await staffPage
       .getByRole("button", { name: "Бараан горим", exact: true })
       .click();
-    await expect(staffPage.locator(".metric-grid")).toBeVisible();
-    await expect(staffPage.locator(".role-actions")).toBeVisible();
+    if (role === "DOCTOR") {
+      await expect(
+        staffPage.getByRole("heading", { name: "Өвчтөний жагсаалт" }),
+      ).toBeVisible();
+      await expect(
+        staffPage.getByRole("heading", { name: "Эмчийн тэмдэглэл" }),
+      ).toBeVisible();
+    } else {
+      await expect(staffPage.locator(".metric-grid")).toBeVisible();
+      await expect(staffPage.locator(".role-actions")).toBeVisible();
+    }
     await staffPage.screenshot({
       path: `test-results/${role.toLowerCase()}-workspace-dark.png`,
       fullPage: true,

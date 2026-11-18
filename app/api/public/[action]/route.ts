@@ -28,6 +28,15 @@ import {
   sameOrigin,
 } from "@/lib/http";
 type Ctx = { params: Promise<{ action: string }> };
+
+async function readPublicClinicSettings() {
+  const settings = await db.setting.findMany({
+    where: { key: { in: [...publicSettingKeys] } },
+    select: { key: true, value: true },
+  });
+  return Object.fromEntries(settings.map(({ key, value }) => [key, value]));
+}
+
 export async function GET(req: Request, ctx: Ctx) {
   return safe(async () => {
     await connection();
@@ -67,19 +76,11 @@ export async function GET(req: Request, ctx: Ctx) {
         ),
       });
     }
+    if (action === "clinic")
+      return json({ clinic: await readPublicClinicSettings() });
     if (action === "catalog")
       return json({
-        clinic: Object.fromEntries(
-          (
-            await db.setting.findMany({
-              where: {
-                key: {
-                  in: [...publicSettingKeys],
-                },
-              },
-            })
-          ).map((s) => [s.key, s.value]),
-        ),
+        clinic: await readPublicClinicSettings(),
         services: await db.service.findMany({
           where: { active: true },
           select: {

@@ -14,6 +14,7 @@
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
+    "db:import-services": "prisma db execute --file prisma/import-services.sql",
     "db:seed": "prisma db seed",
     "test": "tsx --test tests/*.test.ts",
     "test:e2e": "playwright test",
